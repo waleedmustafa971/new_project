@@ -1,0 +1,81 @@
+buildscript {
+    ext {
+        buildToolsVersion = "35.0.0"
+      //  minSdkVersion = 24
+      //  minSdkVersion = 26
+        compileSdkVersion = 35
+        targetSdkVersion = 35
+       // ndkVersion = "27.1.12297006"
+        ndkVersion = "27.1.12297006"
+       // minSdkVersion = 24
+        kotlinVersion = "2.0.21"
+        // "full" includes all filters like drawtext for your text overlays
+        ffmpegKitPackage = "full"
+        //kotlin_version = "1.9.20" // this added for react-native-audio-recorder-player
+    
+     //   ndkVersion = "27.1.12297006"
+        cmakeVersion = "3.30.3"
+        
+        // Add this line for Skia/Video compatibility
+        minSdkVersion = 26 // Skia Video requires API 26+
+    
+    }
+   // RESTORE THIS: Gradle needs this to find the plugins mentioned in the error!
+    repositories {
+        google()
+        mavenCentral()
+       
+    }
+    
+    dependencies {
+        classpath 'com.google.gms:google-services:4.3.15' //firebase notfication
+      //  classpath("com.android.tools.build:gradle")
+        classpath("com.android.tools.build:gradle:8.1.0")
+        classpath("com.facebook.react:react-native-gradle-plugin")
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin") 
+       // implementation "ly.img:camera:1.72.0"      
+    }
+}
+apply plugin: "com.facebook.react.rootproject"
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+         maven {
+            name "IMG.LY Artifactory"
+            url "https://artifactory.img.ly/artifactory/maven"
+            mavenContent {
+                includeGroup("ly.img")
+            }
+        }
+       
+    }
+}
+
+// Add this at the VERY BOTTOM of the file
+// Put this at the VERY BOTTOM of your android/build.gradle
+// This uses the "Resolution Strategy" which works before evaluation is finished.
+// DELETE your old subprojects { ... } block.
+// REPLACE it with this one:
+/* subprojects {
+    configurations.all {
+        resolutionStrategy {
+            force "com.android.ndk:27.1.12297006"
+        }
+    }
+    tasks.withType(com.android.build.gradle.tasks.ExternalNativeBuildTask).configureEach { task ->
+        if (task.name.contains("CMake")) {
+            task.doFirst {
+                println "Forcing CMake version for ${project.name}"
+            }
+        }
+    }
+} */
+// DELETE the old subprojects { afterEvaluate { ... } } block entirely.
+// REPLACE it with this:
+// DELETE everything inside subprojects and leave it like this:
+subprojects {
+    // We are letting the individual libraries handle their own tasks
+    // to avoid the "Could not create task" conflict.
+}

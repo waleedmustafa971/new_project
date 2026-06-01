@@ -1,0 +1,384 @@
+import React, { useEffect, useState } from 'react';
+import {
+    View,
+    Text,
+    Modal,
+    TextInput,
+    TouchableOpacity,
+    StyleSheet,
+    Dimensions,
+    Alert,
+} from 'react-native';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import Toast from 'react-native-toast-message';
+const { width, height } = Dimensions.get('window');
+import * as base from '../../../component/global'
+import axios from 'axios';
+
+// Import components related to obtaining Android device permissions
+import { PermissionsAndroid, Platform } from 'react-native';
+// Import Agora SDK
+import {
+    createAgoraRtcEngine,
+    ChannelProfileType,
+    ClientRoleType,
+    IRtcEngine,
+    RtcSurfaceView,
+    RtcConnection,
+    IRtcEngineEventHandler,
+    VideoSourceType,
+} from 'react-native-agora';
+// Define basic information
+const appId = '141ea750fc7847129f58316d5c4f6b79';
+const token = '<-- Insert Token -->';
+const channelName = '<-- Insert Channel Name -->';
+const localUid = 0; // Local user Uid, no need to modify
+
+//import RtcEngine, { ChannelProfile, ClientRole } from "react-native-agora";
+
+const CreateLiveModal = ({ visible, onClose, onCreate }) => {
+    const [title, setTitle] = useState('');
+    const [location, setLocation] = useState('');
+    const [coins, setCoins] = useState('');
+    const [thumbnail, setThumbnail] = useState('');
+    const [hostlist, setHostlive] = useState([])
+
+
+    useEffect(() => {
+        checkUser()
+    }, [])
+
+    const checkUser = async () => {
+        const jsonValue = await AsyncStorage.getItem("userdata");
+        if (jsonValue != null) {
+            const userData = JSON.parse(jsonValue);
+            //  console.log("user id....." + userData._id);
+            //  setUserid(userData._id);
+            //  setUserinfo(userData);
+            setHostlive(userData)
+        }
+    }
+
+    const handleCreate = async () => {
+        if (!title || !location || !coins) {
+            //  Alert.alert('Error', 'Please fill all required fields');
+            Toast.error("Insert the Required FIelds");
+            return;
+        }
+
+        try {
+            // Prepare API request body
+            const payload = {
+                hostId: hostlist._id,
+                hostName: hostlist.name,
+                hostAvatar: hostlist.image,
+                streamUrl: '', // Add your MUX or streaming URL here if generated
+                thumbnail: thumbnail || 'https://example.com/default-thumbnail.jpg',
+                title,
+                location,
+                coins: Number(coins)
+            };
+
+            // Make POST request to Node.js API
+            const response = await axios.post(base.BASE_URL + '/apis/live/create-stream', payload);
+            console.log(response.data)
+            if (response.data.message == "Live stream created successfully") {
+                Toast.show({
+                    type: 'success', // 'success' | 'error' | 'info'
+                    text1: 'Created !',
+                    text2: 'Live stream created successfully',
+                });
+                //      onCreate(response.data.data);
+                // Clear fields and close modal
+                setTitle('');
+                setLocation('');
+                setCoins('');
+                setThumbnail('');
+                onClose();
+            } else {
+                Alert.alert('Error', 'Something went wrong');
+            }
+        } catch (error) {
+            console.error('Error creating live stream:', error);
+            Alert.alert('Error', 'Failed to create live stream' + error);
+        }
+    };
+
+
+    return (
+        <Modal visible={visible} animationType="slide" transparent>
+            <View style={styles.modalBackground}>
+                <View style={styles.modalContainer}>
+                    <Text style={styles.modalTitle}>Create Live Stream</Text>
+
+                    <TextInput
+                        placeholder="Title"
+                        value={title}
+                        onChangeText={setTitle}
+                        style={styles.input}
+                    />
+                    <TextInput
+                        placeholder="Location"
+                        value={location}
+                        onChangeText={setLocation}
+                        style={styles.input}
+                    />
+                    <TextInput
+                        placeholder="Coins"
+                        value={coins}
+                        onChangeText={setCoins}
+                        keyboardType="numeric"
+                        style={styles.input}
+                    />
+                    <TextInput
+                        placeholder="Thumbnail URL (optional)"
+                        value={thumbnail}
+                        onChangeText={setThumbnail}
+                        style={styles.input}
+                    />
+
+                    <View style={styles.buttonRow}>
+                        <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
+                            <Text style={styles.buttonText}>Cancel</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.createButton} onPress={handleCreate}>
+                            <Text style={styles.buttonText}>Create</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </View>
+        </Modal>
+    );
+};
+
+// Example of how to use this modal inside a parent component:
+const CreateStream = () => {
+    const [modalVisible, setModalVisible] = useState(false);
+    const [streams, setStreams] = useState([]); // Your live stream list here
+
+
+    const agoraEngineRef = useRef<IRtcEngine>(""); // IRtcEngine instance
+    const [isJoined, setIsJoined] = useState(false); // Whether the local user has joined the channel
+    const [isHost, setIsHost] = useState(true); // User role
+    const [remoteUid, setRemoteUid] = useState(0); // Uid of the remote user
+    const [message, setMessage] = useState(''); // User prompt message
+    const eventHandler = useRef<IRtcEngineEventHandler>(""); // Implement callback functions
+
+     useEffect(() => {
+        const init = async () => {
+            await setupVideoSDKEngine();
+            setupEventHandler();
+        };
+        init();
+        return () => {
+            cleanupAgoraEngine(); // Ensure this is synchronous
+        };
+    }, []); // Empty dependency array ensures it runs only once
+
+
+     const setupEventHandler = () => {
+        eventHandler.current = {
+            onJoinChannelSuccess: () => {
+                setMessage('Successfully joined channel: ' + channelName);
+                setupLocalVideo();
+                setIsJoined(true);
+            },
+            onUserJoined: (_connection: RtcConnection, uid: number) => {
+                setMessage('Remote user ' + uid + ' joined');
+                setRemoteUid(uid);
+            },
+            onUserOffline: (_connection: RtcConnection, uid: number) => {
+                setMessage('Remote user ' + uid + ' left the channel');
+                setRemoteUid(uid);
+            },
+        };
+        agoraEngineRef.current?.registerEventHandler(eventHandler.current);
+    };
+    const setupVideoSDKEngine = async () => {
+        try {
+            if (Platform.OS === 'android') { await getPermission(); }
+            agoraEngineRef.current = createAgoraRtcEngine();
+            const agoraEngine = agoraEngineRef.current;
+            await agoraEngine.initialize({ appId: appId });
+        } catch (e) {
+            console.error(e);
+        }
+    };
+    const setupLocalVideo = () => {
+        agoraEngineRef.current?.enableVideo();
+        agoraEngineRef.current?.startPreview();
+    };
+    // Define the join method called after clicking the join channel button
+    const join = async () => {
+        if (isJoined) {
+            return;
+        }
+        try {
+            if (isHost) {
+                // Join the channel as a broadcaster
+                agoraEngineRef.current?.joinChannel(token, channelName, localUid, {
+                    // Set channel profile to live broadcast
+                    channelProfile: ChannelProfileType.ChannelProfileLiveBroadcasting,
+                    // Set user role to broadcaster
+                    clientRoleType: ClientRoleType.ClientRoleBroadcaster,
+                    // Publish audio collected by the microphone
+                    publishMicrophoneTrack: true,
+                    // Publish video collected by the camera
+                    publishCameraTrack: true,
+                    // Automatically subscribe to all audio streams
+                    autoSubscribeAudio: true,
+                    // Automatically subscribe to all video streams
+                    autoSubscribeVideo: true,
+                });
+            } else {
+                // Join the channel as an audience
+                agoraEngineRef.current?.joinChannel(token, channelName, localUid, {
+                    // Set channel profile to live broadcast
+                    channelProfile: ChannelProfileType.ChannelProfileLiveBroadcasting,
+                    // Set user role to audience
+                    clientRoleType: ClientRoleType.ClientRoleAudience,
+                    // Do not publish audio collected by the microphone
+                    publishMicrophoneTrack: false,
+                    // Do not publish video collected by the camera
+                    publishCameraTrack: false,
+                    // Automatically subscribe to all audio streams
+                    autoSubscribeAudio: true,
+                    // Automatically subscribe to all video streams
+                    autoSubscribeVideo: true,
+                    // Change the delay level of the audience to achieve ultra-fast live broadcast
+                    audienceLatencyLevel: AudienceLatencyLevelType.audienceLatencyLevelUltraLowLatency,
+                });
+            }
+        } catch (e) {
+            console.log(e);
+        }
+    };
+    // Define the leave method called after clicking the leave channel button
+    const leave = () => {
+        try {
+            // Call leaveChannel method to leave the channel
+            agoraEngineRef.current?.leaveChannel();
+            setRemoteUid(0);
+            setIsJoined(false);
+            showMessage('Left the channel');
+        } catch (e) {
+            console.log(e);
+        }
+    };
+    const cleanupAgoraEngine = () => {
+        return () => {
+            agoraEngineRef.current?.unregisterEventHandler(eventHandler.current!);
+            agoraEngineRef.current?.release();
+        };
+    };
+
+
+    const addNewStream = (newStream) => {
+        setStreams((prev) => [newStream, ...prev]);
+        Alert.alert('Success', 'Live stream created!');
+    };
+
+    return (
+        <>
+
+        </>
+      /*   <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+            <TouchableOpacity
+                style={{
+                    padding: 15,
+                    backgroundColor: '#007bff',
+                    borderRadius: 8,
+                    marginBottom: 20,
+                }}
+                onPress={() => setModalVisible(true)}
+            >
+                <Text style={{ color: '#fff', fontWeight: 'bold' }}>Create New Live Stream</Text>
+            </TouchableOpacity>
+
+            <CreateLiveModal
+                visible={modalVisible}
+                onClose={() => setModalVisible(false)}
+                onCreate={addNewStream}
+            />
+            <Toast />
+        </View> */
+    );
+};
+
+const styles = StyleSheet.create({
+    modalBackground: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        justifyContent: 'center',
+        padding: 20,
+    },
+    modalContainer: {
+        backgroundColor: '#ffffff',
+        borderRadius: 10,
+        padding: 20,
+    },
+    modalTitle: {
+        color: '#000',
+        fontSize: 20,
+        marginBottom: 20,
+        fontWeight: 'bold',
+        textAlign: 'center',
+    },
+    input: {
+        backgroundColor: '#f2f2f2',
+        color: '#000',
+        borderRadius: 8,
+        paddingHorizontal: 15,
+        paddingVertical: 12,
+        marginBottom: 15,
+    },
+    buttonRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+    },
+    cancelButton: {
+        flex: 1,
+        backgroundColor: 'gray',
+        borderRadius: 8,
+        paddingVertical: 12,
+        marginRight: 10,
+        alignItems: 'center',
+    },
+    createButton: {
+        flex: 1,
+        backgroundColor: '#28a745',
+        borderRadius: 8,
+        paddingVertical: 12,
+        marginLeft: 10,
+        alignItems: 'center',
+    },
+    buttonText: { color: '#fff', fontWeight: 'bold' },
+    /* start from here */
+    button: {
+        paddingHorizontal: 25,
+        paddingVertical: 4,
+        fontWeight: 'bold',
+        color: '#ffffff',
+        backgroundColor: '#0055cc',
+        margin: 5,
+    },
+    main: { flex: 1, alignItems: 'center' },
+    scroll: { flex: 1, backgroundColor: '#ddeeff', width: '100%' },
+    scrollContainer: { alignItems: 'center' },
+    videoView: { width: '90%', height: 200 },
+    btnContainer: { flexDirection: 'row', justifyContent: 'center' },
+    head: { fontSize: 20 },
+    info: { backgroundColor: '#ffffe0', paddingHorizontal: 8, color: '#0000ff' },
+
+});
+
+const getPermission = async () => {
+    if (Platform.OS === 'android') {
+        await PermissionsAndroid.requestMultiple([
+            PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+            PermissionsAndroid.PERMISSIONS.CAMERA,
+        ]);
+    }
+
+    
+export default CreateStream;

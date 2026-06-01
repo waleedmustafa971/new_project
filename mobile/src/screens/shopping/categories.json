@@ -1,0 +1,7 @@
+[
+  { "id": 1, "name": "Men's Fashion", "icon": "tshirt-crew" },
+  { "id": 2, "name": "Women's Fashion", "icon": "hanger" },
+  { "id": 3, "name": "T-Shirts", "icon": "tshirt-v" },
+  { "id": 4, "name": "Kitchen", "icon": "silverware-fork-knife" },
+  { "id": 5, "name": "Watches", "icon": "watch" }
+]

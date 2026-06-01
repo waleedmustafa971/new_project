@@ -1,0 +1,250 @@
+// TopCategoryScreen.tsx
+import React, { useCallback, useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  FlatList,
+  Image,
+  Text,
+  TouchableOpacity,
+  View,
+  StyleSheet,
+} from "react-native";
+import * as base from "../component/global";
+import api from "../component/api";
+import { useNavigation, NavigationProp } from "@react-navigation/native";
+import Feather from "react-native-vector-icons/Feather";
+
+type RootStackParamList = {
+  Home: undefined;
+  ClassifiedDetails: { itemdetails: object }; 
+  SeeAllProduct: { category: string };
+  PropertyDetails: { itemdetails: Property };
+};
+
+type Property = {
+  _id: string;
+  shortTitle?: string;
+  city?: string;
+  country?: string;
+  price?: string | number;
+  currency?: string; 
+  images?: { image: string }[];
+};
+
+type Category = {
+  _id: string;
+  categoryName: string;
+  properties: Property[];
+};
+
+export default function HomeCategory() {
+  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+  const [page, setPage] = useState<number>(1);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [categories, setCategories] = useState<Category[]>([]);
+
+  const fetchPage = useCallback(
+    async (pageToLoad = 1, refresh = false) => {
+      if (loading) return;
+      setLoading(true);
+
+      try {
+        const res = await api.get("/apis/property/gettopcategory", {
+          params: {
+            page: pageToLoad,
+            limit: 10,
+            add_post: "Property",
+          },
+        });
+
+        const data: Category[] = Array.isArray(res.data?.data)
+          ? res.data.data
+          : [];
+
+        setTotalPages(Number(res.data?.totalPages || 1));
+
+        setCategories((prev) => {
+          if (refresh || pageToLoad === 1) return data;
+
+          const map = new Map(prev.map((c) => [c._id, { ...c }]));
+
+          data.forEach((cat) => {
+            const existing = map.get(cat._id);
+            if (!existing) {
+              // new category
+              map.set(cat._id, cat);
+            } else {
+              // merge properties
+              const propMap = new Map(
+                existing.properties.map((p) => [p._id, p])
+              );
+              cat.properties.forEach((p) => propMap.set(p._id, p));
+
+              map.set(existing._id, {
+                ...existing,
+                properties: Array.from(propMap.values()),
+              });
+            }
+          });
+
+          return Array.from(map.values());
+        });
+
+        setPage(pageToLoad);
+      } catch (e) {
+        console.error("Fetch error:", e);
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [loading]
+  );
+
+  useEffect(() => {
+    fetchPage(1, true);
+  }, [fetchPage]);
+
+  const onEndReached = () => {
+    if (!loading && page < totalPages) {
+      fetchPage(page + 1);
+    }
+  };
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchPage(1, true);
+  };
+
+  const renderProperty = ({ item }: { item: Property }) => {
+    const imgUrl = item?.images?.[0]?.image;
+
+    return (
+      <TouchableOpacity
+        style={styles.card}
+        activeOpacity={0.8}
+        onPress={() =>
+          navigation.navigate("PropertyDetails", {
+            itemdetails: item,
+          })
+        }
+      >
+        {imgUrl ? (
+          <Image
+            source={{ uri: base.BASE_URL + imgUrl }}
+            style={styles.cardImage}
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={[styles.cardImage, styles.imgPlaceholder]} />
+        )}
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {item?.shortTitle || "Untitled"}
+        </Text>
+        <Text style={styles.cardMeta}>
+          {item?.city ? `${item.city}, ${item.country || ""}` : item?.country || ""}
+        </Text>
+        {typeof item?.price !== "undefined" && (
+          <Text style={styles.cardPrice}>
+            {item.currency ? item.currency : "AED"} {item.price}
+          </Text>
+        )}
+      </TouchableOpacity>
+    );
+  };
+
+  const HSeparator = () => <View style={{ width: 12 }} />;
+
+  const RenderCategory = React.memo(({ item }: { item: Category }) => (
+    <View style={styles.categoryBlock}>
+      <View style={styles.categoryHeader}>
+        <Text style={styles.categoryTitle} numberOfLines={1}>
+          {item?.categoryName || "Unknown"}
+        </Text>
+        <TouchableOpacity style={styles.arrowCircle}>
+          <Feather name="chevron-right" size={20} color="#333" />
+        </TouchableOpacity>
+      </View>
+
+      <FlatList
+        data={item?.properties || []}
+        keyExtractor={(p) => String(p._id)}
+        renderItem={renderProperty}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.hListContent}
+        ItemSeparatorComponent={HSeparator}
+      />
+    </View>
+  ));
+
+  return (
+    <View style={styles.container}>
+      <FlatList
+        data={categories}
+        keyExtractor={(c) => String(c._id)}
+        renderItem={({ item }) => <RenderCategory item={item} />}
+        onEndReached={onEndReached}
+        onEndReachedThreshold={0.4}
+        refreshing={refreshing}
+        onRefresh={onRefresh}
+        ListFooterComponent={
+          loading ? (
+            <View style={{ paddingVertical: 16 }}>
+              <ActivityIndicator />
+            </View>
+          ) : null
+        }
+        contentContainerStyle={styles.vListContent}
+        ItemSeparatorComponent={() => <View style={{ height: 16 }} />}
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: "#fff", marginBottom: 20 },
+  vListContent: { paddingVertical: 12 },
+  categoryBlock: { paddingHorizontal: 12 },
+  categoryHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 3,
+  },
+  categoryTitle: { fontSize: 13, fontWeight: "700", maxWidth: "80%" },
+  hListContent: { paddingHorizontal: 4 },
+  card: {
+    width: 180,
+    borderRadius: 12,
+    backgroundColor: "#f7f7f7",
+    padding: 0,
+  },
+  cardImage: {
+    width: "100%",
+    height: 110,
+    borderRadius: 10,
+    backgroundColor: "#eaeaea",
+  },
+  imgPlaceholder: { alignItems: "center", justifyContent: "center" },
+  cardTitle: { marginTop: 8, fontSize: 12, fontWeight: "700" },
+  cardMeta: { marginTop: 2, fontSize: 12, opacity: 0.7 },
+  cardPrice: {
+    marginTop: 2,
+    fontSize: 12,
+    fontWeight: "700",
+    marginBottom: 0,
+    padding: 3,
+  },
+  arrowCircle: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: "#DDD",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+});

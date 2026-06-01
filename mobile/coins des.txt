@@ -1,0 +1,77 @@
+Below is a clear idea + technical example inspired by TikTok coin system, explained simply and then implemented using Node.js + MongoDB (Mongoose).
+
+1️⃣ How TikTok-style Coins → Currency Works (Simple)
+🔹 Coins (Virtual Currency)
+
+Users buy coins with real money (USD, INR, etc.)
+
+Example:
+
+$1 = 100 coins
+
+$10 = 1,000 coins
+
+🔹 Gifts (Cartoon Items 🎁)
+
+Coins are spent on cartoon gifts (roses, lions, rockets)
+
+Each gift has a coin value
+
+Rose = 1 coin
+
+Lion = 10,000 coins
+
+🔹 Creator Earnings
+
+When a creator receives gifts:
+
+Coins → Diamonds / Points
+
+Platform takes a commission (usually ~50%)
+
+Example:
+
+User sends 1,000 coins
+
+Creator gets 500 coins worth
+
+Platform keeps 500
+
+🔹 Withdrawal
+
+Creator converts remaining balance → real currency
+
+Minimum payout limit applies
+
+2️⃣ Example Coin Conversion Logic
+1 USD = 100 Coins
+1 Coin = 0.01 USD
+
+User sends 1000 coins
+Platform keeps 50% = 500 coins
+Creator gets 500 coins
+
+500 coins × 0.01 = $5
+
+3️⃣ Where Cartoon Gifts Come From
+
+They are:
+
+Platform-designed digital assets
+
+Stored in DB with:
+
+Name
+
+Animation
+
+Coin price
+
+Not NFTs (usually), just virtual items
+
+Examples:
+
+Rose 🌹
+Diamond 💎
+Rocket 🚀
+Lion 🦁

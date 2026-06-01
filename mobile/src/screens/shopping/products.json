@@ -1,0 +1,14 @@
+[
+  {
+    "id": 1,
+    "name": "Men's Watch",
+    "price": "$50",
+    "image": "https://example.com/watch.jpg"
+  },
+  {
+    "id": 2,
+    "name": "Kitchen Fitting",
+    "price": "$80",
+    "image": "https://example.com/kitchen.jpg"
+  }
+]

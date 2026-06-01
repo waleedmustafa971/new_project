@@ -1,0 +1,27 @@
+1. Firebase Notification setup
+2. Social Media , if someone like send him notification to post man its means who is 
+posted the job.
+3. social media profile setting----add notification
+4. privacy screen create 
+5. Ads Incomplete in social profile
+6. Food Menu ---- Delivery Option --- a) free delivery b) standard c) Proprity 
+7. Food ---- Discount voucher can u check is it for Food Module or ecommerce
+8. Total Incl. fees & Tax sum check .
+9. Increase / Decrease Product
+10. Food Profile Help Center, Max food for Business.
+11. Food Menu Payment Details need to Fix
+12. Food Menu- profile- My Order Need to Check all
+13. Job --- FIx apply Job for Job Sicker
+14. Job - Hire Telented - need to fix Filter with - than when they will click on CV Details 
+it will show the CV and when they will see the CV it will go for to purchase the packages
+15. and allow user to see package like as dubizal. 
+16 Shopping module for now is stop / hide.
+17. Whatsapps profile need to fix block option and profile option
+18. send and setup notification in whatsapps.
+19. whatsapps setup Audio and video calles
+20. setup all message notification if both user is not online.
+21. profile Media Link and docs profile all option in whatsapps.
+22. social media need to change icon like Like icon, with block
+23. 
+
+

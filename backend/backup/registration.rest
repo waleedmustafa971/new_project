@@ -1,0 +1,15 @@
+GET http://localhost:8800
+
+###
+POST http://localhost:8800/welcome
+
+###
+POST http://localhost:8800/api/auth/register
+
+Content-Type: "application/json"
+
+{
+    "name": "manirul islam",
+    "email": "manirul26@gmail.com",
+    "password": "1234"
+}

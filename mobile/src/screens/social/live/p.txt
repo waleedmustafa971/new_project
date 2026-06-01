@@ -1,0 +1,487 @@
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  View,
+  PermissionsAndroid,
+  Platform,
+  ActivityIndicator, 
+  Dimensions
+} from 'react-native';
+import axios from 'axios';
+import {
+  createAgoraRtcEngine,
+  ChannelProfileType,
+  ClientRoleType,
+  RtcSurfaceView,
+  VideoSourceType,
+  RtcEngine, // Import RtcEngine type for useRef
+} from 'react-native-agora';
+import * as base from '../../../component/global'
+const AGORA_APP_ID = '141ea750fc7847129f58316d5c4f6b79';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import HosterHeader from '../../../component/hostermessenger/HosterHeader';
+import HosterMessage from '../../../component/hostermessenger/HosterMessage';
+import HosterFooter from '../../../component/hostermessenger/HosterFooter';
+const { height: screenHeight, width: screenWidth } = Dimensions.get("window");
+import io, { Socket } from "socket.io-client";
+import StartJoinChannel from './StartJoinChannel';
+import { useNavigation } from '@react-navigation/native';
+interface User {
+  _id: string;
+  name: string;
+  email?: string;
+  image?: string;
+}
+
+const CreateStream = () => {
+  // Use RtcEngine type for better type safety
+  const engineRef = useRef<RtcEngine | null>(null);
+  const socket = useRef<Socket | null>(null);
+  const navigation = useNavigation()
+  const [engineReady, setEngineReady] = useState(false);
+  const [isJoined, setIsJoined] = useState(false);
+  const [isHost, setIsHost] = useState(true);
+  const [remoteUid, setRemoteUid] = useState<number | null>(null); // Use number/null
+  const [message, setMessage] = useState('Initializing Agora...');
+  const [token, setToken] = useState('');
+  const [channel, setChannel] = useState('');
+  // Corrected state types for consistency
+  const [channelName, setChannelName] = useState<string | null>(null) 
+  
+  const [showEmojis, setShowEmojis] = useState(false);
+  const commonEmojis = ["❤️", "🔥", "👏", "😮", "😍", "🙌", "😂", "💯"];
+  const [user, setUser] = useState<User | null>(null);
+  const [joinLoading, setJoinLoading] = useState(false);
+
+  // Host info should use the user state
+  const hosterinfo = {
+    hoster: {
+      image: user?.image || "",
+      name: user?.name || "Manirul Islam",
+      is_following: false,
+    },
+    coins: 0,
+    viewers_count: 0,
+  };
+
+  const [messages, setMessages] = useState<{ text: string; system?: boolean; sender?: User }[]>([]);
+  const [messageInput, setMessageInput] = useState("");
+  const [joinModal, setJoinModal] = useState(true);
+
+  const handleEmojiSelect = (emoji: string) => {
+    // 🔥 FIX 4: Append emoji to messageInput, not the status message state
+    setMessageInput(prev => prev + emoji);
+  };
+
+  useEffect(() => {
+    initAgora();
+    
+    const initSocket = async () => {
+      let userIdFinal = "";
+      
+      const jsonValue = await AsyncStorage.getItem("userdata");
+      if (jsonValue) {
+        const data: User = JSON.parse(jsonValue);
+        userIdFinal = data._id;
+        // Use setUser to set the user object immediately
+        setUser(data);
+      }
+      
+      if (!userIdFinal) return; // Exit if no user ID
+
+      // AutoConnect is set to false in the original code, but explicitly setting it to true 
+      // or handling connect event listeners can be more robust. Sticking to original for now.
+      socket.current = io(base.SOCKET_URL, {
+        transports: ["websocket"],
+        query: { userId: userIdFinal },
+        autoConnect: true, // Let it connect
+      });
+
+      socket.current.on("connect", () => {
+        console.log("✅ create Live Socket connected:", socket.current?.id);
+      })
+
+      // Listen for system messages when someone joins 
+      socket.current.on("user-joined", ({ user, role }: { user: User, role: string }) => {
+        console.log('user join', user)
+        const joinMessage = {
+          text: `${user.name} joined as ${role}`,
+          system: true,
+          // sender is omitted for system messages usually
+        };
+        setMessages(prev => [...prev, joinMessage]);
+        console.log('user-joined', JSON.stringify(joinMessage))
+      });
+
+      // Listen for incoming messages
+     /*  socket.current.on("live-message", (msg) => {
+        setMessages((prev) => [...prev, msg]);
+      }); */
+
+      // Listen for incoming messages
+      socket.current.on("live-message", (msg) => {
+          // Check if the message was sent by a remote user (not the current user)
+          // If msg.sender is null or undefined, assume it's valid and render (e.g., system messages)
+          if (!user || msg.sender?._id !== user._id) {
+              setMessages((prev) => [...prev, msg]);
+          }
+      });
+
+      socket.current.on("live-room-created", (data: any) => {
+        console.log("🎉 Live Room Created:", data);
+      });
+    }
+    initSocket();
+
+    return () => {
+      // Cleanup for Agora
+      if (engineRef.current) {
+        engineRef.current.leaveChannel(); // Always leave before releasing
+        engineRef.current.release();
+        engineRef.current = null;
+      }
+      // Cleanup for Socket
+      socket.current?.disconnect();
+    };
+  }, []); 
+
+
+
+  const initAgora = async () => {
+    try {
+      if (Platform.OS === 'android') {
+        const permissions = await PermissionsAndroid.requestMultiple([
+          PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+          PermissionsAndroid.PERMISSIONS.CAMERA,
+        ]);
+        if (permissions['android.permission.CAMERA'] !== 'granted') {
+          setMessage('Camera permission denied');
+          return;
+        }
+      }
+
+      const engine = createAgoraRtcEngine();
+      engine.initialize({ appId: AGORA_APP_ID });
+
+      engine.registerEventHandler({
+        onJoinChannelSuccess: (connection, elapsed) => {
+          setIsJoined(true);
+          setMessage('Joined successfully!');
+          
+          // 🔥 FIX 1: Start local video preview and publishing
+          engine.startPreview(); 
+
+          // 🔥 FIX 3: Host must join the socket room after Agora join for chat
+          if (user && socket.current) {
+            socket.current.emit("join-live-room", {
+                channelName: connection.channelId,
+                user: { _id: user._id, name: user.name },
+                role: "host",
+            });
+            // Also update the channelName state here, as it's now confirmed
+            setChannelName(connection.channelId); 
+          }
+        },
+        onUserJoined: (connection, uid) => {
+          // Agora recommends using uid as number for setRemoteUid state
+          setRemoteUid(uid); 
+        },
+        onUserOffline: () => {
+          setRemoteUid(null);
+        },
+        onError: (err, msg) => {
+          console.error('Agora Error:', err, msg);
+          setMessage(`Agora Error: ${err}`);
+        },
+      });
+
+      engine.enableVideo();
+      engine.setChannelProfile(ChannelProfileType.ChannelProfileLiveBroadcasting);
+
+      engineRef.current = engine;
+      setEngineReady(true);
+      setMessage('Ready to Join');
+    } catch (e) {
+      console.error('Init Failed:', e);
+      setMessage('Init Failed');
+    }
+  };
+
+
+  const joinChannel = async () => {
+    if (!engineReady || !engineRef.current) return;
+    setJoinLoading(true);
+    
+    const jsonValue = await AsyncStorage.getItem("userdata");
+    if (jsonValue == null) {
+      setMessage('User data not found.');
+      setJoinLoading(false);
+      return;
+    }
+    
+    const userData: User = JSON.parse(jsonValue);
+
+    try {
+      setMessage('Requesting token...');
+      const channelToJoin = `room_${Math.floor(Math.random() * 10000)}`;
+
+      const res = await axios.post(
+        base.BASE_URL + '/apis/live/create-stream',
+        {
+          hostId: userData._id,
+          channelName: channelToJoin,
+          title: 'Welcome to my Live Stream!',
+          location: 'Mumbai, India',
+          thumbnail: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32',
+          streamUrl: '',
+          coins: 100,
+        }
+      );
+
+      if (res.data.success) {
+        const backendToken = res.data.token;
+        const backendChannel = res.data.data.channelName;
+
+        setToken(backendToken);
+        setChannel(backendChannel);
+        // 🔥 FIX 2: Set channelName state here so sendMessage works
+        setChannelName(backendChannel); 
+
+        engineRef.current.setClientRole(ClientRoleType.ClientRoleBroadcaster);
+        engineRef.current.joinChannel(backendToken, backendChannel, 0, {});
+        
+        // Signal server that a new live room is created
+        const payload = {
+            channelName: backendChannel,
+            hoster: {
+              _id: userData?._id,
+              name: userData?.name,
+              image: userData?.image
+            },
+        };
+        socket.current?.emit("create-live-room", payload);
+
+        setJoinModal(false)
+        setJoinLoading(false);
+        console.log('Successfully started stream:', backendChannel);
+      } else {
+        setMessage('Backend error: ' + res.data.message);
+        setJoinLoading(false);
+      }
+    } catch (error) {
+      setJoinLoading(false);
+      console.error('Failed to start live:', error);
+      setMessage('Failed to get token or start stream.');
+    }
+  };
+
+  const sendMessage___ = () => {
+    // Ensure channelName and user are set before sending
+    if (!messageInput.trim() || !channelName || !user) return; 
+
+    const msg = {
+      text: messageInput,
+      sender: user,
+    };
+
+    socket.current?.emit("send-live-message", {
+      channelName: channelName, // Now correctly uses state
+      message: msg,
+    });
+
+    setMessages((prev) => [...prev, { ...msg, system: false }]);
+    setMessageInput("");
+  };
+
+// In CreateStream.tsx:
+const sendMessage = () => {
+    if (!messageInput.trim() || !channelName || !user) return; 
+
+    const msg = {
+        text: messageInput,
+        sender: user,
+        // No tempId needed if you filter by sender ID in the listener
+    };
+
+    socket.current?.emit("send-live-message", {
+        channelName: channelName,
+        message: msg,
+    });
+
+    // 1. Local Render: Add the message to state immediately (This is the only render for the sender)
+    setMessages((prev) => [...prev, { ...msg, system: false }]); 
+    setMessageInput("");
+};
+// IMPORTANT: Now you must also ensure your message interface in CreateStream.tsx 
+// and HosterMessage.tsx includes 'id?: string;'.
+
+  // Function to handle the close action
+  const handleCloseStream = () => {
+    // 1. Leave the Agora channel
+    if (engineRef.current && isJoined) {
+      engineRef.current.leaveChannel();
+      engineRef.current.stopPreview(); // Stop the local camera feed
+      setIsJoined(false);
+      setRemoteUid(null);
+      setMessage("Stream closed.");
+    }
+    
+    // 2. Disconnect the socket
+    if (socket.current) {
+      // You might want to emit a 'leave-room' event here
+      // socket.current.emit("leave-live-room", { channelName, userId: user?._id });
+      console.log('socket is disconnected')
+      socket.current.disconnect();
+      navigation.goBack()
+    }
+    
+    // 3. Add any navigation logic here (e.g., navigating back)
+    // navigation.goBack(); 
+  };
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <HosterHeader hosterinfo={hosterinfo} onClose={handleCloseStream} />
+      {/* Conditional rendering for loading/ready states */}
+      {!engineReady && !joinModal ? (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color="#0055cc" />
+          <Text style={styles.loadingText}>{message}</Text>
+        </View>
+      ) : (
+        <>
+          <View style={styles.videoContainer}>
+            <View style={styles.row}>
+              {/* HOST (Local Video) */}
+              <View style={styles.half}>
+                {isJoined && isHost ? (
+                  <RtcSurfaceView
+                    style={styles.video}
+                    canvas={{
+                      uid: 0,
+                      sourceType: VideoSourceType.VideoSourceCamera,
+                    }}
+                  />
+                ) : (
+                    <View style={styles.videoPlaceholder}>
+                       <Text style={styles.videoPlaceholderText}>Waiting to Join Stream...</Text>
+                    </View>
+                )}
+              </View>
+
+              {/* REMOTE (Co-Host/Guest) */}
+              <View style={styles.half}>
+                {isJoined && remoteUid ? (
+                  <RtcSurfaceView
+                    style={styles.video}
+                    canvas={{ uid: remoteUid }}
+                  />
+                ) : (
+                    <View style={styles.videoPlaceholder}>
+                        <Text style={styles.videoPlaceholderText}>No Remote Users</Text>
+                    </View>
+                )}
+              </View>
+            </View>
+          </View>
+
+        </>
+      )}
+      <View style={styles.chatArea}>
+        <View style={styles.welcomeMsg}>
+          <Text style={styles.welcomeText}>
+            Welcome to the stream! {user?.name}
+          </Text>
+        </View>
+        <HosterMessage messages={messages} />
+      </View>
+      
+      <HosterFooter
+        messageInput={messageInput}
+        setMessageInput={setMessageInput}
+        sendMessage={sendMessage}
+        showEmojis={showEmojis}
+        setShowEmojis={setShowEmojis}
+        commonEmojis={commonEmojis}
+        onEmojiSelect={handleEmojiSelect}
+      />
+      {joinModal && (
+        <StartJoinChannel
+          visible={joinModal}
+          title="Live"
+          message="Join and enjoy live stream"
+          loading={joinLoading}
+          onClose={() => {
+            if (!joinLoading) setJoinModal(false);
+          }}
+          onOk={joinChannel}
+        />
+      )}
+
+
+    </SafeAreaView>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#000' },
+  loadingOverlay: { 
+      flex: 1, 
+      justifyContent: 'center', 
+      alignItems: 'center', 
+      height: screenHeight - 100, // full page height minus header/safe area
+  },
+  loadingText: {
+      color: '#fff',
+      marginTop: 10,
+  },
+  header: { fontSize: 24, fontWeight: 'bold', marginBottom: 20, color: 'white' },
+  // Fixed row style to span entire available space for video
+  row: { 
+      flexDirection: 'row', 
+      alignItems: 'center', 
+      flex: 1, // Important: allows children to take space 
+  },
+  videoContainer: { 
+      backgroundColor: '#000', 
+      flex: 1, // Important: allows videos to take space 
+      marginTop: 0, 
+      marginBottom: 100, // Space for chat footer/controls
+  },
+  half: {
+    flex: 1,             
+    borderWidth: 1,
+    borderColor: 'white',
+    height: '100%', // Ensure it takes full height of the row
+  },
+  video: {
+    width: '100%',
+    height: '100%',       
+    backgroundColor: '#000',
+  },
+  videoPlaceholder: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: '#222',
+  },
+  videoPlaceholderText: {
+      color: '#aaa',
+      fontSize: 14,
+  },
+  chatArea: {
+    position: 'absolute',
+    bottom: 100, // Above the footer
+    left: 15,
+    width: screenWidth * 0.7,
+    height: screenHeight * 0.3, 
+    zIndex: 10,
+  },
+  welcomeMsg: { backgroundColor: 'rgba(0,0,0,0.3)', padding: 8, borderRadius: 8 },
+  welcomeText: { color: '#FFD700', fontSize: 12 },
+
+});
+
+export default CreateStream;

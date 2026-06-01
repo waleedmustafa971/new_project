@@ -1,0 +1,217 @@
+import React, { useState, useRef, useEffect } from "react";
+import {
+  Modal,
+  TextInput,
+  View,
+  Text,
+  TouchableOpacity,
+  FlatList,
+  ScrollView,
+  Keyboard,
+  Dimensions,
+  KeyboardAvoidingView,
+  SafeAreaView,
+  Platform,
+  Pressable,
+} from "react-native";
+import AntDesign from "react-native-vector-icons/AntDesign";
+import VolumeBar from "../../post/create/VolumeBar";
+
+const { height } = Dimensions.get("window");
+
+const fonts = [
+  "Arial",
+  "Marimpa",
+  "Editor",
+  "Classic",
+  "Typewriter",
+  "Memu",
+  "Directional",
+  "Literature",
+  "Decorya",
+  "Ramsoneth",
+];
+
+const colors = [
+  "#000000", "#ffffff", "#ff0000", "#00ff00", "#0000ff",
+  "#facc15", "#ff7f50", "#ffa500", "#800080", "#4b0082",
+  "#00ffff", "#008080", "#ff69b4", "#a52a2a", "#808080",
+  "#d2691e", "#1e90ff", "#32cd32", "#ff1493", "#7fffd4",
+];
+
+const TextEditor = ({ visible, onClose, onDone }) => {
+  const inputRef = useRef < TextInput > (null);
+
+  const [text, setText] = useState("");
+  const [fontSize, setFontSize] = useState(20);
+  const [fontFamily, setFontFamily] = useState("Arial");
+  const [fontColor, setFontColor] = useState("#ffffff");
+
+  useEffect(() => {
+    if (visible) {
+      const timer = setTimeout(() => {
+        inputRef.current?.focus();
+
+        // 👇 FORCE keyboard open (Android fix)
+        Keyboard.dismiss();
+        setTimeout(() => {
+          inputRef.current?.focus();
+        }, 100);
+      }, 400);
+
+      return () => clearTimeout(timer);
+    }
+  }, [visible]);
+
+  return (
+    <Modal visible={visible} animationType="slide" statusBarTranslucent>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: "#000" }}>
+          <Pressable style={{ flex: 1 }} onPress={Keyboard.dismiss}>
+            {/* HEADER */}
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+                paddingHorizontal: 16,
+                paddingTop: 12,
+              }}
+            >
+              <TouchableOpacity onPress={onClose}>
+                <AntDesign name="close" size={24} color="white" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => {
+                  onDone({ text, fontSize, fontFamily, fontColor });
+                  setText("");
+                }}
+                style={{
+                  paddingHorizontal: 16,
+                  paddingVertical: 8,
+                  borderRadius: 10,
+                  backgroundColor: "#1EB1FC",
+                }}
+              >
+                <Text style={{ color: "#fff", fontSize: 16 }}>Done</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* TEXT INPUT AREA */}
+            <View
+              style={{
+                marginTop: 16,
+                height: height * 0.55,
+                paddingHorizontal: 16,
+              }}
+            >
+              {/* Font Size Slider */}
+              <View
+                style={{
+                  position: "absolute",
+                  left: -70,
+                  top: 160,
+                  width: 200,
+                  transform: [{ rotate: "-90deg" }],
+                }}
+              >
+                <VolumeBar onChange={setFontSize} />
+              </View>
+
+              <View style={{ flex: 1, marginLeft: 70 }}>
+                <TextInput
+                  ref={inputRef}
+                  autoFocus
+                  showSoftInputOnFocus={true}   // 🔥 REQUIRED
+                  value={text}
+                  onChangeText={setText}
+                  multiline
+                  blurOnSubmit={false}
+                  placeholder="Type your text here..."
+                  placeholderTextColor="#888"
+                  style={{
+                    flex: 1,
+                    color: fontColor,
+                    fontSize,
+                    fontFamily,
+                    textAlignVertical: "top",
+                    padding: 12,
+                  }}
+                />
+
+
+              </View>
+            </View>
+
+            {/* COLOR PICKER */}
+            <View style={{ marginTop: 12 }}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingHorizontal: 16 }}
+              >
+                {colors.map((color) => (
+                  <TouchableOpacity
+                    key={color}
+                    onPress={() => setFontColor(color)}
+                    style={{
+                      width: 30,
+                      height: 30,
+                      borderRadius: 15,
+                      backgroundColor: color,
+                      marginRight: 12,
+                      borderWidth: fontColor === color ? 3 : 1,
+                      borderColor: "#fff",
+                    }}
+                  />
+                ))}
+              </ScrollView>
+            </View>
+
+            {/* FONT PICKER */}
+            <View style={{ marginTop: 20, paddingBottom: 20 }}>
+              <FlatList
+                horizontal
+                data={fonts}
+                keyExtractor={(item) => item}
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingHorizontal: 16 }}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    onPress={() => setFontFamily(item)}
+                    style={{
+                      paddingHorizontal: 16,
+                      paddingVertical: 8,
+                      marginRight: 12,
+                      borderRadius: 20,
+                      backgroundColor:
+                        fontFamily === item ? "#1EB1FC" : "#333",
+                      borderWidth: 1,
+                      borderColor: "#888",
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontFamily: item,
+                        fontSize: 14,
+                        color: "#fff",
+                      }}
+                    >
+                      {item}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              />
+            </View>
+
+          </Pressable>
+        </SafeAreaView>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+};
+
+export default TextEditor;

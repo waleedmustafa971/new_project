@@ -1,0 +1,613 @@
+ Configure android/app/build.gradle
+ 
+signingConfigs {
+    release {
+        storeFile file(MYAPP_UPLOAD_STORE_FILE)
+        storePassword MYAPP_UPLOAD_STORE_PASSWORD
+        keyAlias MYAPP_UPLOAD_KEY_ALIAS
+        keyPassword MYAPP_UPLOAD_KEY_PASSWORD
+    }
+}
+
+
+release {
+    signingConfig signingConfigs.release
+    minifyEnabled false // Optional: Set to true if using Proguard
+    shrinkResources false
+    proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+}
+
+cd android
+./gradlew assembleRelease
+android/app/build/outputs/apk/release/app-release.apk
+./gradlew clean
+./gradlew assembleRelease
+
+
+import { configureGoogleSignIn } from './googleConfig';
+
+useEffect(() => {
+  configureGoogleSignIn();
+}, []);
+
+git pull --no-rebase origin main
+
+https://github.com/manirul26/max_apps_inc
+
+Email : manirul2633@gmail.com
+
+
+
+===========================================
+Reel Search Option Fix
+From Dashboard Reels not going next screen
+From Dashboard Post Profile Message is not working
+
+
+Send Private Message
+===============================
+ const userdata = {
+            _id: item._id, // No conversation yet
+            type: "private",
+            partner: {
+                _id: item._id,
+                name: item.name,
+                image: item.image || ""
+            },
+            lastMsg: null, // or {} if you want to initialize an empty object
+        };
+    navigation.navigate("ChatDetails", { me: me, partner: item._id, userinfo: userdata });
+
+===get profile id ===00000
+
+const ProfileData = async () => {
+  try {
+    const jsonValue = await AsyncStorage.getItem("userdata");
+    if (!jsonValue) return;
+    const userData = JSON.parse(jsonValue);
+    const response = await api.get(
+      `/apis/auth/getProfile`,
+      {
+        params: { id: userData._id },
+      }
+    );
+    // Axios automatically parses JSON
+    const { user } = response.data;
+    console.log('..data... ', JSON.stringify(response.data))
+    setUserdata(user);
+    SetFullname(user.name);
+    setEmail(user.email);
+    setFollower(user.followersCount);
+    setFollowing(user.followingCount);
+    setImage(user.image);
+
+  } catch (error) {
+    console.log("error profile", error?.response || error);
+    setLoading(false);
+  }
+};
+
+
+Mux video 
+================================================================
+https://www.mux.com/docs/frameworks/react-native-uploading-videos
+
+
+video editor SDK
+==========================================
+69IIccqvSekCpyyz2rH47y4A5pwTjtlAcy_NfF2Vz1gTLXLEHegZDsS28vAw3zjd
+
+npm install @imgly/editor-react-native
+
+
+
+setting.gradle
+================================================================
+pluginManagement { includeBuild("../node_modules/@react-native/gradle-plugin") }
+plugins { id("com.facebook.react.settings") }
+extensions.configure(com.facebook.react.ReactSettingsExtension){ ex -> ex.autolinkLibrariesFromCommand() }
+rootProject.name = 'messengeruae'
+include ':app'
+includeBuild('../node_modules/@react-native/gradle-plugin')
+
+include ':@react-native-camera-roll_camera-roll'
+project(':@react-native-camera-roll_camera-roll').projectDir = new File(rootProject.projectDir, '../node_modules/@react-native-camera-roll/camera-roll/android')
+
+include ':react-native-audio-recorder-player'
+project(':react-native-audio-recorder-player').projectDir = new File(rootProject.projectDir, 	'../node_modules/react-native-audio-recorder-player/android')
+
+=====android image filtering
+
+
+https://www.youtube.com/watch?v=P53yPHpmDAs
+ Advance Image Filtering & Manipulation in React Native 
+
+ https://shopify.github.io/react-native-skia/docs/animated-images
+ "@shopify/react-native-skia": "^2.4.14",
+    "@azzapp/react-native-skia-video": "^0.9.0", // this video editor we will use
+
+
+npm install @louiscapelle/react-native-video-editing
+
+
+===============
+import React, { useRef, useState } from 'react';
+import {
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  Text,
+  useWindowDimensions,
+} from 'react-native';
+import {
+  Camera,
+  useCameraDevice,
+  type Camera as CameraType,
+} from 'react-native-vision-camera';
+import { Canvas, Text as SkiaText, useFont } from '@shopify/react-native-skia';
+import {
+  useVideoCompositionPlayer,
+  useVideoPlayer,
+} from '@azzapp/react-native-skia-video';
+
+export default function TestSokia() {
+  const camera = useRef<CameraType>(null);
+  const device = useCameraDevice('front');
+  const { width, height } = useWindowDimensions();
+
+  const [recording, setRecording] = useState(false);
+  const [videoUri, setVideoUri] = useState<string | null>(null);
+  const [currentTime, setCurrentTime] = useState(0);
+
+  const font = useFont(
+    require('../../../../../assets/font/arial_narrow_7.ttf'),
+    48
+  );
+
+  // 🎞 Load video frames
+  /* const videoPlayer = useVideoPlayer(
+    videoUri ? { uri: videoUri } : undefined
+  ); */
+
+  // 🎬 Composition
+ /*  const composition = useVideoCompositionPlayer(
+    videoPlayer
+      ? {
+          duration: videoPlayer.duration,
+          fps: 30,
+          onFrame: (time) => setCurrentTime(time),
+        }
+      : undefined
+  ); */
+
+  const onRecordPress = async () => {
+    if (!camera.current) return;
+
+    if (recording) {
+      await camera.current.stopRecording();
+      return;
+    }
+
+    setRecording(true);
+    await camera.current.startRecording({
+      onRecordingFinished: (video) => {
+        const uri = video.path.startsWith('file://')
+          ? video.path
+          : `file://${video.path}`;
+
+        setVideoUri(uri);
+        setRecording(false);
+      },
+      onRecordingError: () => setRecording(false),
+    });
+  };
+
+  const exportVideo = async () => {
+    if (!composition || !videoPlayer?.duration) return;
+
+    const result = await composition.export({
+      width,
+      height: Math.floor(height * 0.7),
+      fileName: 'edited_video.mp4',
+    });
+
+    console.log('Exported:', result.path);
+  };
+
+  return (
+    <View style={styles.container}>
+    {/*  {videoUri && videoPlayer && ( */}
+      {videoUri  && (
+        <>
+          <Canvas style={{ width, height: height * 0.7 }}>
+           {/*  {videoPlayer.frame && (
+              <videoPlayer.Frame
+                frame={videoPlayer.frame}
+                x={0}
+                y={0}
+                width={width}
+                height={height * 0.7}
+              />
+            )} */}
+
+            {font && (
+              <SkiaText
+                text="Hello Skia Editor 🎬"
+                x={40}
+                y={80}
+                font={font}
+                color="white"
+              />
+            )}
+          </Canvas>
+
+          <View style={styles.timeline}>
+            <Text style={{ color: 'white' }}>
+              {currentTime.toFixed(2)}s
+            </Text>
+          </View>
+
+          <TouchableOpacity onPress={exportVideo} style={styles.exportBtn}>
+            <Text style={styles.btnText}>Export Video</Text>
+          </TouchableOpacity>
+        </>
+      )}
+
+      {!videoUri && device && (
+        <Camera
+          ref={camera}
+          style={StyleSheet.absoluteFill}
+          device={device}
+          video
+          audio
+          isActive
+        />
+      )}
+
+      {!videoUri && (
+        <TouchableOpacity
+          onPress={onRecordPress}
+          style={[
+            styles.recBtn,
+            recording && { backgroundColor: 'red' },
+          ]}
+        />
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: 'black' },
+  recBtn: {
+    position: 'absolute',
+    bottom: 50,
+    alignSelf: 'center',
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    borderWidth: 5,
+    borderColor: 'white',
+  },
+  timeline: {
+    padding: 10,
+    alignItems: 'center',
+  },
+  exportBtn: {
+    backgroundColor: '#444',
+    padding: 15,
+    alignItems: 'center',
+    margin: 10,
+    borderRadius: 8,
+  },
+  btnText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+});
+
+
+======Video record from camera and show player
+
+import React, { useRef, useState, useEffect } from 'react';
+import {
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  Text,
+  useWindowDimensions,
+  Alert,
+} from 'react-native';
+import {
+  Camera,
+  useCameraDevice,
+  type Camera as CameraType,
+} from 'react-native-vision-camera';
+import { Canvas, Text as SkiaText, useFont } from '@shopify/react-native-skia';
+import ReelEditor from '../../../../../native/ReelEditor';
+import Video from 'react-native-video';
+type Mode = 'camera' | 'editor';
+
+export default function TestSokia() {
+  const camera = useRef<CameraType>(null);
+  const device = useCameraDevice('front');
+  const { width, height } = useWindowDimensions();
+
+  const [mode, setMode] = useState<Mode>('camera');
+  const [recording, setRecording] = useState(false);
+  const [videoUri, setVideoUri] = useState<string | null>(null);
+  const [showEditor, setShowEditor] = useState(false);
+
+  const font = useFont(require('../../../../../assets/font/arial_narrow_7.ttf'), 48);
+
+  // ------------------- Permissions -------------------
+  useEffect(() => {
+    (async () => {
+      const camPerm = await Camera.getCameraPermissionStatus();
+      const micPerm = await Camera.getMicrophonePermissionStatus();
+
+      if (camPerm !== 'authorized') await Camera.requestCameraPermission();
+      if (micPerm !== 'authorized') await Camera.requestMicrophonePermission();
+    })();
+  }, []);
+
+  // ------------------- Record Video -------------------
+  const onRecordPress = async () => {
+    if (!camera.current || !device) return;
+
+    if (recording) {
+      await camera.current.stopRecording();
+      return;
+    }
+
+    setRecording(true);
+
+    await camera.current.startRecording({
+      onRecordingFinished: (video) => {
+        const uri = video.path.startsWith('file://') ? video.path : `file://${video.path}`;
+        setRecording(false);
+        setVideoUri(uri);
+
+        // Wait a tiny bit before mounting editor to avoid GPU conflicts on Android
+        setTimeout(() => {
+          setShowEditor(true);
+          setMode('editor');
+        }, 500);
+      },
+      onRecordingError: (error) => {
+        console.error('Recording error:', error);
+        setRecording(false);
+      },
+    });
+  };
+
+  return (
+    <View style={styles.container}>
+      {/* Video Load URL */}
+
+      {videoUri && (
+       /*  <ReelEditor videoUri={videoUri} /> */
+         <Video
+          source={{ uri: videoUri }} // Use the variable you are checking!
+          style={{ width: '100%', height: '100%' }}
+          resizeMode="contain"
+          controls={true}                // Highly recommended so users can play/pause
+          paused={false}                 // Auto-play when it appears
+          repeat={true}                  // Loops the video
+          onError={(e) => console.log("Video Error: ", e)} // Catch playback issues
+        /> 
+      )}
+      {/* CAMERA MODE */}
+      {mode === 'camera' && (
+        <>
+          {device ? (
+            <Camera
+              ref={camera}
+              style={StyleSheet.absoluteFill}
+              device={device}
+              video
+              audio
+              isActive={true}
+              androidPreviewViewType="texture-view"
+            />
+          ) : (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+              <Text style={{ color: 'white' }}>Loading camera...</Text>
+            </View>
+          )}
+
+          <TouchableOpacity
+            onPress={onRecordPress}
+            style={[styles.recBtn, recording && { backgroundColor: 'red' }]}
+          />
+        </>
+      )}
+
+    </View>
+  );
+}
+
+
+// ------------------- STYLES -------------------
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: 'black' },
+  editorContainer: { flex: 1, backgroundColor: 'black' },
+  recBtn: {
+    position: 'absolute',
+    bottom: 50,
+    alignSelf: 'center',
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    borderWidth: 5,
+    borderColor: 'white',
+  },
+  timeline: { padding: 10, alignItems: 'center' },
+  timelineText: { color: 'white' },
+  exportBtn: {
+    backgroundColor: '#444',
+    padding: 15,
+    alignItems: 'center',
+    margin: 10,
+    borderRadius: 8,
+  },
+  backBtn: {
+    backgroundColor: '#222',
+    padding: 15,
+    alignItems: 'center',
+    marginHorizontal: 10,
+    marginBottom: 20,
+    borderRadius: 8,
+  },
+  btnText: { color: 'white', fontWeight: 'bold' },
+});
+
+
+//
+https://www.youtube.com/watch?v=uVAVJb71ngQ create native module with ffmg
+
+https://www.youtube.com/watch?v=uVAVJb71ngQ
+
+clean everything together
+===========
+rm -rf android/app/.cxx android/app/build android/build android/.gradle
+
+and codegen generated two files from android/app/generated/source/codegen
+NativeVideoEditor-generated.cpp
+NativeVideoEditor.h
+
+======Video Editor=================
+My Recommendation
+React Native CLI
+For FFmpeg:
+
+✅ Use Java TurboModule
+✅ Call C++ only for FFmpeg execution
+✅ Much simpler and stable
+
+Even Instagram/TikTok use this pattern.
+
+// specs/NativeVideoEditor.ts
+
+// specs/NativeVideoEditor.ts
+
+import { TurboModule, TurboModuleRegistry } from 'react-native';
+
+export interface Spec extends TurboModule {
+  trimVideo(
+    input: string,
+    output: string,
+    start: number,
+    duration: number
+  ): Promise<string>;
+}
+
+export default TurboModuleRegistry.getEnforcing<Spec>('NativeVideoEditor');
+
+
+rm -rf android/.cxx
+rm -rf android/build
+rm -rf android/app/build
+
+After codegen registration run this command cd android ./gradlew generateCodegenArtifactsFromSchema
+
+cd android
+./gradlew generateCodegenArtifactsFromSchema --rerun-tasks
+cd ..
+Run only for running device – 
+
+c++ native module data ======
+
+for trim video i use stream 
+=========================================================
+rm -rf android/.cxx
+rm -rf android/build
+rm -rf android/app/build
+cd android && ./gradlew clean
+npx react-native run-android --active-arch-only
+
+du -sh node_modules
+7.7G    node_modules
+
+run tis terminal in proejct root:
+ grep -R "av_init_packet(" shared/NativeSampleModule.cpp
+
+
+
+after change clean .cpp will affect
+===================================
+ cd android
+./gradlew :app:installDebug
+
+=======================================
+1️⃣ What you are doing now: Stream Copy
+
+Your current trimVideoMinimal just copies a portion of the video without re-encoding.
+
+Pros:
+Very fast, almost instant.
+No quality loss.
+
+Cons:
+
+Cannot modify the video. You cannot:
+Add text overlay
+Add image overlay
+Do green screen/chroma key
+Adjust colors, crop, rotate, etc.
+Why: Filters like drawtext, overlay, chromakey require decoding the frames and re-encoding them. Stream copy just slices the video file as-is.
+2️⃣ What you need for overlays or green screen: Decode → Filter → Encode
+You must decode the video frames into memory, apply filters, then re-encode into a new file.
+This uses FFmpeg libavfilter (buffersrc, buffersink, drawtext, overlay, chromakey).
+Example possibilities:
+Add text: drawtext=text='Hello':x=100:y=50:fontfile=/path/to/font.ttf:fontsize=24:fontcolor=white
+Add image overlay: overlay=x=50:y=50
+Green screen: chromakey=color=0x00FF00:similarity=0.1:blend=0.0
+3️⃣ Implication
+
+Your current method cannot do this.
+
+To see green screen or add overlays, you need a full re-encoding pipeline, which is:
+
+Open input file.
+
+Decode video frames.
+
+Apply filters (drawtext, overlay, chromakey…).
+
+Encode frames to output.
+
+This is slower than stream copy because it re-encodes the video.
+
+=====
+Input video
+↓ decode
+↓ chromakey / drawtext / overlay
+↓ encode
+↓ output.mp4
+↓ <Video source={{ uri: output.mp4 }} />
+
+=========
+Input video
+  ↓
+FFmpeg decodes internally
+  ↓
+libavfilter:
+  - chromakey
+  - drawtext
+  - overlay (image/video)
+  ↓
+libx264 encoder
+  ↓
+output.mp4
+  ↓
+React Native <Video />
+
+Notes :
+=================================
+1. 
+
+
+
+
+

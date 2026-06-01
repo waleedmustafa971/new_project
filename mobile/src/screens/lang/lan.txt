@@ -1,0 +1,141 @@
+import React, { useState, useEffect } from 'react';
+import { Modal, View, Text, Button, StyleSheet, TouchableOpacity, FlatList } from 'react-native';
+//import i18n from './i18n';
+import '../../locales/i18n'
+import { useTranslation } from 'react-i18next';
+
+import Icon from 'react-native-vector-icons/Ionicons'; // or MaterialIcons, FontAwesome etc.
+
+const LANGUAGES = [
+  { id: 'en', name: 'English', color: '#f2f2f2' },
+  { id: 'ar', name: 'عربي', color: '#f2f2f2' },
+  { id: 'hi', name: 'হিন্দি', color: '#f2f2f2' },
+  { id: 'bn', name: 'বাংলা', color: '#f2f2f2' }
+];
+
+
+const LanguageModal = ({ visible, onClose }) => {
+    const { t, i18n } = useTranslation();
+
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedLang, setSelectedLang] = useState('en');
+
+  const changeLanguage = async (id) => {
+  setSelectedLang(id);
+  await i18n.changeLanguage(id);
+
+  // Optionally update direction
+  const isRTL = id === 'ar';
+  I18nManager.forceRTL(isRTL); // Optional, only if you're handling RTL
+
+  // Close the modal after change
+  onClose();
+};
+
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalBox}>
+          <Text style={styles.modalTitle}>{t('Choose_Your_Language')} </Text>
+          <FlatList
+            data={LANGUAGES}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={[
+                  styles.languageButton,
+                  { backgroundColor: item.color },
+                  selectedLang === item.id && styles.selectedButton,
+                ]}
+                onPress={() => changeLanguage(item.id)}
+              >
+                <Text style={styles.languageText}>{item.name}</Text>
+              </TouchableOpacity>
+            )}
+          />
+           <TouchableOpacity onPress={() => onClose()} style={styles.closeButton}>
+            <Text style={styles.buttonText}>Apply</Text>
+          </TouchableOpacity> 
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
+const styles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    justifyContent: 'flex-end', // Position modal at the bottom
+    backgroundColor: 'rgba(0, 0, 0, 0.5)', // Semi-transparent backdrop
+  },
+  modalContainer: {
+    height: '50%', // Covers bottom 50% of screen
+    backgroundColor: '#000',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+  },
+  closeButton: {
+    position: 'absolute',
+    right: 15,
+    top: 15,
+    zIndex: 10,
+  },
+  openButton: {
+    backgroundColor: '#1D4ED8',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  buttonText: { color: 'white', fontSize: 12 },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalBox: {
+    width: '85%',
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 20,
+    maxHeight: '70%',
+  },
+  modalTitle: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    marginBottom: 15,
+    textAlign: 'center',
+  },
+  languageButton: {
+    padding: 12,
+    marginVertical: 6,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  languageText: {
+    color: '#000',
+    fontWeight: '600',
+    fontSize: 12,
+  },
+  selectedButton: {
+    borderWidth: 2,
+    borderColor: '#000',
+  },
+  closeButton: {
+    marginTop: 10,
+    padding: 12,
+    backgroundColor: '#9CA3AF',
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+
+});
+
+
+export default LanguageModal;

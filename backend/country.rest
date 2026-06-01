@@ -1,0 +1,9 @@
+GET http://localhost:8800/api/countries
+
+###
+
+POST http://localhost:8800/api/countries
+
+Content-Type: "application/json"
+
+{ "name": "USA", "code": "US", "cities": [] })

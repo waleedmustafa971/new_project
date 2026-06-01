@@ -1,0 +1,86 @@
+# ── Dependencies ──────────────────────────────────────────────
+node_modules/
+.pnp
+.pnp.js
+
+# ── React Native build artifacts ──────────────────────────────
+mobile/android/build/
+mobile/android/app/build/
+mobile/android/.cxx/
+mobile/android/app/.cxx/
+mobile/android/local.properties
+mobile/ios/build/
+mobile/ios/Pods/
+mobile/ios/DerivedData/
+mobile/ios/*.xcworkspace/xcuserdata/
+mobile/.xcode.env.local
+
+# ── React Native generated ─────────────────────────────────────
+mobile/.expo/
+mobile/dist/
+
+# ── Backend runtime files ──────────────────────────────────────
+backend/uploads/
+backend/outputs/
+backend/profilepicture/
+backend/backup/uploads_off/
+backend/backup/profilepicture/
+
+# ── Environment & secrets ──────────────────────────────────────
+.env
+.env.local
+.env.production
+.env.development
+*.env
+google-services.json
+GoogleService-Info.plist
+
+# ── Android signing ────────────────────────────────────────────
+*.keystore
+*.jks
+
+# ── Archive — kept locally only, not pushed to GitHub ─────────
+archive/
+
+# ── Archive — exclude build artifacts & media inside backups ──
+archive/**/node_modules/
+archive/**/android/build/
+archive/**/android/app/build/
+archive/**/android/.cxx/
+archive/**/android/app/.cxx/
+archive/**/ios/build/
+archive/**/ios/Pods/
+archive/**/uploads/
+archive/**/outputs/
+archive/**/profilepicture/
+archive/**/backup/uploads_off/
+archive/**/backup/profilepicture/
+
+# ── macOS junk ─────────────────────────────────────────────────
+.DS_Store
+__MACOSX/
+
+# ── Editor & OS ────────────────────────────────────────────────
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+Thumbs.db
+
+# ── Logs ───────────────────────────────────────────────────────
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ── Large archive zips (exceed GitHub 100MB limit) ────────────
+*.zip
+*.tar.gz
+*.rar
+
+# ── Misc ───────────────────────────────────────────────────────
+.refact/
+*.orig

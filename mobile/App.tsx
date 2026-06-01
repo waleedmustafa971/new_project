@@ -1,0 +1,177 @@
+import React, { useEffect, useState } from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import StackNavigator from './src/navigation/StackNavigator';
+import Toast from 'react-native-toast-message';
+import { StripeProvider } from '@stripe/stripe-react-native';
+import { navigationRef } from './src/navigation/RootNavigation';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+//import { requestAllPermissions, getLiveLocation } from '../../screens/permission/PermissionManager';
+import { requestAllPermissions, getLiveLocation } from './src/screens/permission/PermissionManager';
+import NetInfo from "@react-native-community/netinfo";
+import { Alert, PermissionsAndroid, Platform } from 'react-native';
+import Geolocation from '@react-native-community/geolocation';
+import { StatusBar } from 'react-native';
+import messaging from '@react-native-firebase/messaging';
+import notifee from '@notifee/react-native';
+
+
+export default function App() {
+  const [loading, setLoading] = useState(false)
+
+/*   useEffect(() => {
+    requestAllPermissions();
+    requestPermission();
+    getFCMToken();
+  }, [])
+
+useEffect(() => {
+  async function setup() {
+    await notifee.createChannel({
+      id: 'default',
+      name: 'Default Channel',
+    });
+  }
+  setup();
+}, []);
+  
+ async function requestPermission() {
+    const authStatus = await messaging().requestPermission();
+    console.log('Permission status:', authStatus);
+  }
+
+  async function getFCMToken() {
+    const token = await messaging().getToken();
+    console.log('FCM Token:', token);
+     await AsyncStorage.setItem("fcmtoken", token);
+    // Send token to backend
+   // sendTokenToServer(token); how to manage only after new install it will update token
+  }
+
+
+useEffect(() => {
+  const unsubscribe = messaging().onMessage(async remoteMessage => {
+    console.log('Foreground message:', remoteMessage);
+    Alert.alert(
+      remoteMessage.notification?.title || 'Notification',
+      remoteMessage.notification?.body || ''
+    );
+  });
+  return unsubscribe;
+}, []);
+ */
+
+  // ----------------------------
+  // INIT (permissions + token)
+  // ----------------------------
+  useEffect(() => {
+    initApp();
+  }, []);
+
+  const initApp = async () => {
+    await requestAllPermissions();
+    await requestNotificationPermission();
+    await createNotificationChannel();
+    await getFCMToken();
+  };
+
+  // ----------------------------
+  // NOTIFICATION PERMISSION
+  // ----------------------------
+  const requestNotificationPermission = async () => {
+    try {
+      const authStatus = await messaging().requestPermission();
+      console.log('Notification permission:', authStatus);
+    } catch (error) {
+      console.log('Permission error:', error);
+    }
+  };
+
+  // ----------------------------
+  // NOTIFEE CHANNEL
+  // ----------------------------
+  const createNotificationChannel = async () => {
+    await notifee.createChannel({
+      id: 'default',
+      name: 'Default Channel',
+    });
+  };
+
+  // ----------------------------
+  // FCM TOKEN MANAGEMENT
+  // ----------------------------
+  const getFCMToken = async () => {
+    try {
+      const storedToken = await AsyncStorage.getItem('fcmtoken');
+      const currentToken = await messaging().getToken();
+
+      console.log('FCM Token:', currentToken);
+
+      // First install
+      if (!storedToken) {
+        await AsyncStorage.setItem('fcmtoken', currentToken);
+        sendTokenToServer(currentToken);
+        return;
+      }
+
+      // Token changed
+      if (storedToken !== currentToken) {
+        await AsyncStorage.setItem('fcmtoken', currentToken);
+        sendTokenToServer(currentToken);
+      }
+    } catch (error) {
+      console.log('FCM token error:', error);
+    }
+  };
+
+  // ----------------------------
+  // TOKEN REFRESH LISTENER
+  // ----------------------------
+  useEffect(() => {
+    const unsubscribe = messaging().onTokenRefresh(async token => {
+      console.log('FCM Token refreshed:', token);
+
+      await AsyncStorage.setItem('fcmtoken', token);
+      sendTokenToServer(token);
+    });
+
+    return unsubscribe;
+  }, []);
+
+  // ----------------------------
+  // FOREGROUND NOTIFICATIONS
+  // ----------------------------
+  useEffect(() => {
+    const unsubscribe = messaging().onMessage(async remoteMessage => {
+      console.log('Foreground message:', remoteMessage);
+      Alert.alert(
+        remoteMessage.notification?.title || 'Notification',
+        remoteMessage.notification?.body || ''
+      );
+    });
+    return unsubscribe;
+  }, []);
+
+  // ----------------------------
+  // BACKEND API (replace with your API)
+  // ----------------------------
+  const sendTokenToServer = (token: string) => {
+    console.log('Send token to backend:', token);
+
+    // Example:
+    // axios.post('/api/save-token', { token })
+  };
+  return (
+    <>
+      <StatusBar
+        barStyle="light-content"   // or "dark-content"
+        backgroundColor="#000"     // Android only
+      />
+      <NavigationContainer ref={navigationRef}>
+        <StripeProvider publishableKey="pk_test_dXSih2GWiQmhH7myqOlpeWos">
+          <StackNavigator />
+        </StripeProvider>
+      </NavigationContainer>
+      <Toast />
+    </>
+  );
+}

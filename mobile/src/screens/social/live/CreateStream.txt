@@ -1,0 +1,167 @@
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  Switch,
+  PermissionsAndroid,
+  Platform,
+  ActivityIndicator,
+} from 'react-native';
+
+import {
+  createAgoraRtcEngine,
+  ChannelProfileType,
+  ClientRoleType,
+  RtcSurfaceView,
+  VideoSourceType,
+} from 'react-native-agora';
+
+const AGORA_APP_ID = '141ea750fc7847129f58316d5c4f6b79';
+const TOKEN = '007eJxTYPBOZYoNElz/f9FnP7t58j1BOUVbO8wfZy3aNEmTYdf8Fb4KDIYmhqmJ5qYGacnmFibmhkaWaaYWxoZmKabJJmlmSeaWpn/8MxsCGRnk+M0ZGRkgEMTnZChJLS6Jz8ksS2VgAABpRh8p';
+const CHANNEL_NAME = 'test_live';
+
+const CreateStream = () => {
+  const engineRef = useRef(null);
+  const [engineReady, setEngineReady] = useState(false);
+  const [isJoined, setIsJoined] = useState(false);
+  const [isHost, setIsHost] = useState(true);
+  const [remoteUid, setRemoteUid] = useState(null);
+  const [message, setMessage] = useState('Initializing Agora...');
+
+  useEffect(() => {
+    initAgora();
+    return () => {
+      if (engineRef.current) {
+        engineRef.current.release();
+        engineRef.current = null;
+      }
+    };
+  }, []);
+
+  const initAgora = async () => {
+    try {
+      if (Platform.OS === 'android') {
+        const permissions = await PermissionsAndroid.requestMultiple([
+          PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+          PermissionsAndroid.PERMISSIONS.CAMERA,
+        ]);
+        if (permissions['android.permission.CAMERA'] !== 'granted') {
+          setMessage('Camera permission denied');
+          return;
+        }
+      }
+
+      // 1. Create instance
+      const engine = createAgoraRtcEngine();
+      
+      // 2. Initialize
+      engine.initialize({ appId: AGORA_APP_ID });
+
+      // 3. Register Handlers
+      engine.registerEventHandler({
+        onJoinChannelSuccess: () => {
+          setIsJoined(true);
+          setMessage('Joined successfully!');
+        },
+        onUserJoined: (connection, uid) => {
+          setRemoteUid(uid);
+        },
+        onUserOffline: () => {
+          setRemoteUid(null);
+        },
+        onError: (err, msg) => {
+          console.error('Agora Error:', err, msg);
+          setMessage(`Error: ${err}`);
+        },
+      });
+
+      engine.enableVideo();
+      engine.setChannelProfile(ChannelProfileType.ChannelProfileLiveBroadcasting);
+      
+      // 4. Update the Ref and State
+      engineRef.current = engine; 
+      setEngineReady(true);
+      setMessage('Ready to Join');
+      console.log('Agora Engine Initialized');
+    } catch (e) {
+      console.error('Init Failed:', e);
+      setMessage('Init Failed');
+    }
+  };
+
+  const joinChannel = () => {
+    if (!engineReady || !engineRef.current) {
+      console.log('Cannot join: Engine not ready');
+      return;
+    }
+
+    engineRef.current.setClientRole(
+      isHost ? ClientRoleType.ClientRoleBroadcaster : ClientRoleType.ClientRoleAudience
+    );
+
+    engineRef.current.joinChannel(TOKEN, CHANNEL_NAME, 0, {});
+
+    //insert into db
+    
+  };
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <Text style={styles.header}>Agora Live</Text>
+      
+      {/* SHOW LOADING SPINNER UNTIL ENGINE IS READY */}
+      {!engineReady ? (
+        <View style={{ alignItems: 'center' }}>
+          <ActivityIndicator size="large" color="#0055cc" />
+          <Text>{message}</Text>
+        </View>
+      ) : (
+        <>
+          <View style={styles.row}>
+            <Text onPress={joinChannel} style={styles.button}>Join</Text>
+            <Text onPress={() => {
+              engineRef.current?.leaveChannel();
+              setIsJoined(false);
+            }} style={styles.button}>Leave</Text>
+          </View>
+
+          <View style={styles.row}>
+            <Text>Role: {isHost ? 'Host' : 'Audience'}</Text>
+            <Switch value={isHost} onValueChange={setIsHost} />
+          </View>
+
+          <ScrollView contentContainerStyle={styles.videoContainer}>
+            {isJoined && isHost && (
+              <RtcSurfaceView 
+                style={styles.video} 
+                canvas={{ uid: 0, sourceType: VideoSourceType.VideoSourceCamera }} 
+              />
+            )}
+            {isJoined && remoteUid && (
+              <RtcSurfaceView 
+                style={styles.video} 
+                canvas={{ uid: remoteUid }} 
+              />
+            )}
+            <Text style={styles.info}>{message}</Text>
+          </ScrollView>
+        </>
+      )}
+    </SafeAreaView>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: { flex: 1, alignItems: 'center', paddingTop: 50 },
+  header: { fontSize: 24, fontWeight: 'bold', marginBottom: 20 },
+  row: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
+  button: { backgroundColor: '#0055cc', color: '#fff', padding: 15, marginHorizontal: 10, borderRadius: 5 },
+  videoContainer: { width: '100%', alignItems: 'center' },
+  video: { width: 300, height: 200, backgroundColor: '#000', marginVertical: 10 },
+  info: { marginTop: 20, color: '#666' }
+});
+
+export default CreateStream;
