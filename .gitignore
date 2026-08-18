@@ -84,3 +84,8 @@ yarn-error.log*
 # ── Misc ───────────────────────────────────────────────────────
 .refact/
 *.orig
+
+# Local runtime artefacts and env backups (added 2026-08-18)
+.env.backup-*
+backend/server_out.txt
+backend/server_err.txt
