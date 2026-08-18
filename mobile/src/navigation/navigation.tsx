@@ -4,6 +4,8 @@ export type RootStackParamList = {
     AuthScreen: undefined;
     Details: undefined;
     HomeSocial: undefined;
+    /** Social Media module: backend end-to-end tester (developer screen) */
+    SocialLab: undefined;
     AIReelsScreen: undefined;
     SavedReelsScreen: undefined;
     SettingSocial: undefined;

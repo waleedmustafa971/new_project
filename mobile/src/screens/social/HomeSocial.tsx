@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo } from "react";
-import { Text, View, StyleSheet, Alert, Dimensions, Modal, ActivityIndicator } from "react-native";
+import { Text, View, StyleSheet, Alert, Dimensions, Modal, ActivityIndicator, TouchableOpacity } from "react-native";
 import {
   Platform,
   StatusBar,
@@ -58,6 +58,8 @@ const HomeSocial = () => {
   //const [getpost, setGetpost] = useState([]);
   const [getpost, setGetpost] = useState<Post[]>([]);
   const [page, setPage] = useState(1);
+  const pageRef = useRef(1);
+  const fetchingRef = useRef(false);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [userid, setUserid] = useState(null)
@@ -124,15 +126,22 @@ const HomeSocial = () => {
 
   const fetchPosts = useCallback(
     async (isInitial = false) => {
-      if (!isInitial && (loading || !hasMore)) return;
+      // The page and the in-flight flag live in refs, not state: onEndReached
+      // fires as soon as the first page renders short, which is before a
+      // setPage/setLoading update has committed. Reading state here would
+      // re-request page 1 and append it a second time.
+      if (fetchingRef.current) return;
+      if (!isInitial && !hasMore) return;
 
-      setLoading(true); // ✅ ADD THIS
+      const requestedPage = isInitial ? 1 : pageRef.current;
+      fetchingRef.current = true;
+      setLoading(true);
       if (isInitial) setInitialLoading(true);
 
       try {
         const res = await api.get("/apis/postreel/lasttenpost", {
           params: {
-            page: isInitial ? 1 : page,
+            page: requestedPage,
             limit: 10,
             username: user?.username,
             userid: user?._id,
@@ -142,19 +151,32 @@ const HomeSocial = () => {
         if (res.data?.message === "No posts found") {
           setHasMore(false);
         } else {
-          setGetpost(prev =>
-            isInitial ? res.data.reels : [...prev, ...res.data.reels]
-          );
-          setPage(prev => (isInitial ? 2 : prev + 1));
+          const incoming: Post[] = res.data.reels ?? [];
+          // Belt and braces: the server can legitimately return a post already
+          // held (a new post shifts the page window), and duplicate keys break
+          // FlatList's identity tracking.
+          setGetpost(prev => {
+            const merged = isInitial ? incoming : [...prev, ...incoming];
+            const seen = new Set<string>();
+            return merged.filter(p => {
+              const id = String(p._id);
+              if (seen.has(id)) return false;
+              seen.add(id);
+              return true;
+            });
+          });
+          pageRef.current = requestedPage + 1;
+          setPage(requestedPage + 1);
         }
       } catch (error) {
         console.error("Fetch posts error:", error);
       } finally {
-        setLoading(false); // ✅ ADD THIS
+        fetchingRef.current = false;
+        setLoading(false);
         setInitialLoading(false);
       }
     },
-    [loading, hasMore, page, user]
+    [hasMore, user]
   );
 
   return (
@@ -198,6 +220,18 @@ const HomeSocial = () => {
           showsVerticalScrollIndicator={false}
         />
       </View>
+      {/* Backend end-to-end tester. Only rendered while pointed at the local
+          server, so it disappears from production builds on its own. */}
+      {base.USE_LOCAL_SERVER && (
+        <TouchableOpacity
+          style={styles.labButton}
+          onPress={() => navigation.navigate('SocialLab' as never)}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.labButtonText}>LAB</Text>
+        </TouchableOpacity>
+      )}
+
       <View style={styles.footer}>
         <Footerpage navigation={navigation} />
       </View>
@@ -210,6 +244,27 @@ const styles = StyleSheet.create({
     backgroundColor: "#ffffff",
     padding: 0
     //paddingTop: Platform.OS === "android" ? 0 : 0, // ✅ number, not string
+  },
+  labButton: {
+    position: 'absolute',
+    right: 14,
+    bottom: 92,
+    backgroundColor: '#6f74e8',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    zIndex: 20,
+  },
+  labButtonText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.6,
   },
   footer: {
     backgroundColor: 'white',

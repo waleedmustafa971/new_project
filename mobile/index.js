@@ -13,15 +13,19 @@ import { UserProvider } from './src/screens/context/UserContext';
 import { TranslationProvider } from './src/screens/lang/TranslationContext';
 import backgroundSync from "./src/component/backgroundtask/backgroundTask";
 import { SocketProvider } from './src/screens/context/SocketContext';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import messaging from '@react-native-firebase/messaging';
 import notifee, { EventType } from '@notifee/react-native';
 
 function Main() {
   return (
+    <SafeAreaProvider>
     <Provider store={store}>
       <TranslationProvider>
-        <UserProvider> {/* how to take userid from here */}
-          <SocketProvider> {/* <SocketProvider userId={"123"}> */}
+        {/* how to take userid from here */}
+        <UserProvider>
+          {/* <SocketProvider userId={"123"}> */}
+          <SocketProvider>
             <CartProvider>
               <CartProviderFood>
               <PaperProvider>
@@ -33,6 +37,7 @@ function Main() {
         </UserProvider>
       </TranslationProvider>
     </Provider>
+    </SafeAreaProvider>
   );
 }
 

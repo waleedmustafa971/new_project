@@ -283,10 +283,14 @@ const PropertyDashboard = () => {
                      {loading ? (
                             <ScrollView>
                                    <ShimmerHeader />
-                                   <ShimmerSection /> {/* Represents Nearby Locations */}
-                                   <ShimmerSection /> {/* Represents Keep Looking */}
-                                   <ShimmerSection /> {/* Represents Recommended */}
-                                   <ShimmerSection /> {/* Represents Recommended */}
+                                   {/* Represents Nearby Locations */}
+                                   <ShimmerSection />
+                                   {/* Represents Keep Looking */}
+                                   <ShimmerSection />
+                                   {/* Represents Recommended */}
+                                   <ShimmerSection />
+                                   {/* Represents Recommended */}
+                                   <ShimmerSection />
                             </ScrollView>
                      ) : (
                             <>

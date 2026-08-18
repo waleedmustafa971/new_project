@@ -1425,7 +1425,8 @@ const ChatDetails = () => {
       }
       {
         forwardModal ?
-          <> {/* ForwardContactModal */}
+          <>
+            {/* ForwardContactModal */}
             <ForwardContactModal
               visible={forwardModal}
               onClose={() => setForwardModal(false)}

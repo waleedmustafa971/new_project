@@ -68,6 +68,8 @@ import EditProfile from '../screens/social/profile/EditProfile';
 import CurrentUserFollowers from '../screens/social/profile/CurrentUserFollowers';
 import CurrentUserFollowering from '../screens/social/profile/CurrentUserFollowering';
 import GalleryScreen from '../screens/social/gallery/GalleryScreen';
+// Social Media module: developer end-to-end tester (not linked from user navigation)
+import SocialLab from '../screens/social/devtools/SocialLab';
 import ListAds from '../screens/social/ads/ListAds';
 import DashboardSearch from '../screens/social/search/DashboardSearch';
 import NotificationPage from '../screens/social/notification/NotificationPage';
@@ -836,6 +838,11 @@ export default function StackNavigator() {
 
 
       {/* End Food Module */}
+
+      {/* Social Media module — backend end-to-end tester.
+          Reach it with navigation.navigate('SocialLab') */}
+      <Stack.Screen name="SocialLab" component={SocialLab}
+        options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 }

@@ -102,7 +102,9 @@ android {
     externalNativeBuild {
         cmake {
             path "src/main/jni/CMakeLists.txt" // Point this to your actual CMake path
-            version "3.30.3" // <--- Make sure this matches your cmake.dir
+            // Must match a CMake version actually installed in the Android SDK
+            // (see $ANDROID_HOME/cmake). RN 0.80 itself only needs 3.13.
+            version "3.22.1"
         }
     }
     /* signingConfigs {

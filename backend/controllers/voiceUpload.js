@@ -418,14 +418,40 @@ export const getGroupMessagedata = async(req, res) => {
   }
 }
 
+/*
+  These two routes are mounted without auth middleware, so req.user is never
+  populated — the blocker id has to come from the request itself. The route
+  param is :userid (lowercase d), which is the user being blocked.
+
+  Prefer /apis/safety/block, which also tears down the follow relationship.
+*/
 export const blockUsers = async(req, res) => {
    try {
-    const currentUserId = req.user._id; // from auth middleware
-    const userToBlock = req.params.userId;
-    await User.findByIdAndUpdate(
-      currentUserId,
-      { $addToSet: { blockedUsers: userToBlock } }
-    );
+    const currentUserId = req.user?._id || req.user?.userId || req.body?.userId;
+    const userToBlock = req.params.userid || req.params.userId;
+
+    if (!currentUserId || !userToBlock) {
+      return res.status(400).json({ error: "userId (blocker) and :userid (target) are required" });
+    }
+    if (String(currentUserId) === String(userToBlock)) {
+      return res.status(400).json({ error: "You cannot block yourself" });
+    }
+
+    await User.findByIdAndUpdate(currentUserId, {
+      $addToSet: { blockedUsers: userToBlock },
+      $pull: {
+        followers: userToBlock, following: userToBlock,
+        followRequests: userToBlock, sentFollowRequests: userToBlock,
+        closeFriends: userToBlock,
+      },
+    });
+    await User.findByIdAndUpdate(userToBlock, {
+      $pull: {
+        followers: currentUserId, following: currentUserId,
+        followRequests: currentUserId, sentFollowRequests: currentUserId,
+        closeFriends: currentUserId,
+      },
+    });
 
     res.status(200).json({ message: "User blocked successfully" });
   } catch (error) {
@@ -433,11 +459,15 @@ export const blockUsers = async(req, res) => {
   }
 }
 
-// POST /unblock/:userId
+// POST /unblock/:userid
 export const unblockUsers = async (req, res) => {
   try {
-    const currentUserId = req.user._id;
-    const userToUnblock = req.params.userId;
+    const currentUserId = req.user?._id || req.user?.userId || req.body?.userId;
+    const userToUnblock = req.params.userid || req.params.userId;
+
+    if (!currentUserId || !userToUnblock) {
+      return res.status(400).json({ error: "userId (blocker) and :userid (target) are required" });
+    }
 
     await User.findByIdAndUpdate(
       currentUserId,

@@ -11,6 +11,7 @@ import NetInfo from "@react-native-community/netinfo";
 import { Alert, PermissionsAndroid, Platform } from 'react-native';
 import Geolocation from '@react-native-community/geolocation';
 import { StatusBar } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import messaging from '@react-native-firebase/messaging';
 import notifee from '@notifee/react-native';
 
@@ -166,11 +167,19 @@ useEffect(() => {
         barStyle="light-content"   // or "dark-content"
         backgroundColor="#000"     // Android only
       />
-      <NavigationContainer ref={navigationRef}>
-        <StripeProvider publishableKey="pk_test_dXSih2GWiQmhH7myqOlpeWos">
-          <StackNavigator />
-        </StripeProvider>
-      </NavigationContainer>
+      {/* targetSdk 35 (Android 15) forces edge-to-edge, so StatusBar's
+          backgroundColor is ignored and screens draw under the status bar.
+          Every screen is headerShown:false, so React Navigation adds no inset
+          either — this reserves the status bar height once for the whole app.
+          Screens with their own SafeAreaView are unaffected: the native view
+          measures its own on-screen position, so a nested one resolves to 0. */}
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }} edges={['top']}>
+        <NavigationContainer ref={navigationRef}>
+          <StripeProvider publishableKey="pk_test_dXSih2GWiQmhH7myqOlpeWos">
+            <StackNavigator />
+          </StripeProvider>
+        </NavigationContainer>
+      </SafeAreaView>
       <Toast />
     </>
   );

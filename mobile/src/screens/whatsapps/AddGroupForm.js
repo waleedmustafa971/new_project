@@ -121,7 +121,8 @@ const AddGroupForm = ({ visible, onClose, users, userid }) => {
                 </Text>
               </View>
 
-            </View> {/* headerLeft */}
+            </View>
+            {/* headerLeft */}
             <View>
               {
                 isloading ?
@@ -132,7 +133,8 @@ const AddGroupForm = ({ visible, onClose, users, userid }) => {
                   </TouchableOpacity>
               }
             </View>
-          </View> {/* Header */}
+          </View>
+          {/* Header */}
           <View style={styles.groupform}>
             <TouchableOpacity style={styles.groupicon}>
               <MaterialIcons name="photo-camera" size={24} color="#000" />

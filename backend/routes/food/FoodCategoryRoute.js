@@ -9,7 +9,7 @@ import { addCategory,updateCategory,
   getCategorywisefilter, getBrandwisefilter, updateResturant,
   getItemname, getNearbyrestaurants, getDiscountRestaurant,
   getListofbrand, addNewcompany, listCompany, updateCompany, getCategoryResturant,
-  getPromos, getListofbrandsetup, changePassword
+  getPromos, getListofbrandsetup
        } from "../../controllers/food/FoodCategoryController.js";
 import authMiddleware from '../../middleware/auth.js';
 //import upload from '../../config/multer.js';
@@ -28,7 +28,6 @@ router.get("/list-of-brand", getListofbrand) //authMiddleware, Resturant brand s
 router.get("/list-of-brand-setup", getListofbrandsetup) //authMiddleware, Resturant brand selected
 
 router.post("/addnewresturant", upload.array('images', 1), addResturant)  //authMiddleware, 
-router.post("/foodvendor-changepassword", changePassword)  //authMiddleware, 
 router.post("/vendor-signup", upload.array('images', 1), addResturant)  //authMiddleware, 
 router.put("/update-resturant/:id", upload.single("images"), updateResturant);
 

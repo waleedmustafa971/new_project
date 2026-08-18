@@ -168,8 +168,10 @@ const MotorsDetailsChild = ({ item }: any) => {
       <View style={styles.keySpecsRow}>
         <IconDetail iconName="calendar-outline" value={item?.year} />
         <IconDetail iconName="speedometer-outline" value={item?.kilometers} />
-        <IconDetail iconName="speedometer" value={item?.steeringside} />. {/* Left Hand */}
-        <IconDetail iconName="globe-outline" value={item?.regional_specs} /> {/* GCC Specs */}
+        {/* Left Hand */}
+        <IconDetail iconName="speedometer" value={item?.steeringside} />
+        {/* GCC Specs */}
+        <IconDetail iconName="globe-outline" value={item?.regional_specs} />
       </View>
 
       <View style={{ marginTop: 7 }}>

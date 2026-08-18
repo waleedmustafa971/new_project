@@ -14,7 +14,7 @@ buildscript {
         //kotlin_version = "1.9.20" // this added for react-native-audio-recorder-player
     
      //   ndkVersion = "27.1.12297006"
-        cmakeVersion = "3.30.3"
+        cmakeVersion = "3.22.1"
         
         // Add this line for Skia/Video compatibility
         minSdkVersion = 26 // Skia Video requires API 26+

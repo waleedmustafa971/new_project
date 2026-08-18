@@ -12,6 +12,8 @@ const StorySection = ({ navigation, name, image }) => {
   const [user, setUser] = useState(null);
   const [profileImage, setProfileImage] = useState(null);
   const [page, setPage] = useState(1);
+  const pageRef = useRef(1);
+  const fetchingRef = useRef(false);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [currentVisibleIndex, setCurrentVisibleIndex] = useState(0);
@@ -33,8 +35,14 @@ const StorySection = ({ navigation, name, image }) => {
   }, [currentVisibleIndex]);
 
 const fetchStory = useCallback(async () => {
-  if (loading || !hasMore) return;
+  // Page and in-flight flag are refs, not state: this list is horizontal and
+  // short, so onEndReached fires before a setPage/setLoading update commits.
+  // Reading state here would refetch page 1 and append it a second time,
+  // duplicating every story and the "create_story" tile.
+  if (fetchingRef.current || !hasMore) return;
 
+  const requestedPage = pageRef.current;
+  fetchingRef.current = true;
   setLoading(true);
 
   try {
@@ -46,7 +54,7 @@ const fetchStory = useCallback(async () => {
     setProfileImage(profilePic);
     const res = await api.get("/apis/postreel/recentstory", {
       params: {
-        page,
+        page: requestedPage,
         limit: 10,
         username,
         posttype: "Story",
@@ -57,19 +65,30 @@ const fetchStory = useCallback(async () => {
       setHasMore(false);
     } else {
       const newData =
-        page === 1
+        requestedPage === 1
           ? [{ _id: "create_story", isCreateStory: true }, ...res.data.reels]
           : res.data.reels;
 
-      setGetstory((prev) => [...prev, ...newData]);
-      setPage((prev) => prev + 1);
+      setGetstory((prev) => {
+        const merged = [...prev, ...newData];
+        const seen = new Set();
+        return merged.filter((s) => {
+          const id = String(s._id);
+          if (seen.has(id)) return false;
+          seen.add(id);
+          return true;
+        });
+      });
+      pageRef.current = requestedPage + 1;
+      setPage(requestedPage + 1);
     }
   } catch (error) {
     console.error("Failed to fetch story:", error);
   } finally {
+    fetchingRef.current = false;
     setLoading(false);
   }
-}, [loading, hasMore, page]);
+}, [hasMore]);
 
   const renderStoryItem = ({ item, index }) => {
     const isVideo = (url) => /\.(mp4|mov|webm|avi|m3u8)$/i.test(url);
@@ -115,9 +134,9 @@ const fetchStory = useCallback(async () => {
           <View style={styles.profileImageContainer}>
             <Image
               source={
-                item
+                item?.userInfo?.image
                   ? {
-                      uri: item?.userInfo.image,
+                      uri: item.userInfo.image,
                     }
                   : null //require("../../../assets/user.png")
               }

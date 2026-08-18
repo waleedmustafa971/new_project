@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh auth *)",
+      "Bash(git credential-manager *)",
+      "Bash(git-credential-manager --version)",
+      "Bash(cd \"d:/React Projects/new project\" && rm -rf .git && echo \"git history wiped\")"
+    ],
+    "additionalDirectories": [
+      "d:\\React Projects\\new project\\.git"
+    ]
+  }
+}

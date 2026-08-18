@@ -560,7 +560,8 @@ export default function MotorsAdsdetails() {
                         <Text style={{
                             fontSize: 14
                         }}>Transmission type </Text>
-                    </View> {/* handleTransmissionSelect */}
+                    </View>
+                    {/* handleTransmissionSelect */}
                     <View style={styles.propertyTypeContainer}>
                         {['Manual Transmission', 'Automatic Transmission'].map((type) => (
                             <TouchableOpacity

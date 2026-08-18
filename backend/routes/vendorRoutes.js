@@ -1,6 +1,6 @@
 import express from "express";
 import { addVendor, updateVendor,
-      deleteVendor, listVendors,vendorLogin, orderList
+      deleteVendor, listVendors,vendorLogin, vendororderList as orderList
        } from "../controllers/vendorController.js";
 import authMiddleware from '../middleware/auth.js';
 import { upload } from "../helpers/uploadHelpervendor.js";

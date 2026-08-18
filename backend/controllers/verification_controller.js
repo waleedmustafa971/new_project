@@ -224,6 +224,217 @@ export const getList = async (req, res) => {
   }
 };
 
+/* ==================================================================== */
+/* Verified Badge (blue tick) — mobile-facing social verification        */
+/*                                                                       */
+/* Separate from the business/trade-licence flow above: these write       */
+/* kind:"social" documents into the same collection so the admin review   */
+/* queue at /admin covers both.                                          */
+/* ==================================================================== */
+
+const VERIFY_DIR = "uploads/verify";
+
+// Turn uploaded ID documents into optimised webp, same as the business flow.
+const storeDocuments = async (files) => {
+  if (!fs.existsSync(VERIFY_DIR)) fs.mkdirSync(VERIFY_DIR, { recursive: true });
+
+  return Promise.all(
+    (files || []).map(async (file, index) => {
+      const baseName = path.basename(file.originalname, path.extname(file.originalname));
+      const webpFileName = `verify_${Date.now()}_${index}_${baseName}.webp`;
+      const outputPath = path.join(VERIFY_DIR, webpFileName);
+
+      await sharp(file.path)
+        .resize(1600, 1600, { fit: "inside" })
+        .webp({ quality: 82 })
+        .toFile(outputPath);
+
+      fs.unlinkSync(file.path);
+      return { slNo: index + 1, image: `/uploads/verify/${webpFileName}` };
+    })
+  );
+};
+
+const SOCIAL_CATEGORIES = [
+  "creator", "public_figure", "business", "news", "sports", "entertainment", "other",
+];
+
+/*
+  POST /apis/verification/apply
+  Submit (or resubmit) a blue-tick application.
+*/
+export const applyForBadge = async (req, res) => {
+  try {
+    const { files } = req;
+    const {
+      userid, fullName, knownAs, category, country,
+      idDocumentType, notes, referenceLinks,
+    } = req.body || {};
+
+    if (!mongoose.Types.ObjectId.isValid(userid)) {
+      return res.status(400).json({ success: false, message: "A valid userid is required" });
+    }
+    if (!fullName || !category) {
+      return res.status(400).json({ success: false, message: "fullName and category are required" });
+    }
+    if (!SOCIAL_CATEGORIES.includes(category)) {
+      return res.status(400).json({
+        success: false,
+        message: `category must be one of: ${SOCIAL_CATEGORIES.join(", ")}`,
+      });
+    }
+
+    const user = await Users.findById(userid).select("verifiedBadge name").lean();
+    if (!user) return res.status(404).json({ success: false, message: "User not found" });
+    if (user.verifiedBadge) {
+      return res.status(409).json({ success: false, message: "This account is already verified" });
+    }
+
+    const existing = await Verification.findOne({ userid, kind: "social" });
+    if (existing && existing.status === "pending") {
+      return res.status(409).json({
+        success: false,
+        message: "You already have an application under review",
+        request: existing,
+      });
+    }
+
+    // referenceLinks may arrive as a JSON string or repeated form fields
+    let links = [];
+    if (Array.isArray(referenceLinks)) links = referenceLinks;
+    else if (typeof referenceLinks === "string" && referenceLinks.trim()) {
+      try {
+        const parsed = JSON.parse(referenceLinks);
+        links = Array.isArray(parsed) ? parsed : [referenceLinks];
+      } catch {
+        links = referenceLinks.split(",").map((s) => s.trim()).filter(Boolean);
+      }
+    }
+
+    const images = await storeDocuments(files);
+    const payload = {
+      userid, kind: "social",
+      fullName, knownAs, category, country,
+      idDocumentType, notes,
+      referenceLinks: links,
+      status: "pending",
+      reviewNote: "",
+      reviewedAt: null,
+      createdBy: userid,
+      createdAt: new Date(),
+    };
+    if (images.length) payload.images = images;
+
+    // A rejected application can be resubmitted in place
+    const request = existing
+      ? await Verification.findByIdAndUpdate(existing._id, payload, { new: true })
+      : await Verification.create(payload);
+
+    return res.status(201).json({
+      success: true,
+      message: "Application submitted — we'll review it shortly",
+      request,
+    });
+  } catch (error) {
+    console.error("Error applying for badge:", error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/*
+  GET /apis/verification/my-status?userid=...
+  What the "Verification" screen shows the user.
+*/
+export const getBadgeStatus = async (req, res) => {
+  try {
+    const userid = req.query.userid || req.query.userId;
+    if (!mongoose.Types.ObjectId.isValid(userid)) {
+      return res.status(400).json({ success: false, message: "A valid userid is required" });
+    }
+
+    const user = await Users.findById(userid).select("verifiedBadge accountType").lean();
+    if (!user) return res.status(404).json({ success: false, message: "User not found" });
+
+    const request = await Verification.findOne({ userid, kind: "social" })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return res.status(200).json({
+      success: true,
+      verified: !!user.verifiedBadge,
+      accountType: user.accountType || "personal",
+      // Nothing submitted yet, or the last decision
+      status: request ? request.status : "none",
+      canApply: !user.verifiedBadge && (!request || request.status === "rejected"),
+      reviewNote: request?.reviewNote || "",
+      submittedAt: request?.createdAt || null,
+      reviewedAt: request?.reviewedAt || null,
+      request: request || null,
+      categories: SOCIAL_CATEGORIES,
+    });
+  } catch (error) {
+    console.error("Error fetching badge status:", error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/*
+  POST /apis/verification/withdraw
+  Pull a pending application back.
+*/
+export const withdrawBadgeRequest = async (req, res) => {
+  try {
+    const userid = req.body?.userid || req.body?.userId;
+    if (!mongoose.Types.ObjectId.isValid(userid)) {
+      return res.status(400).json({ success: false, message: "A valid userid is required" });
+    }
+
+    const request = await Verification.findOne({ userid, kind: "social", status: "pending" });
+    if (!request) {
+      return res.status(404).json({ success: false, message: "No pending application to withdraw" });
+    }
+
+    await Verification.findByIdAndDelete(request._id);
+    return res.status(200).json({ success: true, message: "Application withdrawn" });
+  } catch (error) {
+    console.error("Error withdrawing badge request:", error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/*
+  GET /apis/verification/badge?userIds=a,b,c
+  Bulk badge lookup so feed and comment lists can render ticks in one call.
+*/
+export const getBadges = async (req, res) => {
+  try {
+    const raw = req.query.userIds || "";
+    const ids = String(raw).split(",").map((s) => s.trim())
+      .filter((s) => mongoose.Types.ObjectId.isValid(s));
+
+    if (ids.length === 0) {
+      return res.status(400).json({ success: false, message: "userIds is required" });
+    }
+
+    const users = await Users.find({ _id: { $in: ids } })
+      .select("verifiedBadge accountType")
+      .lean();
+
+    const badges = {};
+    for (const u of users) {
+      badges[String(u._id)] = {
+        verified: !!u.verifiedBadge,
+        accountType: u.accountType || "personal",
+      };
+    }
+
+    return res.status(200).json({ success: true, badges });
+  } catch (error) {
+    console.error("Error fetching badges:", error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 export const deleteData = async (req, res) => {
   try {
     const { id } = req.params;
