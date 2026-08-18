@@ -1,10 +1,24 @@
 import Socialgroup from "../models/socialmediagroup.js";
+import GroupMember from "../models/GroupMember.js";
+import { syncGroupMembership, isId, oid } from "../helpers/groups.js";
 import { processLogo } from "../helpers/uploadGroupimage.js";
 import fs from "fs";
 import path from "path";
-import bcrypt from "bcryptjs";
 
-/* ---------------- ADD VENDOR ---------------- */
+/*
+  Legacy group CRUD, kept at /api/socialgroup.
+
+  The richer surface lives at /apis/groups (controllers/groupsController.js);
+  these four endpoints stay because the admin side still calls them, and their
+  request and response shapes are unchanged. What changed here is only that
+  update and delete now address the group collection at all — both referenced
+  an undefined `Vendor` binding copied in from the vendor controller, so every
+  call threw a ReferenceError before reaching the database.
+*/
+
+const logoPathFor = (filename) => path.join("uploads/groupimage", filename);
+
+/* ---------------- ADD GROUP ---------------- */
 export const addGroup = async (req, res) => {
   try {
     // Process logo if uploaded
@@ -13,92 +27,97 @@ export const addGroup = async (req, res) => {
       logoFilename = await processLogo(req.file);
     }
 
-    const vendorData = {
+    const groupData = {
       ...req.body,
       logo: logoFilename,
     };
 
-    const newVendor = new Socialgroup(vendorData);
-    const savedVendor = await newVendor.save();
+    const newGroup = new Socialgroup(groupData);
+    const savedGroup = await newGroup.save();
 
-    res.status(201).json({ success: true, data: savedVendor });
+    /*
+      Give the creator an ownership row so a group made through this route is
+      administrable through /apis/groups. Without it the group has members but
+      nobody who can moderate it.
+    */
+    if (isId(savedGroup.creator)) {
+      await GroupMember.findOneAndUpdate(
+        { group: savedGroup._id, user: oid(savedGroup.creator) },
+        { $set: { role: "owner", status: "active", joinedAt: new Date() } },
+        { upsert: true, setDefaultsOnInsert: true }
+      );
+      await syncGroupMembership(savedGroup._id);
+    }
+
+    res.status(201).json({ success: true, data: savedGroup });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: err.message });
   }
 };
 
-
-/* ---------------- UPDATE VENDOR ---------------- */
+/* ---------------- UPDATE GROUP ---------------- */
 export const updateGroup = async (req, res) => {
   try {
     const { id } = req.params;
-    let vendor = await Vendor.findById(id);
-    if (!vendor) return res.status(404).json({ success: false, message: "Vendor not found" });
-
-    // Email duplicate check if changed
-    if (req.body.email && req.body.email !== vendor.email) {
-      const exists = await Vendor.findOne({ email: req.body.email });
-      if (exists) return res.status(400).json({ success: false, message: "Email already exists" });
-    }
+    const group = await Socialgroup.findById(id);
+    if (!group) return res.status(404).json({ success: false, message: "Group not found" });
 
     // Process new logo if uploaded (replace)
-    let logoFilename = vendor.logo;
+    let logoFilename = group.logo;
     if (req.file) {
       // delete old file if exists
       if (logoFilename) {
-        const oldPath = path.join("uploads/vendors/optimized", logoFilename);
+        const oldPath = logoPathFor(logoFilename);
         if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
       }
       logoFilename = await processLogo(req.file);
     }
 
-    // If password provided, hash it
-    if (req.body.password) {
-      const salt = await bcrypt.genSalt(10);
-      req.body.password = await bcrypt.hash(req.body.password, salt);
-    } else {
-      // don't include password in update if not provided
-      delete req.body.password;
-    }
+    /*
+      Membership is owned by the groupmember collection now, so it is dropped
+      from the payload rather than written from a form post — a stray
+      `members` field here would overwrite the synced arrays wholesale.
+    */
+    const { members, admins, pendingRequests, memberCount, pendingCount, ...safe } = req.body;
 
-    // Ensure addresses if provided (client should send array)
     const updateData = {
-      ...req.body,
+      ...safe,
       logo: logoFilename,
     };
 
-    const updated = await Vendor.findByIdAndUpdate(id, updateData, { new: true });
-    const obj = updated.toObject();
-    delete obj.password;
-    res.json({ success: true, data: obj });
+    const updated = await Socialgroup.findByIdAndUpdate(id, updateData, { new: true });
+    res.json({ success: true, data: updated });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: err.message });
   }
 };
 
-/* ---------------- DELETE VENDOR ---------------- */
+/* ---------------- DELETE GROUP ---------------- */
 export const deleteVendor = async (req, res) => {
   try {
     const { id } = req.params;
-    const vendor = await Vendor.findByIdAndDelete(id);
-    if (!vendor) return res.status(404).json({ success: false, message: "Vendor not found" });
+    const group = await Socialgroup.findByIdAndDelete(id);
+    if (!group) return res.status(404).json({ success: false, message: "Group not found" });
+
+    // Membership rows would otherwise outlive the group they belong to.
+    await GroupMember.deleteMany({ group: group._id });
 
     // remove logo file
-    if (vendor.logo) {
-      const logoPath = path.join("uploads/vendors/optimized", vendor.logo);
+    if (group.logo) {
+      const logoPath = logoPathFor(group.logo);
       if (fs.existsSync(logoPath)) fs.unlinkSync(logoPath);
     }
 
-    res.json({ success: true, message: "Vendor deleted" });
+    res.json({ success: true, message: "Group deleted" });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: err.message });
   }
 };
 
-/* ---------------- LIST VENDORS ---------------- */
+/* ---------------- LIST GROUPS ---------------- */
 export const listGroup = async (req, res) => {
   try {
     // support query params: page, limit, search, status
@@ -113,7 +132,7 @@ export const listGroup = async (req, res) => {
 
     const skip = (page - 1) * limit;
     const total = await Socialgroup.countDocuments(filter);
-    const vendors = await Socialgroup.find(filter)
+    const groups = await Socialgroup.find(filter)
       .skip(parseInt(skip))
       .limit(parseInt(limit))
       .sort({ createdAt: -1 });
@@ -124,11 +143,10 @@ export const listGroup = async (req, res) => {
       total,
       page: parseInt(page),
       pages: Math.ceil(total / limit),
-      data: vendors
+      data: groups
     });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: err.message });
   }
 };
-

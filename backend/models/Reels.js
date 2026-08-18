@@ -256,6 +256,27 @@ const videoSchema = new mongoose.Schema({
   // Cached ranking inputs, refreshed when the feed scores a document
   engagementScore: { type: Number, default: 0 },
   scoredAt: { type: Date, default: null },
+
+  /* ---- Groups & Community ---- */
+
+  // The group this post belongs to. Absent/null for an ordinary timeline post,
+  // which is what keeps group content out of the public feed: baseMatch()
+  // filters on `group: null` and a missing field matches that in Mongo.
+  group: { type: mongoose.Schema.Types.ObjectId, ref: "socialgroup", default: null },
+
+  /*
+    Moderation state inside the group.
+
+    `approved` for a post in an open group, `pending` where the group's
+    postPolicy is "approval". A rejected post keeps its row so the author can
+    be told why rather than watching it silently vanish.
+  */
+  groupStatus: { type: String, enum: ["pending", "approved", "rejected"], default: "approved" },
+  groupReviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: "users", default: null },
+  groupReviewedAt: { type: Date, default: null },
+  groupReviewNote: { type: String, default: null },
+  // Admin-pinned to the top of the group feed. At most one per group.
+  groupPinned: { type: Boolean, default: false },
 });
 
 /* ---- indexes the feed queries rely on ---- */
@@ -271,6 +292,8 @@ videoSchema.index({ "music.track": 1, xtime: -1 });
 videoSchema.index({ "savepost.username": 1, xtime: -1 });
 // Geospatial index for "nearby" / location discovery
 videoSchema.index({ "place.location": "2dsphere" });
+// Group feed, and the moderation queue that reads the same collection
+videoSchema.index({ group: 1, groupStatus: 1, xtime: -1 });
 
 // Create Model
 const Reels = mongoose.model("Reels", videoSchema);

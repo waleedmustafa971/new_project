@@ -235,12 +235,20 @@ export function scoreTrending(doc) {
   Base match for any feed query: published, not hidden by a moderator, not
   from a blocked account, and (for stories) not expired.
 */
-export function baseMatch(ctx, { type, includeExpired = false } = {}) {
+export function baseMatch(ctx, { type, includeExpired = false, group = null } = {}) {
   const match = {
     // "deleted" is the soft-delete tombstone written by the posting controller.
     status: { $nin: ["hidden", "deleted"] },
     status_draft_publish: { $ne: "Draft" },
+    /*
+      Group posts are readable only through the group's own feed, so the public
+      timeline asks for `group: null`. Mongo matches a missing field against
+      null, which is what keeps every post written before groups existed in the
+      feed. Pass a group id to invert this and read that group instead.
+    */
+    group: group || null,
   };
+  if (group) match.groupStatus = "approved";
 
   if (type && POSTTYPE[type]) match.posttype = POSTTYPE[type];
   if (ctx.hidden.length) match.username = { $nin: ctx.hidden.map(oid) };

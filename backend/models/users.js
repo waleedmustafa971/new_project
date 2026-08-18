@@ -54,6 +54,7 @@ const NotificationPrefsSchema = new mongoose.Schema({
   follows:      { type: Boolean, default: true },
   shares:       { type: Boolean, default: true },
   live:         { type: Boolean, default: true },
+  groups:       { type: Boolean, default: true },
 }, { _id: false });
 
 const userSchema = new mongoose.Schema({
@@ -160,8 +161,28 @@ const userSchema = new mongoose.Schema({
         type: [Number], // [lng, lat]
         default: [0, 0]
       }
-  }
+  },
+
+  /* --- Discovery & Search --- */
+  // Hashtags this user follows, so their topics can feed a discovery rail.
+  followedHashtags: { type: [String], default: [], lowercase: true },
+  // Free-text topics/city the creator wants to be discovered under.
+  discoveryTopics: { type: [String], default: [] },
+  city: { type: String, trim: true },
+  country: { type: String, trim: true }
 });
+
+/*
+  Geospatial index for nearby-creator discovery. Documents with no `location`
+  are simply not indexed, which is the common case here — but note the schema
+  default above writes [0, 0] whenever a location object IS created, and that
+  is a real point in the Gulf of Guinea. Every geo query in the discovery
+  controller therefore excludes [0, 0] explicitly rather than trusting the
+  index, or every such account reads as "near" anyone searching from there.
+*/
+userSchema.index({ location: "2dsphere" });
+userSchema.index({ followedHashtags: 1 });
+userSchema.index({ accountType: 1, verifiedBadge: -1 });
 
 const User = mongoose.model('users', userSchema);
 

@@ -88,6 +88,11 @@ const PREF_OF = {
   share: "shares",
   live_request: "live",
   live_gift: "live",
+  group_request: "groups",
+  group_approved: "groups",
+  group_invite: "groups",
+  group_role: "groups",
+  group_post: "groups",
 };
 
 const REACTION_VERB = {
@@ -119,6 +124,18 @@ const copyFor = (type, actorName, extra = {}) => {
       return { title: actorName, body: `${actorName} ${extra.preview || "wants to join your live"}` };
     case "live_gift":
       return { title: actorName, body: `${actorName} ${extra.preview || "sent you a gift"}` };
+
+    /* Groups & Community — `preview` carries the group name from the caller. */
+    case "group_request":
+      return { title: "New join request", body: `${actorName} asked to join ${extra.preview || "your group"}` };
+    case "group_approved":
+      return { title: "Request approved", body: `You're now a member of ${extra.preview || "the group"}` };
+    case "group_invite":
+      return { title: "Group invitation", body: `${actorName} invited you to ${extra.preview || "a group"}` };
+    case "group_role":
+      return { title: "New group role", body: extra.preview || `${actorName} changed your role in a group` };
+    case "group_post":
+      return { title: actorName, body: extra.preview || "There's an update on your group post" };
     default:
       return { title: actorName, body: "You have a new notification" };
   }
@@ -131,7 +148,7 @@ const truncate = (s, n = 120) => {
 
 export const notify = async ({
   recipient, actor, type,
-  post = null, commentId = null,
+  post = null, commentId = null, group = null,
   preview, reactionType, thumbnail,
 }) => {
   try {
@@ -160,6 +177,7 @@ export const notify = async ({
           preview: truncate(preview),
           reactionType,
           thumbnail,
+          group,
           read: false,
           readAt: null,
           createdAt: new Date(),
@@ -180,6 +198,7 @@ export const notify = async ({
           actorName: actorDoc.name || "",
           postId: post || "",
           commentId: commentId || "",
+          groupId: group || "",
         },
       });
       if (sent) await Notification.updateOne({ _id: record._id }, { $set: { pushed: true } });

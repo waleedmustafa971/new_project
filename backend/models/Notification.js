@@ -25,6 +25,13 @@ export const NOTIFICATION_TYPES = [
   "share",            // shared your post
   "live_request",     // asked to co-host / join your live as a guest
   "live_gift",        // sent a gift on your live
+
+  /* Groups & Community */
+  "group_request",    // asked to join a group you moderate
+  "group_approved",   // your request to join was approved
+  "group_invite",     // invited you to a group
+  "group_role",       // made you an admin / moderator of a group
+  "group_post",       // your group post was approved or removed
 ];
 
 const notificationSchema = new mongoose.Schema({
@@ -36,6 +43,15 @@ const notificationSchema = new mongoose.Schema({
   // of Reels.comments, which is why it is a bare ObjectId and not a ref.
   post:      { type: mongoose.Schema.Types.ObjectId, ref: "Reels", default: null },
   commentId: { type: mongoose.Schema.Types.ObjectId, default: null },
+
+  /*
+    Which group the notification came from. Context only — deliberately NOT
+    part of the upsert key below, because the unique index already deployed
+    covers five fields and adding a sixth would make every group notification
+    collide with it on insert and be dropped. The cost is that two requests
+    from the same person to two groups you moderate collapse into one row.
+  */
+  group:     { type: mongoose.Schema.Types.ObjectId, ref: "socialgroup", default: null },
 
   // Denormalised so the list endpoint does not have to re-read the post for
   // every row just to show a line of context.
