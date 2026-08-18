@@ -25,6 +25,17 @@ export const initSocket = (server) => {
   return io;
 };
 
+/*
+  index.js builds its own Server instance rather than calling initSocket, so
+  getIO() had nothing to return and every REST-side emit threw. Registering the
+  live instance here is what lets the REST controllers reach the same sockets
+  the chat handlers already use.
+*/
+export const setIO = (instance) => {
+  io = instance;
+  return io;
+};
+
 export const getIO = () => {
   if (!io) {
     throw new Error("Socket.io not initialized!");

@@ -9,6 +9,7 @@ import crypto from "crypto"
 import { MessageModel, ConversationModel } from "../models/ConversationModel.js";
 import { GroupChat } from '../models/Groupchat.js'
 import { saveBase64Audio } from "./uploadVoice.js";
+import { applyDisappearing } from "../controllers/chatController.js";
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -30,7 +31,10 @@ const handleSendMessage = async (io, socket = null, data, callback) => {
     const {
       clientMessageId, text, imageUrl, videoUrl,
       audioUrl, sender, receiver, groupId, type, 
-      messagetype, replyTo, forwardedFrom, isForwarded
+      messagetype, replyTo, forwardedFrom, isForwarded,
+      // Messaging module: typed files, stickers and view-once media travel the
+      // socket path too, not only the REST one.
+      attachments, sticker, viewOnce
     } = data;
      console.log('..sendMessage..new.cccc', JSON.stringify(data))
     // ===============================
@@ -67,13 +71,21 @@ const handleSendMessage = async (io, socket = null, data, callback) => {
         messagetype,
         replyTo: data.replyTo,
         forwardedFrom: data.forwardedFrom,
-        isForwarded: data.isForwarded
+        isForwarded: data.isForwarded,
+        attachments: Array.isArray(attachments) ? attachments : [],
+        sticker: sticker || undefined,
+        viewOnce: !!viewOnce
       });
 
       const saved = await msg.save();
       convo.messages.push(saved._id);
       convo.updatedAt = new Date();
+      convo.lastMessageAt = new Date();
       await convo.save();
+
+      // Stamp the conversation's disappearing TTL onto the new message.
+      const expiresAt = await applyDisappearing(convo._id, saved._id);
+      if (expiresAt) saved.expiresAt = expiresAt;
 
       const fullConvo = await ConversationModel.findById(convo._id)
         .populate("messages")
@@ -136,13 +148,20 @@ const handleSendMessage = async (io, socket = null, data, callback) => {
         msgByUserId: sender,  //replyTo,forwardedFrom,isForwarded
         replyTo: data.replyTo,
         forwardedFrom: data.forwardedFrom,
-        isForwarded: data.isForwarded
+        isForwarded: data.isForwarded,
+        attachments: Array.isArray(attachments) ? attachments : [],
+        sticker: sticker || undefined,
+        viewOnce: !!viewOnce
       });
 
       const saved = await msg.save();
       convo.messages.push(saved._id);
       convo.updatedAt = new Date();
+      convo.lastMessageAt = new Date();
       await convo.save();
+
+      const expiresAt = await applyDisappearing(convo._id, saved._id);
+      if (expiresAt) saved.expiresAt = expiresAt;
 
       const fullConvo = await ConversationModel.findById(convo._id)
         .populate("messages");
