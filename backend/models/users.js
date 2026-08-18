@@ -163,6 +163,14 @@ const userSchema = new mongoose.Schema({
       }
   },
 
+  /* --- Profile: interests & hobbies --- */
+  /*
+    Multi-select interests. The legacy `interest` String above is kept in sync
+    with the first entry so the old signup picker and /apis/auth/update-interest
+    keep working; nothing reads it as the source of truth any more.
+  */
+  interests: { type: [String], default: [] },
+
   /* --- Discovery & Search --- */
   // Hashtags this user follows, so their topics can feed a discovery rail.
   followedHashtags: { type: [String], default: [], lowercase: true },

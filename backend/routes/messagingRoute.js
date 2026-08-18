@@ -7,6 +7,7 @@ import fs from "fs";
 import * as chat from "../controllers/chatController.js";
 import * as calls from "../controllers/callController.js";
 import * as e2e from "../controllers/encryptionController.js";
+import * as groups from "../controllers/groupChatController.js";
 
 // Same uploads/chat destination the socket handler already writes to.
 const dir = "uploads/chat/";
@@ -57,6 +58,23 @@ router.post("/encrypted", e2e.storeEncrypted);
 
 /* ---- typing indicator ---- */
 router.post("/typing", chat.setTyping);
+
+/* ---- group chat: management only ----
+   Message traffic runs through the conversation endpoints below against the
+   group's conversation id, so a group gets reactions, receipts, disappearing
+   timers and attachments rather than a second, thinner message path. */
+router.get("/groups", groups.myGroups);
+router.post("/groups", groups.createGroup);
+router.get("/groups/:groupId", groups.getGroup);
+router.patch("/groups/:groupId", groups.updateGroup);
+router.delete("/groups/:groupId", groups.deleteGroup);
+router.get("/groups/:groupId/conversation", groups.groupConversation);
+router.get("/groups/:groupId/members", groups.listMembers);
+router.post("/groups/:groupId/members", groups.addMembers);
+router.delete("/groups/:groupId/members/:memberId", groups.removeMember);
+router.post("/groups/:groupId/members/:memberId/admin", groups.setAdmin);
+router.post("/groups/:groupId/leave", groups.leaveGroup);
+router.post("/groups/:groupId/transfer", groups.transferGroup);
 
 /* ---- a single message ---- */
 router.post("/messages/:id/react", chat.reactToMessage);

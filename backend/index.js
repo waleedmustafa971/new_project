@@ -199,6 +199,7 @@ import liveRoute from "./routes/liveRoute.js";
 import messagingRoute from "./routes/messagingRoute.js";
 import groupsRoute from "./routes/groupsRoute.js";
 import discoveryRoute from "./routes/discoveryRoute.js";
+import profileRoute from "./routes/profileRoute.js";
 app.use("/apis/feed", feedRoute);
 app.use("/apis/engagement", engagementRoute);
 app.use("/apis/posting", postingRoute);
@@ -213,6 +214,8 @@ app.use("/apis/groups", groupsRoute);
 // Discovery & Search. The narrower /apis/feed search, hashtag, nearby and
 // recommendation endpoints stay exactly as they are.
 app.use("/apis/discovery", discoveryRoute);
+// User Account & Profile. /apis/auth/editprofile and /apis/reel/Addfollow stay.
+app.use("/apis/profile", profileRoute);
 
 app.use("/api/socialgroup", socialgroup_route);
 app.use("/api/ecomcategory", ecomcategoryRoute);

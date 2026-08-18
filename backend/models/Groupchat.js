@@ -13,13 +13,16 @@ const groupChatSchema = new mongoose.Schema({
         type: String, 
         required: true 
     },
+    description: { type: String, trim: true, maxlength: 500 },
+    // Soft delete, so a disbanded group's message history is not orphaned.
+    deletedAt: { type: Date, default: null },
     isDisappearing: { 
         type: String, 
-        required: true 
+        default: 'no'
     },
     grouppermission_enable: { 
         type: String, 
-        required: true 
+        default: 'no'
     },
     groupPermission: { 
         type: String, 
@@ -28,11 +31,11 @@ const groupChatSchema = new mongoose.Schema({
     },
     editgroupsetting: { 
         type: String, 
-        required: true 
+        default: 'no'
     },
     sendmessagepermission: { 
         type: String, 
-        required: true 
+        default: 'no'
     },
     members: [
         { 
@@ -55,6 +58,15 @@ const groupChatSchema = new mongoose.Schema({
 }, {
     timestamps: true
 });
+
+/*
+  `members` is the field every membership question should be asked against.
+  `createdBy` is only the founder — the legacy /apis/messenger/getmessengergroup
+  filters on it, which is why that endpoint never returns a group you were
+  added to.
+*/
+groupChatSchema.index({ members: 1, updatedAt: -1 });
+groupChatSchema.index({ createdBy: 1 });
 
 // Model
 const GroupChat = mongoose.model('GroupChat', groupChatSchema);
