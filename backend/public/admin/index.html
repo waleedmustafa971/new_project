@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Social Media Admin — Super App</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>" />
+</head>
+<body>
+
+  <!-- ============ AUTH SCREEN ============ -->
+  <div id="auth" class="auth hidden">
+    <div class="auth-card">
+      <div class="auth-brand">
+        <div class="auth-logo">SA</div>
+        <div>
+          <h1>Social Media Admin</h1>
+          <p>Super App control panel</p>
+        </div>
+      </div>
+
+      <div id="bootstrapNotice" class="notice hidden">
+        No admin account exists yet. Create the first one below — this form is
+        disabled permanently once an admin exists.
+      </div>
+
+      <form id="authForm" class="auth-form" autocomplete="on">
+        <label class="field" id="nameField" hidden>
+          <span>Full name</span>
+          <input type="text" id="authName" placeholder="Super Admin" />
+        </label>
+        <label class="field">
+          <span>Email</span>
+          <input type="email" id="authEmail" placeholder="admin@superapp.com" required autocomplete="username" />
+        </label>
+        <label class="field">
+          <span>Password</span>
+          <input type="password" id="authPassword" placeholder="••••••••" required autocomplete="current-password" />
+        </label>
+        <div id="authError" class="auth-error hidden"></div>
+        <button type="submit" class="btn btn-primary btn-block" id="authSubmit">Sign in</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============ APP SHELL ============ -->
+  <div id="shell" class="shell hidden">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-logo">SA</div>
+        <div class="brand-text">
+          <strong>Social Media</strong>
+          <span>Admin Panel</span>
+        </div>
+      </div>
+
+      <nav class="nav" id="nav"><!-- built by app.js --></nav>
+
+      <div class="sidebar-foot">
+        <div class="who">
+          <div class="who-avatar" id="whoAvatar">A</div>
+          <div class="who-text">
+            <strong id="whoName">Admin</strong>
+            <span id="whoEmail"></span>
+          </div>
+        </div>
+        <button class="btn btn-ghost btn-sm btn-block" id="logoutBtn">Sign out</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <button class="icon-btn menu-btn" id="menuBtn" aria-label="Toggle menu">☰</button>
+        <div class="topbar-title">
+          <h2 id="pageTitle">Dashboard</h2>
+          <p id="pageSubtitle">Overview of the social media module</p>
+        </div>
+        <div class="topbar-actions" id="topbarActions"></div>
+      </header>
+
+      <div class="content" id="view"><!-- built by app.js --></div>
+    </main>
+  </div>
+
+  <!-- ============ MODAL ============ -->
+  <div class="modal-backdrop hidden" id="modalBackdrop">
+    <div class="modal" role="dialog" aria-modal="true">
+      <div class="modal-head">
+        <h3 id="modalTitle">Title</h3>
+        <button class="icon-btn" id="modalClose" aria-label="Close">✕</button>
+      </div>
+      <div class="modal-body" id="modalBody"></div>
+      <div class="modal-foot" id="modalFoot"></div>
+    </div>
+  </div>
+
+  <div class="toasts" id="toasts"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
