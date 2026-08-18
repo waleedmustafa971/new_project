@@ -41,7 +41,16 @@ const PostSection = ({ post: initialPost, navigation, userid }) => {
   const dispatch = useDispatch();
   const { followedUsers, loading, error } = useSelector((state) => state.users);
   const { getUserData } = useSelector((state) => state.auth);
-  const gradientColors = post?.xbackgroundcolor ? post.xbackgroundcolor.split(',') : ['#ffffff', '#ffffff'];
+  // LinearGradient needs at least 2 colors — older posts store a single one.
+  const bgColors = (Array.isArray(post?.xbackgroundcolor)
+    ? post.xbackgroundcolor
+    : String(post?.xbackgroundcolor ?? '').split(','))
+    .map((c) => String(c).trim())
+    .filter(Boolean);
+  const gradientColors =
+    bgColors.length >= 2 ? bgColors
+      : bgColors.length === 1 ? [bgColors[0], bgColors[0]]
+        : ['#ffffff', '#ffffff'];
   const viewfont = post?.xfontsize ? Number(post.xfontsize) : 14;
   const [showComments, setShowComments] = useState(null);
   const [commentVisible, setCommentVisible] = useState(null)
