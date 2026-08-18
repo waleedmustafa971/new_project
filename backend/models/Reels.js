@@ -1,9 +1,16 @@
 import mongoose from "mongoose";
 
 // Define sub-schema for interactions
+// Shared by likes / dislikes / favorites / shares / savepost.
+// `type` only carries meaning on `likes`, where it holds the reaction. Rows
+// written before reactions existed have no `type` and read back as "like".
+export const REACTIONS = ["like", "love", "haha", "wow", "sad", "angry"];
+
 const interactionSchema = new mongoose.Schema({
   username: { type: mongoose.Schema.Types.ObjectId, ref: "users", required: true },
-  count: { type: Number, default: 1 }
+  count: { type: Number, default: 1 },
+  type: { type: String, enum: REACTIONS, default: "like" },
+  xtime: { type: Date, default: Date.now }
 });
 
 const sharepostSchema = new mongoose.Schema({
@@ -43,9 +50,116 @@ const commentSchema = new mongoose.Schema({
   message: { type: String, required: true },  // The comment text
   timestamp: { type: Date, default: Date.now }, // When the comment was posted
   likes: { type: [commentLikeSchema], default: [] }, // Users who liked the comment
-  reply: { type: [commentReplyLikeSchema], default: [] }
-  
+  // Legacy single-level replies. Still read so old threads keep rendering;
+  // new replies are stored as comments carrying `parentId` instead.
+  reply: { type: [commentReplyLikeSchema], default: [] },
+
+  /* ---- threading ---- */
+  // null for a top-level comment, otherwise the _id of the comment replied to.
+  // Replies live in the same array so one write reaches any depth without
+  // walking a nested tree.
+  parentId: { type: mongoose.Schema.Types.ObjectId, default: null },
+  // Denormalised author of the comment being replied to, so "replying to @x"
+  // renders without another lookup.
+  replyTo: { type: mongoose.Schema.Types.ObjectId, ref: "users", default: null },
+  mentions: [{ type: mongoose.Schema.Types.ObjectId, ref: "users" }],
+  editedAt: { type: Date, default: null },
+  // Soft delete: a removed parent still has to hold its replies together.
+  deleted: { type: Boolean, default: false }
 });
+
+/* ---- Social Feed (Timeline) sub-schemas ---- */
+
+// One item of a carousel. A single-image post simply has one of these.
+const MediaSchema = new mongoose.Schema({
+  url: { type: String, required: true },
+  type: { type: String, enum: ["image", "video"], default: "image" },
+  thumbnail: { type: String },
+  width: { type: Number },
+  height: { type: Number },
+  duration: { type: Number },   // seconds, video only
+  altText: { type: String },    // accessibility / AI caption slot
+  order: { type: Number, default: 0 },
+}, { _id: false });
+
+const PollOptionSchema = new mongoose.Schema({
+  id: { type: String, required: true },
+  text: { type: String, required: true, trim: true },
+  votes: [{ type: mongoose.Schema.Types.ObjectId, ref: "users" }],
+}, { _id: false });
+
+const PollSchema = new mongoose.Schema({
+  question: { type: String, required: true, trim: true },
+  options: { type: [PollOptionSchema], validate: v => v.length >= 2 && v.length <= 6 },
+  multiple: { type: Boolean, default: false },  // allow picking more than one
+  endsAt: { type: Date },                        // null means it never closes
+  closed: { type: Boolean, default: false },
+}, { _id: false });
+
+// GeoJSON point. Its own schema so it is only ever written as a whole:
+// `coordinates` is required, so a Point can never be stored without one.
+const GeoPointSchema = new mongoose.Schema({
+  type: { type: String, enum: ["Point"], default: "Point" },
+  coordinates: { type: [Number], required: true }, // [lng, lat]
+}, { _id: false });
+
+// Structured check-in. `location` is GeoJSON so a 2dsphere index works.
+const PlaceSchema = new mongoose.Schema({
+  name: { type: String, required: true, trim: true },
+  address: { type: String },
+  city: { type: String },
+  country: { type: String },
+  placeId: { type: String },   // external provider id, if the app has one
+  // `default: undefined` keeps this absent for a name-only check-in. Declared
+  // inline, Mongoose applies the `type: "Point"` default on its own and stores
+  // a coordinate-less Point, which the 2dsphere index below cannot index — and
+  // that makes *every* later update to the post fail with "Can't extract geo
+  // keys", including adding a comment or a like.
+  location: { type: GeoPointSchema, default: undefined },
+}, { _id: false });
+
+/*
+  Music attached to a video or story. The track is referenced so the library
+  stays the single source of truth, but title/artist/url are copied alongside
+  it: a post has to keep rendering its sound strip even if the track is later
+  pulled from the catalogue.
+*/
+const TrackSchema = new mongoose.Schema({
+  track: { type: mongoose.Schema.Types.ObjectId, ref: "musictbl" },
+  title: { type: String },
+  artist: { type: String },
+  url: { type: String },
+  coverImage: { type: String },
+  // Which slice of the track plays, in seconds from its start.
+  startAt: { type: Number, default: 0, min: 0 },
+  duration: { type: Number, min: 0 },
+  volume: { type: Number, default: 1, min: 0, max: 1 },
+}, { _id: false });
+
+/*
+  Capture-time treatment. Applied on the device; recorded here so the post can
+  be re-rendered or audited with the same look.
+*/
+const EffectsSchema = new mongoose.Schema({
+  filter: { type: mongoose.Schema.Types.ObjectId, ref: "filters" },
+  filterName: { type: String },
+  intensity: { type: Number, default: 1, min: 0, max: 1 },
+  beauty: {
+    smooth:   { type: Number, min: 0, max: 1 },
+    slim:     { type: Number, min: 0, max: 1 },
+    brighten: { type: Number, min: 0, max: 1 },
+    eyes:     { type: Number, min: 0, max: 1 },
+  },
+}, { _id: false });
+
+const TaggedUserSchema = new mongoose.Schema({
+  user: { type: mongoose.Schema.Types.ObjectId, ref: "users", required: true },
+  // Position on the image as a 0-1 fraction, for photo tags
+  x: { type: Number, min: 0, max: 1 },
+  y: { type: Number, min: 0, max: 1 },
+  mediaIndex: { type: Number, default: 0 },  // which carousel item
+  approved: { type: Boolean, default: true }, // tagged user may remove themselves
+}, { _id: false });
 
 const videoSchema = new mongoose.Schema({
   videoUrl: { type: Object, required: true },
@@ -84,9 +198,79 @@ const videoSchema = new mongoose.Schema({
     default: "Draft",
     required: true,
   },
-  sharegroup: { type: Object }
+  sharegroup: { type: Object },
 
+  /* ================================================================
+     Social Feed (Timeline) additions.
+
+     All additive. `videoUrl` and `location` are still written by the
+     create endpoints so the existing mobile screens keep working while
+     new screens move to `media[]` and `place`.
+     ================================================================ */
+
+  // Carousel: ordered media items. Single-item posts have one entry.
+  media: { type: [MediaSchema], default: [] },
+
+  // Polls in posts
+  poll: { type: PollSchema, default: undefined },
+
+  // Structured check-in / location tag (supersedes the free-text `location`)
+  place: { type: PlaceSchema, default: undefined },
+
+  // Tag friends: users tagged in the post, optionally positioned on the photo
+  taggedUsers: { type: [TaggedUserSchema], default: [] },
+
+  // Structured music (supersedes the loose `sound` / `videosound` objects)
+  music: { type: TrackSchema, default: undefined },
+
+  // Camera filter / beauty settings used at capture
+  effects: { type: EffectsSchema, default: undefined },
+
+  // Draft bookkeeping. `status_draft_publish` above holds the state; these
+  // record when it last moved, so a drafts list can sort by real recency.
+  draftUpdatedAt: { type: Date, default: null },
+  publishedAt: { type: Date, default: null },
+
+  // Soft delete. The row stays so counters, notifications and shares that
+  // point at it can be cleaned up deliberately rather than dangling.
+  deletedAt: { type: Date, default: null },
+
+  // Extracted from the caption on save; lowercased, no leading #
+  hashtags: { type: [String], default: [], index: true },
+  mentions: [{ type: mongoose.Schema.Types.ObjectId, ref: "users" }],
+
+  // Stories expire 24h after posting. Filtered on read rather than deleted,
+  // so the author keeps their archive and highlights stay possible.
+  expiresAt: { type: Date, default: null },
+
+  // Reach + story seen-state
+  viewsCount: { type: Number, default: 0 },
+  viewedBy: {
+    type: [{
+      user: { type: mongoose.Schema.Types.ObjectId, ref: "users" },
+      at: { type: Date, default: Date.now },
+    }],
+    default: [],
+  },
+
+  // Cached ranking inputs, refreshed when the feed scores a document
+  engagementScore: { type: Number, default: 0 },
+  scoredAt: { type: Date, default: null },
 });
+
+/* ---- indexes the feed queries rely on ---- */
+videoSchema.index({ posttype: 1, xtime: -1 });
+videoSchema.index({ username: 1, xtime: -1 });
+videoSchema.index({ hashtags: 1, xtime: -1 });
+videoSchema.index({ expiresAt: 1 });
+videoSchema.index({ engagementScore: -1, xtime: -1 });
+videoSchema.index({ "taggedUsers.user": 1, xtime: -1 });
+videoSchema.index({ "comments.parentId": 1 });
+videoSchema.index({ username: 1, status_draft_publish: 1, draftUpdatedAt: -1 });
+videoSchema.index({ "music.track": 1, xtime: -1 });
+videoSchema.index({ "savepost.username": 1, xtime: -1 });
+// Geospatial index for "nearby" / location discovery
+videoSchema.index({ "place.location": "2dsphere" });
 
 // Create Model
 const Reels = mongoose.model("Reels", videoSchema);

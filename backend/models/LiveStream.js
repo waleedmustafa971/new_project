@@ -38,12 +38,35 @@ const liveStreamSchema = new mongoose.Schema({
     videoOn: { type: Boolean, default: true },
     status: {
     type: String,
-    enum: ["requested", "approved", "rejected"],
+    enum: ["requested", "approved", "rejected", "left", "removed"],
     default: "requested"
     },
-    joinedAt: { type: Date }
+    // A co-host is invited to share the broadcast; a guest is a viewer who
+    // asked to come up. Same seat mechanics, different intent and UI.
+    role: {
+    type: String,
+    enum: ["cohost", "guest"],
+    default: "cohost"
+    },
+    joinedAt: { type: Date },
+    leftAt: { type: Date }
     }
     ],
+
+    // Who is currently watching. Kept as rows rather than a bare counter so a
+    // reconnect cannot double-count and a viewer list is possible.
+    viewers: [
+    {
+    user: { type: mongoose.Schema.Types.ObjectId, ref: "users", required: true },
+    joinedAt: { type: Date, default: Date.now },
+    leftAt: { type: Date, default: null }
+    }
+    ],
+    peak_viewers: { type: Number, default: 0 },
+
+    // Running total of gift coins received on this stream.
+    gift_coins: { type: Number, default: 0 },
+    endedAt: { type: Date },
     stream_url: { type: String },
     thumbnail: { type: String },
     title: { type: String },
@@ -58,6 +81,10 @@ const liveStreamSchema = new mongoose.Schema({
     updateby: { type: Date, default: Date.now },
     xtime: { type: Date, default: Date.now },
 });
+
+liveStreamSchema.index({ status: 1, enteredby: -1 });
+liveStreamSchema.index({ hoster: 1, status: 1 });
+liveStreamSchema.index({ "viewers.user": 1 });
 
 const LiveStream = mongoose.model('livestreamtbl', liveStreamSchema);
 

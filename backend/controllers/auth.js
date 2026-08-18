@@ -14,6 +14,7 @@ import path from 'path';
 import sharp from 'sharp';
 import dotenv from "dotenv";
 import { upload } from "../middleware/imageHelper.js"; // multer setup
+import { statusOf } from "../helpers/accountStatus.js";
 dotenv.config();
 const SECRET_KEY = process.env.SECRET_KEY;
 
@@ -115,6 +116,18 @@ export const Googlesignin = async (req, res) => {
     const existingUseremail = await User.findOne({ email: email });
     if (existingUseremail) {
       console.log({ message: "email is already used" });
+
+      // Google sign-in returns an existing account straight into a session,
+      // so it needs the same moderation check the password path does.
+      const standing = await statusOf(existingUseremail);
+      if (!standing.allowed) {
+        return res.status(standing.code).json({
+          message: standing.reason,
+          accountStatus: standing.status,
+          suspendedUntil: standing.suspendedUntil,
+        });
+      }
+
       // 3️⃣ Generate JWT Token
       const token = jwt.sign(
         { userId: existingUseremail._id, email: existingUseremail.email },
@@ -768,6 +781,17 @@ export const login = async (req, res) => {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
+    // A banned or suspended account must not get a session. Checked after the
+    // password so the response never reveals which accounts are moderated.
+    const standing = await statusOf(user);
+    if (!standing.allowed) {
+      return res.status(standing.code).json({
+        message: standing.reason,
+        accountStatus: standing.status,
+        suspendedUntil: standing.suspendedUntil,
+      });
+    }
+
     // Generate access token (short-lived)
     const token = jwt.sign(
       { userId: user._id, email: user.email },
@@ -809,6 +833,17 @@ export const refreshToken = async (req, res) => {
   try {
     // Verify with the REFRESH secret
     const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+
+    // An account banned mid-session keeps its access token until it expires;
+    // refusing the refresh is what actually ends the session.
+    const standing = await statusOf(decoded.userId);
+    if (!standing.allowed) {
+      return res.status(standing.code).json({
+        message: standing.reason,
+        accountStatus: standing.status,
+        suspendedUntil: standing.suspendedUntil,
+      });
+    }
 
     // Create new access token
     const newAccessToken = jwt.sign(
@@ -1018,7 +1053,12 @@ export const getProfileid = async (req, res) => {
         address: user.address,
         followersCount,
         followingCount,
-        coins: user.coins
+        coins: user.coins,
+        // Social Media module: blue tick + privacy state
+        verifiedBadge: !!user.verifiedBadge,
+        accountType: user.accountType || "personal",
+        privacy: user.privacy || "public",
+        pendingFollowRequests: (user.followRequests || []).length,
       },
     });
   } catch (error) {
@@ -1076,7 +1116,12 @@ export const getProfile = async (req, res) => {
         address: user.address,
         followersCount,
         followingCount,
-        coins: user.coins
+        coins: user.coins,
+        // Social Media module: blue tick + privacy state
+        verifiedBadge: !!user.verifiedBadge,
+        accountType: user.accountType || "personal",
+        privacy: user.privacy || "public",
+        pendingFollowRequests: (user.followRequests || []).length,
       },
     });
   } catch (error) {

@@ -9,6 +9,7 @@ import { createServer } from "http";
 import { Server } from "socket.io";
 
 import path from "path";
+import { setIO } from "./socket/socket.js";
 dotenv.config();
 
 const app = express();
@@ -31,6 +32,12 @@ const io = new Server(server, {
     credentials: true
   }
 });
+// Expose io so routes (e.g. admin panel moderation) can emit to rooms
+app.set("io", io);
+// And register it with the socket module, so controllers reaching for getIO()
+// (messaging, calls, encryption) talk to this same instance rather than throwing.
+setIO(io);
+
 // initSocket(server); here is for live stream
 // initSocket(server);
 
@@ -74,6 +81,9 @@ const __dirname = path.dirname(__filename);
 // Serve static files from "uploads" folder
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use("/profilepicture", express.static(path.join(__dirname, "profilepicture")));
+
+// Admin Panel UI (Social Media module) -> http://localhost:PORT/admin
+app.use("/admin", express.static(path.join(__dirname, "public", "admin")));
 
 const MONGO_URI = process.env.MONGO_URI;
 mongoose
@@ -129,6 +139,7 @@ import verificationRoutes from "./routes/verification_route.js"
 import supportRoutes from "./routes/support_router.js"
 import dashboardRoutes from "./routes/userdashboard_router.js"
 import jobRoutes from './routes/job_route.js'
+import notificationRoutes from "./routes/notificationRoutes.js"
 import agentRoutes from "./routes/agentRoute.js"
 import propertyvideoRoutes from './routes/property_video.js'
 //import JobcategoryRoutes from './router/JobcategoryRoutes.js'
@@ -166,6 +177,35 @@ app.use("/api/deliveryboy", DeliveryRouter);
 app.use("/api/videoprocessing", videoprocessing_route);
 /* end Food */
 
+/* Admin Panel API (backs the UI at /admin) */
+import adminPanelRoute from "./routes/adminPanelRoute.js";
+import adminUsersRoute from "./routes/adminUsersRoute.js";
+app.use("/api/adminpanel", adminPanelRoute);
+// Extended user management (audit, bulk, export, safe delete). Mounted on its
+// own path so the panel's existing /api/adminpanel/users routes keep working.
+app.use("/api/adminusers", adminUsersRoute);
+
+/* Social Media module: privacy settings + safety (block & report) */
+import privacyRoute from "./routes/privacyRoute.js";
+import safetyRoute from "./routes/safetyRoute.js";
+app.use("/apis/privacy", privacyRoute);
+app.use("/apis/safety", safetyRoute);
+
+/* Social Media module: feed, For You, trending, stories, hashtags, check-ins */
+import feedRoute from "./routes/feedRoute.js";
+import engagementRoute from "./routes/engagementRoute.js";
+import postingRoute from "./routes/postingRoute.js";
+import liveRoute from "./routes/liveRoute.js";
+import messagingRoute from "./routes/messagingRoute.js";
+app.use("/apis/feed", feedRoute);
+app.use("/apis/engagement", engagementRoute);
+app.use("/apis/posting", postingRoute);
+// Shares the /apis/live prefix with livestream_router below, which keeps the
+// Agora token and gift-admin endpoints. Registered first, so any path added
+// there that collides with one here would be shadowed — keep them disjoint.
+app.use("/apis/live", liveRoute);
+app.use("/apis/messaging", messagingRoute);
+
 app.use("/api/socialgroup", socialgroup_route);
 app.use("/api/ecomcategory", ecomcategoryRoute);
 app.use("/api/vendor", vendorRoute);
@@ -184,6 +224,7 @@ app.use("/apis/countries", countryRoutes);
 app.use("/apis/reel", reelRoutes);
 app.use("/apis/promo", promoRoutes)
 app.use("/apis/job", jobRoutes)
+app.use("/apis/notification", notificationRoutes)
 app.use("/apis/propertyvideo", propertyvideoRoutes)
 
 app.use("/apis/chat", chatRoutes);
@@ -546,20 +587,31 @@ export const socket = io(SOCKET_URL, {
         return;
       }
 
-      if (sender.coins < giftCoins) {
+      /*
+        Debit conditionally rather than read-modify-write: matching on
+        `coins: { $gte: cost }` and decrementing in the same operation means two
+        gifts fired at once cannot both pass the check and overdraw the wallet.
+        A zero match means they could not afford it and nothing has moved.
+      */
+      const debit = await User.updateOne(
+        { _id: sender._id, coins: { $gte: giftCoins } },
+        { $inc: { coins: -giftCoins } }
+      );
+      if (debit.matchedCount === 0) {
         console.log('Not enough coins');
         socket.emit("gift-error", { message: "Not enough coins" });
         return;
       }
 
-      // Deduct sender coins
-      sender.coins -= giftCoins;
-      await sender.save();
+      await User.updateOne({ _id: liveStream.hoster }, { $inc: { coins: giftCoins } });
+      // Keep the stream's running total in step with the REST gift path.
+      await LiveStream.updateOne(
+        { _id: liveStream._id },
+        { $inc: { gift_coins: giftCoins, coins: giftCoins } }
+      );
 
-      // Add coins to host
       const host = await User.findById(liveStream.hoster);
-      host.coins += giftCoins;
-      await host.save();
+      sender.coins -= giftCoins;
 
       const logdata = {
         sender: sender._id,

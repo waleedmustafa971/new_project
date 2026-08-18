@@ -2,7 +2,8 @@ import mongoose from "mongoose";
 import Reel from "../models/Reels.js";
 import User from "../models/users.js";
 import Video from '../models/VideoFile.js'; 
-import Savereel from '../models/savereel.js'; 
+import Savereel from '../models/savereel.js';
+import { relationship, needsFollowApproval } from "../helpers/privacy.js";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -13,6 +14,7 @@ import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 
 import Mux from '@mux/mux-node';
+import { notify } from "../services/notificationService.js";
 const mux = new Mux({
   tokenId: process.env.MUX_TOKEN_ID,
   tokenSecret: process.env.MUX_TOKEN_SECRET,
@@ -78,7 +80,7 @@ export const removeLike = async (req, res) => {
     }
 
     // Remove like from the array
-    reel.likes = reel.likes.filter((like) => like.username !== username);
+    reel.likes = reel.likes.filter((like) => String(like.username) !== String(username));
     await reel.save();
 
     const totalLikes = reel.likes.length;
@@ -100,7 +102,7 @@ export const isLiked = async (req, res) => {
       return res.status(404).json({ error: "Reel not found" });
     }
 
-    const liked = reel.likes.some((like) => like.username === username);
+    const liked = reel.likes.some((like) => String(like.username) === String(username));
 
     res.json({ liked });
   } catch (error) {
@@ -225,7 +227,7 @@ export const addFavourite = async (req, res) => {
     }
 
     // ✅ Check if user has already liked
-    const existingFav = reel.favorites.find((fav) => fav.username === username);
+    const existingFav = reel.favorites.find((fav) => String(fav.username) === String(username));
     if (existingFav) {
       return res
         .status(400)
@@ -911,6 +913,33 @@ export const Addfollow = async (req, res) => {
   }
 
   try {
+    // Respect privacy + blocking: a private account gets a pending request
+    // instead of an instant follow. Same rules as /apis/privacy/follow.
+    const target = await User.findById(followId)
+      .select("privacy privacySettings followers followRequests blockedUsers")
+      .lean();
+
+    if (!target) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    const rel = await relationship(userId, target);
+    if (rel === "blocked") {
+      return res.status(403).json({ message: "This profile is not available." });
+    }
+    if (rel === "follower") {
+      return res.json({ message: "Already following!", status: "following" });
+    }
+    if (rel === "requested") {
+      return res.json({ message: "Request already pending.", status: "requested" });
+    }
+
+    if (needsFollowApproval(target)) {
+      await User.findByIdAndUpdate(followId, { $addToSet: { followRequests: userId } });
+      await User.findByIdAndUpdate(userId, { $addToSet: { sentFollowRequests: followId } });
+      return res.json({ message: "Follow request sent!", status: "requested" });
+    }
+
     // Add followId to userId's following list
     await User.findByIdAndUpdate(userId, {
       $addToSet: { following: followId },
@@ -921,7 +950,9 @@ export const Addfollow = async (req, res) => {
       $addToSet: { followers: userId },
     });
 
-    res.json({ message: "Followed successfully!" });
+    await notify({ recipient: followId, actor: userId, type: "follow" });
+
+    res.json({ message: "Followed successfully!", status: "following" });
   } catch (error) {
     console.error("Follow error:", error);
     res.status(500).json({ message: "Internal Server Error" });
