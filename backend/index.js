@@ -198,6 +198,7 @@ import postingRoute from "./routes/postingRoute.js";
 import liveRoute from "./routes/liveRoute.js";
 import monetisationRoute from "./routes/monetisationRoute.js";
 import creatorRoute from "./routes/creatorRoute.js";
+import storyRoute from "./routes/storyRoute.js";
 import messagingRoute from "./routes/messagingRoute.js";
 import groupsRoute from "./routes/groupsRoute.js";
 import discoveryRoute from "./routes/discoveryRoute.js";
@@ -215,6 +216,9 @@ app.use("/apis/monetisation", monetisationRoute);
 
 /* Pages / Creator / Business — analytics, scheduling, boosts and ads. */
 app.use("/apis/creator", creatorRoute);
+
+/* Stories — stickers, highlights, swipe-up links and mentions. */
+app.use("/apis/stories", storyRoute);
 
 /*
   Publish scheduled posts as they come due.

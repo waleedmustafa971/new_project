@@ -107,7 +107,8 @@ const searchPosts = async (q, ctx, { limit, skip = 0, type }) => {
   const tag = normalizeTerm(q);
 
   const match = baseMatch(ctx, { type: POSTTYPE[type] ? type : undefined });
-  match.$and = [{ $or: [{ videoTitle: rx }, { hashtags: tag }, { "place.name": rx }] }];
+  match.$and = [
+    ...(match.$and || []),{ $or: [{ videoTitle: rx }, { hashtags: tag }, { "place.name": rx }] }];
 
   const total = await Reels.countDocuments(match);
 
@@ -887,6 +888,7 @@ export const discoverVideos = wrap(async (req, res) => {
   */
   match.$and = [
     ...(match.$and || []),
+    ...(match.$and || []),
     {
       $or: [
         { posttype: POSTTYPE.reel },
@@ -942,6 +944,7 @@ export const videoCategories = wrap(async (req, res) => {
   const match = baseMatch(ctx);
   match.xtime = { $gte: since(hours) };
   match.$and = [
+    ...(match.$and || []),
     ...(match.$and || []),
     { $or: [{ posttype: POSTTYPE.reel }, { "media.type": "video" }, { "videoUrl.type": "video" }] },
   ];

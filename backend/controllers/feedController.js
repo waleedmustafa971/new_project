@@ -286,7 +286,15 @@ export const storyFeed = wrap(async (req, res) => {
   const match = baseMatch(ctx, { type: "story" });
   // A story counts as live if expiresAt is ahead, or (for older documents that
   // predate the field) it was posted within the last 24 hours.
+  /*
+    Pushed onto whatever baseMatch() already put in `$and`, not assigned over it.
+    baseMatch uses `$and` for the scheduled-post guard, and replacing the array
+    here would silently drop that guard for the story feed alone — the kind of
+    leak that only shows up once someone schedules a story.
+  */
   match.$and = [
+    ...(match.$and || []),
+    ...(match.$and || []),
     {
       $or: [
         { expiresAt: { $gt: new Date() } },
@@ -1160,7 +1168,8 @@ export const searchContent = wrap(async (req, res) => {
   const rx = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
 
   const match = baseMatch(ctx, { type: req.query.type });
-  match.$and = [{ $or: [{ videoTitle: rx }, { hashtags: q.replace(/^#/, "").toLowerCase() }, { "place.name": rx }] }];
+  match.$and = [
+    ...(match.$and || []),{ $or: [{ videoTitle: rx }, { hashtags: q.replace(/^#/, "").toLowerCase() }, { "place.name": rx }] }];
 
   const docs = await Reels.find(match)
     .sort({ xtime: -1 })

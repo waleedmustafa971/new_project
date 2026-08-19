@@ -264,6 +264,47 @@ const videoSchema = new mongoose.Schema({
   // Polls in posts
   poll: { type: PollSchema, default: undefined },
 
+  /*
+    Interactive story stickers — polls, questions, quizzes and sliders.
+
+    Separate from the `poll` field above, which belongs to a feed post and is
+    one per post. A story carries several stickers at once, each positioned on
+    the canvas, and a quiz needs a correct answer while a question takes free
+    text — one shape cannot serve all four, so `kind` selects which of the
+    optional fields apply.
+
+    The answers themselves live in their own collection: a popular story
+    collects thousands, and pushing them into this document would grow it
+    without bound and rewrite it on every tap.
+  */
+  stickers: {
+    type: [new mongoose.Schema({
+      kind: { type: String, enum: ["poll", "question", "quiz", "slider"], required: true },
+      prompt: { type: String, required: true, maxlength: 200 },
+      // poll and quiz only
+      options: { type: [String], default: [] },
+      // quiz only: index into `options`
+      correctOption: { type: Number, default: null },
+      // slider only
+      emoji: { type: String, default: "😍" },
+      // Where it sits on the story canvas, 0..1 so it survives any screen size.
+      x: { type: Number, default: 0.5 },
+      y: { type: Number, default: 0.5 },
+      createdAt: { type: Date, default: Date.now },
+    })],
+    default: [],
+  },
+
+  /*
+    Swipe-up link. Restricted to creator and business accounts, which is the
+    only reason it is not simply a field on every story.
+  */
+  swipeUpLink: {
+    url: { type: String, default: "" },
+    label: { type: String, default: "Learn more" },
+    clicks: { type: Number, default: 0 },
+  },
+
   // Structured check-in / location tag (supersedes the free-text `location`)
   place: { type: PlaceSchema, default: undefined },
 

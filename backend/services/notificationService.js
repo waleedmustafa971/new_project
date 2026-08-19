@@ -93,6 +93,8 @@ const PREF_OF = {
   // — which is the right default for someone paying you money.
   subscription: "subscriptions",
   login_alert: "security",
+  story_response: "comments",
+  mention_story: "mentions",
   group_request: "groups",
   group_approved: "groups",
   group_invite: "groups",
@@ -129,6 +131,10 @@ const copyFor = (type, actorName, extra = {}) => {
       return { title: actorName, body: `${actorName} ${extra.preview || "wants to join your live"}` };
     case "live_invite":
       return { title: actorName, body: `${actorName} ${extra.preview || "invited you onto their live"}` };
+    case "story_response":
+      return { title: actorName, body: `${actorName} answered: ${extra.preview || "your story sticker"}` };
+    case "mention_story":
+      return { title: actorName, body: `${actorName} mentioned you in their story` };
     case "login_alert":
       return { title: "New sign-in", body: `Your account was signed in to from ${extra.preview || "a new device"}` };
     case "subscription":
