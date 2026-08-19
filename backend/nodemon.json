@@ -1,0 +1,11 @@
+{
+  "//": "Legacy polling: the default watcher does not fire on this drive, so nodemon serves stale code without it.",
+  "legacyWatch": true,
+  "ext": "js,mjs,json",
+  "ignore": [
+    "scripts/*",
+    "public/*",
+    "uploads/*",
+    "node_modules/*"
+  ]
+}

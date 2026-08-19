@@ -18,6 +18,13 @@ import { statusOf } from "../helpers/accountStatus.js";
 dotenv.config();
 const SECRET_KEY = process.env.SECRET_KEY;
 
+/*
+  Every session in this file is minted through issueSession(), which is where
+  the two-factor gate lives. Signing a token pair directly bypasses it — see
+  helpers/session.js for why that mattered across ten separate functions.
+*/
+import { issueSession, twoFactorPending, refreshPredatesTwoFactor } from "../helpers/session.js";
+
 
 console.log('Bucket Name:', process.env.S3_BUCKET_NAME);
 
@@ -62,19 +69,14 @@ export const Googlecheck = async (req, res) => {
       return res.status(404).json({ message: "Invalid info" });
     }
 
-    // 3️⃣ Generate JWT Token
-    const token = jwt.sign(
-      { userId: user._id, email: user.email },
-      process.env.SECRET_KEY,
-      { expiresIn: "1h" }
-    );
-
-    // Generate refresh token (longer-lived)
-    const refreshToken = jwt.sign(
-      { userId: user._id, email: user.email },
-      process.env.JWT_REFRESH_SECRET,
-      { expiresIn: "7d" }
-    );
+    // Signing in with Google is not a second factor — it hands an existing
+    // account a full session, so it passes the same gate /login does.
+    const session = await issueSession(user, {
+      payload: { userId: user._id, email: user.email },
+      expiresIn: "1h",
+    });
+    if (session.twoFactorRequired) return twoFactorPending(res, session.challengeToken);
+    const { token, refreshToken } = session;
 
     /*  const token = jwt.sign(
        { userId: user._id, email: user.email },
@@ -128,19 +130,12 @@ export const Googlesignin = async (req, res) => {
         });
       }
 
-      // 3️⃣ Generate JWT Token
-      const token = jwt.sign(
-        { userId: existingUseremail._id, email: existingUseremail.email },
-        SECRET_KEY,
-        { expiresIn: "1h" }
-      );
-
-      // Generate refresh token (longer-lived)
-      const refreshToken = jwt.sign(
-        { userId: existingUseremail._id, email: existingUseremail.email },
-        process.env.JWT_REFRESH_SECRET,
-        { expiresIn: "7d" }
-      );
+      const session = await issueSession(existingUseremail, {
+        payload: { userId: existingUseremail._id, email: existingUseremail.email },
+        expiresIn: "1h",
+      });
+      if (session.twoFactorRequired) return twoFactorPending(res, session.challengeToken);
+      const { token, refreshToken } = session;
       console.log({ message: "email already exits", token, refreshToken, usersdata: existingUseremail })
       return res
         .status(201)
@@ -164,19 +159,14 @@ export const Googlesignin = async (req, res) => {
     if (!user) {
       return res.status(201).json({ message: "Invalid info" });
     }
-    // 3️⃣ Generate JWT Token
-    const token = jwt.sign(
-      { userId: newUser._id, email: newUser.mobileno },
-      SECRET_KEY,
-      { expiresIn: "1h" }
-    );
-
-    // Generate refresh token (longer-lived)
-    const refreshToken = jwt.sign(
-      { userId: user._id, email: user.email },
-      process.env.JWT_REFRESH_SECRET,
-      { expiresIn: "7d" }
-    );
+    // A just-created account cannot have 2FA on, so the gate is a no-op here —
+    // routed through it anyway so no session in this file skips the check.
+    const session = await issueSession(user, {
+      payload: { userId: newUser._id, email: newUser.mobileno },
+      expiresIn: "1h",
+    });
+    if (session.twoFactorRequired) return twoFactorPending(res, session.challengeToken);
+    const { token, refreshToken } = session;
     console.log({ message: "User registered successfully", token, refreshToken, usersdata: user })
     return res
       .status(201)
@@ -230,12 +220,12 @@ export const registerMobile_off = async (req, res) => {
     const existingUser = await User.findOne({ mobileno: mobileno });
     if (existingUser) {
       await reEntryotp(mobileno, otpcode); // ✅ CORRECT WAY
-      const token = jwt.sign(
-        { userId: existingUser._id, email: mobileno },
-        SECRET_KEY,
-        { expiresIn: "1h" }
-      );
-      return res.status(201).json({ message: "mobile no is already used", token, usersdata: existingUser });
+      const session = await issueSession(existingUser, {
+        payload: { userId: existingUser._id, email: mobileno },
+        expiresIn: "1h", refresh: false,
+      });
+      if (session.twoFactorRequired) return twoFactorPending(res, session.challengeToken);
+      return res.status(201).json({ message: "mobile no is already used", token: session.token, usersdata: existingUser });
     }
     const newUser = new Otptbl({
       name,
@@ -253,12 +243,12 @@ export const registerMobile_off = async (req, res) => {
     if (!user) {
       return res.status(201).json({ message: "Invalid info" });
     }
-    // 3️⃣ Generate JWT Token
-    const token = jwt.sign(
-      { userId: newUser._id, email: newUser.mobileno },
-      SECRET_KEY,
-      { expiresIn: "1h" }
-    );
+    const session = await issueSession(user, {
+      payload: { userId: newUser._id, email: newUser.mobileno },
+      expiresIn: "1h", refresh: false,
+    });
+    if (session.twoFactorRequired) return twoFactorPending(res, session.challengeToken);
+    const token = session.token;
     return res
       .status(201)
       .json({ message: "User registered successfully", token, usersdata: user });
@@ -287,11 +277,12 @@ export const registerMobile = async (req, res) => {
       // 🔁 resend OTP
       await reEntryotp(mobileno, otpcode);
 
-      const token = jwt.sign(
-        { userId: existingUser._id, mobileno },
-        SECRET_KEY,
-        { expiresIn: "1h" }
-      );
+      const session = await issueSession(existingUser, {
+        payload: { userId: existingUser._id, mobileno },
+        expiresIn: "1h", refresh: false,
+      });
+      if (session.twoFactorRequired) return twoFactorPending(res, session.challengeToken);
+      const token = session.token;
 
       return res.status(200).json({
         message: "Mobile already exists, OTP resent",
@@ -319,11 +310,12 @@ export const registerMobile = async (req, res) => {
     await newUser.save();
     // 📩 Save OTP
     await reEntryotp(mobileno, otpcode);
-    const token = jwt.sign(
-      { userId: newUser._id, mobileno },
-      SECRET_KEY,
-      { expiresIn: "1h" }
-    );
+    const session = await issueSession(newUser, {
+      payload: { userId: newUser._id, mobileno },
+      expiresIn: "1h", refresh: false,
+    });
+    if (session.twoFactorRequired) return twoFactorPending(res, session.challengeToken);
+    const token = session.token;
 
     return res.status(200).json({
       message: "User registered successfully, OTP sent",
@@ -384,19 +376,16 @@ export const verifyMobile = async (req, res) => {
     await user.save();
     // 🧹 remove OTP
     await Otptbl.deleteMany({ mobileno });
-    // Generate access token (short-lived)
-    const token = jwt.sign(
-      { userId: user._id, email: user.email },
-      SECRET_KEY,
-      { expiresIn: "10m" } //1h 1h 1d
-    );
-
-    // Generate refresh token (longer-lived)
-    const refreshToken = jwt.sign(
-      { userId: user._id, email: user.email },
-      process.env.JWT_REFRESH_SECRET,
-      { expiresIn: "7d" }
-    );
+    /*
+      Confirming a mobile number is not the second factor either: this returns a
+      session for an account that may already exist, so it goes through the gate.
+    */
+    const session = await issueSession(user, {
+      payload: { userId: user._id, email: user.email },
+      expiresIn: "10m", //1h 1h 1d
+    });
+    if (session.twoFactorRequired) return twoFactorPending(res, session.challengeToken);
+    const { token, refreshToken } = session;
     // You can store refresh token in DB for extra security (optional)
     return res.status(200).json({
       message: "Mobile verified successfully",
@@ -492,11 +481,12 @@ export const verifyMobile_off = async (req, res) => {
     await existingUser.save();
 
     // ✅ Generate token
-    const token = jwt.sign(
-      { userId: existingUser._id, email: existingUser.mobileno },
-      SECRET_KEY,
-      { expiresIn: "1h" }
-    );
+    const session = await issueSession(existingUser, {
+      payload: { userId: existingUser._id, email: existingUser.mobileno },
+      expiresIn: "1h", refresh: false,
+    });
+    if (session.twoFactorRequired) return twoFactorPending(res, session.challengeToken);
+    const token = session.token;
 
     console.log("User verified:", existingUser);
 
@@ -602,12 +592,12 @@ export const updateDateofbirthbyemail = async (req, res) => {
       if (!user) {
         return res.status(201).json({ message: "Invalid info" });
       }
-      // 3️⃣ Generate JWT Token
-      const token = jwt.sign(
-        { userId: newUser._id, email: newUser.mobileno },
-        SECRET_KEY,
-        { expiresIn: "1h" }
-      );
+      const session = await issueSession(user, {
+        payload: { userId: newUser._id, email: newUser.mobileno },
+        expiresIn: "1h", refresh: false,
+      });
+      if (session.twoFactorRequired) return twoFactorPending(res, session.challengeToken);
+      const token = session.token;
       return res
         .status(201)
         .json({ message: "User registered successfully", token, usersdata: user });
@@ -699,12 +689,12 @@ export const register = async (req, res) => {
     if (!user) {
       return res.status(201).json({ message: "Invalid info" });
     }
-    // 3️⃣ Generate JWT Token
-    const token = jwt.sign(
-      { userId: newUser._id, email: newUser.email },
-      SECRET_KEY,
-      { expiresIn: "1h" }
-    );
+    const session = await issueSession(user, {
+      payload: { userId: newUser._id, email: newUser.email },
+      expiresIn: "1h", refresh: false,
+    });
+    if (session.twoFactorRequired) return twoFactorPending(res, session.challengeToken);
+    const token = session.token;
     return res
       .status(201)
       .json({ message: "User registered successfully", token, usersdata: user });
@@ -792,19 +782,19 @@ export const login = async (req, res) => {
       });
     }
 
-    // Generate access token (short-lived)
-    const token = jwt.sign(
-      { userId: user._id, email: user.email },
-      SECRET_KEY,
-      { expiresIn: "10m" } //1h 1h 1d
-    );
-
-    // Generate refresh token (longer-lived)
-    const refreshToken = jwt.sign(
-      { userId: user._id, email: user.email },
-      process.env.JWT_REFRESH_SECRET,
-      { expiresIn: "7d" }
-    );
+    /*
+      Password checked and the account is in good standing — but that is only
+      the first factor. If this account has 2FA on, issueSession returns a
+      challenge instead of tokens and the caller must present a code.
+    */
+    const session = await issueSession(user, {
+      payload: { userId: user._id, email: user.email },
+      expiresIn: "10m", //1h 1h 1d
+    });
+    if (session.twoFactorRequired) {
+      return twoFactorPending(res, session.challengeToken);
+    }
+    const { token, refreshToken } = session;
 
     // You can store refresh token in DB for extra security (optional)
 
@@ -845,9 +835,23 @@ export const refreshToken = async (req, res) => {
       });
     }
 
+    /*
+      A refresh token issued before 2FA was switched on must not keep minting
+      sessions. It lives for seven days, so without this check, turning 2FA on
+      protects nothing for a week — the attacker holding an older refresh token
+      simply keeps refreshing past the factor.
+    */
+    const holder = await User.findById(decoded.userId).select("twoFactor.enabled twoFactor.enabledAt").lean();
+    if (refreshPredatesTwoFactor(decoded, holder)) {
+      return res.status(401).json({
+        message: "Two-factor authentication was enabled after this session started. Please sign in again.",
+        reauthenticate: true,
+      });
+    }
+
     // Create new access token
     const newAccessToken = jwt.sign(
-      { userId: decoded.userId, email: decoded.email },
+      { userId: decoded.userId, email: decoded.email, mfa: decoded.mfa === true },
       SECRET_KEY,
       { expiresIn: "15m" }
     );
@@ -1569,12 +1573,12 @@ export const webSignup = async (req, res) => {
     if (!user) {
       return res.status(201).json({ message: "Invalid info" });
     }
-    // 3️⃣ Generate JWT Token
-    const token = jwt.sign(
-      { userId: newUser._id, email: newUser.mobileno },
-      SECRET_KEY,
-      { expiresIn: "1h" }
-    );
+    const session = await issueSession(user, {
+      payload: { userId: newUser._id, email: newUser.mobileno },
+      expiresIn: "1h", refresh: false,
+    });
+    if (session.twoFactorRequired) return twoFactorPending(res, session.challengeToken);
+    const token = session.token;
     return res
       .status(201)
       .json({ message: "User registered successfully", token, usersdata: user });

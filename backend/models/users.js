@@ -109,6 +109,49 @@ const userSchema = new mongoose.Schema({
     type: mongoose.Schema.ObjectId,
     ref: "users"
   }],
+  /* --- Two-Factor Authentication (extra login security) --- */
+  /*
+    TOTP, not SMS: there is no working delivery transport on this server (no
+    mail sender, no SMS gateway, and push is disabled for want of Firebase
+    credentials), and an authenticator secret is exchanged once at enrolment
+    rather than on every login.
+
+    `secret` and `recoveryCodes` carry `select: false`. That is not decoration —
+    the login handler returns the whole user document as `usersdata`, so a
+    selectable secret would be handed to the client on every login and defeat
+    the entire feature. Anything that genuinely needs them must ask for them by
+    name via .select("+twoFactor.secret").
+  */
+  twoFactor: {
+    enabled: { type: Boolean, default: false },
+    method: { type: String, enum: ["totp"], default: "totp" },
+
+    // The live secret, and the one staged by /setup but not yet confirmed by a
+    // successful code. Enrolment never overwrites a working secret.
+    secret: { type: String, select: false, default: null },
+    pendingSecret: { type: String, select: false, default: null },
+
+    enabledAt: { type: Date, default: null },
+
+    /*
+      The last TOTP step number accepted. A code stays valid for its whole ~30s
+      window, so without this the same six digits can be replayed inside that
+      window by anyone who saw them.
+    */
+    lastUsedStep: { type: Number, default: null, select: false },
+
+    // Single-use fallbacks, bcrypt-hashed exactly like a password: the server
+    // never holds a recovery code it could leak in plaintext.
+    recoveryCodes: {
+      type: [{
+        codeHash: { type: String, required: true },
+        usedAt: { type: Date, default: null },
+      }],
+      default: [],
+      select: false,
+    },
+  },
+
   fcm_token: { type : String},
   fcm_tokens: { type: [String], default: [] },
   setting_user: { type : Object},

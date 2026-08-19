@@ -228,6 +228,13 @@ app.use("/api/cart", cartRoute);
 app.use("/api/order", orderRoute);
 app.use("/api/test", testinvoiceRoute)
 /* end ecommerce */
+/*
+  Two-Factor Authentication. Mounted before authRoute so /apis/auth/2fa/* is
+  matched here rather than falling through to the broader auth router.
+*/
+import twoFactorRoute from "./routes/twoFactorRoute.js";
+app.use("/apis/auth/2fa", twoFactorRoute);
+
 app.use("/apis/auth", authRoute); 
 app.use("/apis/categories", categoryRoutes); //list
 //app.use("/apis/jobcategories", JobcategoryRoutes); //list
