@@ -68,9 +68,19 @@ const SUBSCRIPTION_DAYS = 30;
 const addPeriod = (from = new Date()) =>
   new Date(new Date(from).getTime() + SUBSCRIPTION_DAYS * 24 * 60 * 60 * 1000);
 
-const STRIPE_KEY = process.env.STRIPE_SECRET_KEY ||
-  "";
-const stripe = new Stripe(STRIPE_KEY);
+/*
+  The Stripe key comes from the environment and nowhere else.
+
+  It used to fall back to a test key written into this file, which is how the
+  branch ended up carrying a secret GitHub's push protection refused. A fallback
+  is also how a test key reaches production unnoticed: the deployment "works",
+  and nobody finds out the payments were never real.
+*/
+const STRIPE_KEY = process.env.STRIPE_SECRET_KEY || "";
+if (!STRIPE_KEY) {
+  console.warn("[monetisation] STRIPE_SECRET_KEY is not set — coin purchases will fail.");
+}
+const stripe = new Stripe(STRIPE_KEY || "sk_missing");
 
 /* ------------------------------------------------------------------ */
 /* 1. In-App Coin Purchase                                             */

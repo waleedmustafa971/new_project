@@ -75,8 +75,16 @@ await mongoose.connect(process.env.MONGO_URI);
 const db = mongoose.connection;
 const OID = (v) => new mongoose.Types.ObjectId(String(v));
 
-const stripe = Stripe(process.env.STRIPE_SECRET_KEY ||
-  "");
+/* The key lives in .env, which is gitignored. Without it this suite cannot
+   drive Stripe at all, so say so plainly rather than failing 40 checks. */
+if (!process.env.STRIPE_SECRET_KEY) {
+  console.error(
+    "\n  STRIPE_SECRET_KEY is not set in backend/.env — this suite drives real" +
+    "\n  test-mode Stripe calls and cannot run without it.\n"
+  );
+  process.exit(1);
+}
+const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
 
 const TEST_TIER = "SUITE Inner Circle";
 const TEST_ITEM_PREFIX = "SUITEITEM ";
