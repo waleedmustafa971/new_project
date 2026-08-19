@@ -73,7 +73,7 @@ export const Googlecheck = async (req, res) => {
     // account a full session, so it passes the same gate /login does.
     const session = await issueSession(user, {
       payload: { userId: user._id, email: user.email },
-      expiresIn: "1h",
+      expiresIn: "1h", req, method: "google",
     });
     if (session.twoFactorRequired) return twoFactorPending(res, session.challengeToken);
     const { token, refreshToken } = session;
@@ -132,7 +132,7 @@ export const Googlesignin = async (req, res) => {
 
       const session = await issueSession(existingUseremail, {
         payload: { userId: existingUseremail._id, email: existingUseremail.email },
-        expiresIn: "1h",
+        expiresIn: "1h", req, method: "google",
       });
       if (session.twoFactorRequired) return twoFactorPending(res, session.challengeToken);
       const { token, refreshToken } = session;
@@ -383,6 +383,7 @@ export const verifyMobile = async (req, res) => {
     const session = await issueSession(user, {
       payload: { userId: user._id, email: user.email },
       expiresIn: "10m", //1h 1h 1d
+      req, method: "mobile",
     });
     if (session.twoFactorRequired) return twoFactorPending(res, session.challengeToken);
     const { token, refreshToken } = session;
@@ -790,6 +791,8 @@ export const login = async (req, res) => {
     const session = await issueSession(user, {
       payload: { userId: user._id, email: user.email },
       expiresIn: "10m", //1h 1h 1d
+      // `req` turns on the sign-in record and the new-device alert.
+      req, method: "password",
     });
     if (session.twoFactorRequired) {
       return twoFactorPending(res, session.challengeToken);

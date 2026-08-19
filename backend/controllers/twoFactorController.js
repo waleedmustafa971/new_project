@@ -301,6 +301,9 @@ export const verify = wrap(async (req, res) => {
     payload: { userId: user._id, email: user.email },
     expiresIn: "10m",
     mfaSatisfied: true,
+    // Recorded here rather than at /login, which issued only a challenge — the
+    // sign-in is this call, not the password step that preceded it.
+    req, method: usedRecoveryCode ? "2fa-recovery" : "2fa",
   });
 
   const remaining = (user.twoFactor.recoveryCodes || [])

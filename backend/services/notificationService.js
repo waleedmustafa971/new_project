@@ -92,6 +92,7 @@ const PREF_OF = {
   // No such key exists in notificationPrefs, and an unknown key defaults to on
   // — which is the right default for someone paying you money.
   subscription: "subscriptions",
+  login_alert: "security",
   group_request: "groups",
   group_approved: "groups",
   group_invite: "groups",
@@ -128,6 +129,8 @@ const copyFor = (type, actorName, extra = {}) => {
       return { title: actorName, body: `${actorName} ${extra.preview || "wants to join your live"}` };
     case "live_invite":
       return { title: actorName, body: `${actorName} ${extra.preview || "invited you onto their live"}` };
+    case "login_alert":
+      return { title: "New sign-in", body: `Your account was signed in to from ${extra.preview || "a new device"}` };
     case "subscription":
       return { title: "New subscriber", body: `${actorName} ${extra.preview || "subscribed to you"}` };
     case "live_gift":
@@ -161,8 +164,12 @@ export const notify = async ({
 }) => {
   try {
     if (!recipient || !actor || !type) return null;
-    // Never notify someone about their own action.
-    if (String(recipient) === String(actor)) return null;
+    /*
+      Never notify someone about their own action — except a security alert,
+      where the recipient and the actor are deliberately the same person and
+      telling them is the entire point.
+    */
+    if (String(recipient) === String(actor) && type !== "login_alert") return null;
 
     const [target, actorDoc] = await Promise.all([
       User.findById(recipient).select("notificationPrefs blockedUsers fcm_tokens fcm_token").lean(),

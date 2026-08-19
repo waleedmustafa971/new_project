@@ -109,6 +109,33 @@ const userSchema = new mongoose.Schema({
     type: mongoose.Schema.ObjectId,
     ref: "users"
   }],
+
+  /*
+    Restricting is the quieter half of blocking.
+
+    A block is mutual and obvious: neither side sees the other, and the person
+    blocked can tell. Restricting is one-directional and deliberately invisible
+    to the person restricted — they carry on commenting and messaging as though
+    nothing changed, but their comments on your posts stay hidden until you
+    approve them, their messages land in a request folder, and they no longer
+    see your online status or read receipts. It exists for the case where
+    blocking someone would itself cause trouble.
+  */
+  restrictedUsers: [{
+    type: mongoose.Schema.ObjectId,
+    ref: "users"
+  }],
+
+  /*
+    Posts this user has hidden from their own feed ("not interested").
+
+    Distinct from the admin `status: "hidden"` on the post itself, which hides
+    it from everyone. This is per-viewer and affects nobody else's feed.
+  */
+  hiddenPosts: [{
+    type: mongoose.Schema.ObjectId,
+    ref: "Reels"
+  }],
   /* --- Two-Factor Authentication (extra login security) --- */
   /*
     TOTP, not SMS: there is no working delivery transport on this server (no

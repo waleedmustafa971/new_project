@@ -14,6 +14,7 @@ import Reels from "../models/Reels.js";
 import User from "../models/users.js";
 import Hashtag from "../models/Hashtag.js";
 import { hiddenUserIds, canView, relationship, effectiveSettings } from "./privacy.js";
+import { meetsAgeGate } from "./safety.js";
 
 export const isId = (v) => mongoose.Types.ObjectId.isValid(v);
 const oid = (v) => new mongoose.Types.ObjectId(String(v));
@@ -259,8 +260,19 @@ export function baseMatch(ctx, { type, includeExpired = false, group = null } = 
 }
 
 /*
-  Second pass: drop anything the author's privacy settings hide from this
-  viewer. Runs on the candidate page only, so it stays cheap.
+  Second pass: drop anything this viewer must not see. Runs on the candidate
+  page only, so it stays cheap.
+
+  Three rules are layered here, in order of how specific they are:
+
+    1. posts the viewer has hidden themselves ("not interested")
+    2. the post's own `audience`, which overrides the account-level setting
+    3. the account-level privacy setting, for posts that set no audience
+
+  Two overrides rather than one combined test, because a public post on a
+  followers-only account is exactly what a per-post control is for; ANDing the
+  two settings would make that impossible to express. Age-restricted posts are
+  gated separately, since being old enough is not a relationship.
 */
 export async function filterByPrivacy(docs, viewerId, area = "posts") {
   if (docs.length === 0) return [];
@@ -271,6 +283,14 @@ export async function filterByPrivacy(docs, viewerId, area = "posts") {
     .lean();
   const byId = Object.fromEntries(authors.map((a) => [String(a._id), a]));
 
+  // The viewer's own hide list and date of birth, both per-viewer rather than
+  // per-author, so they are read once for the whole page.
+  const viewer = isId(viewerId)
+    ? await User.findById(viewerId).select("hiddenPosts dateofbirth").lean()
+    : null;
+  const hiddenPostIds = new Set((viewer?.hiddenPosts || []).map(String));
+  const oldEnough = meetsAgeGate(viewer);
+
   const allowed = {};
   for (const id of authorIds) {
     const author = byId[id];
@@ -280,7 +300,30 @@ export async function filterByPrivacy(docs, viewerId, area = "posts") {
     allowed[id] = await canView(viewerId, author, area, rel);
   }
 
-  return docs.filter((d) => allowed[String(d.username?._id || d.username)]);
+  const holds = (list, id) => (list || []).some((x) => String(x?._id || x) === String(id));
+
+  return docs.filter((d) => {
+    const authorId = String(d.username?._id || d.username);
+
+    // Applies to the author too: hiding your own post from your own feed is a
+    // legitimate thing to want, and nothing else here would honour it.
+    if (hiddenPostIds.has(String(d._id))) return false;
+
+    const mine = viewerId && String(viewerId) === authorId;
+    if (mine) return true;
+
+    if (d.ageRestricted && !oldEnough) return false;
+
+    const audience = d.audience;
+    if (audience === "onlyMe") return false;
+    // Posts written before the field existed carry no audience and fall
+    // through to the account-level setting, which is what they always used.
+    if (audience === "everyone") return true;
+    if (audience === "followers") return holds(byId[authorId]?.followers, viewerId);
+    if (audience === "closeFriends") return holds(byId[authorId]?.closeFriends, viewerId);
+
+    return allowed[authorId];
+  });
 }
 
 /* ------------------------------------------------------------------ */

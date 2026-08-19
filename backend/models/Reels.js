@@ -65,7 +65,15 @@ const commentSchema = new mongoose.Schema({
   mentions: [{ type: mongoose.Schema.Types.ObjectId, ref: "users" }],
   editedAt: { type: Date, default: null },
   // Soft delete: a removed parent still has to hold its replies together.
-  deleted: { type: Boolean, default: false }
+  deleted: { type: Boolean, default: false },
+  deletedAt: { type: Date, default: null },
+
+  /*
+    Set when the post's author approves a comment left by someone they have
+    restricted. Until then the comment is visible only to its writer, who is
+    given no signal that anyone else cannot see it.
+  */
+  restrictedApproved: { type: Boolean, default: false }
 });
 
 /* ---- Social Feed (Timeline) sub-schemas ---- */
@@ -192,6 +200,29 @@ const videoSchema = new mongoose.Schema({
   status: {
     type: String
   },
+
+  /*
+    Who this individual post is for.
+
+    The account-level `privacySettings.posts` says who may see the account's
+    posts in general; this overrides it for one post, which is what "Post
+    Visibility Controls" means — a private thought on an otherwise public
+    account, or one public announcement from a followers-only account.
+
+    `onlyMe` is deliberately separate from deleting: an author archiving a post
+    still wants it in their own profile.
+  */
+  audience: {
+    type: String,
+    enum: ["everyone", "followers", "closeFriends", "onlyMe"],
+    default: "everyone",
+  },
+
+  /*
+    Marks content that under-18s must not be shown. Set by the author or by a
+    moderator; enforcement reads the viewer's date of birth.
+  */
+  ageRestricted: { type: Boolean, default: false },
   status_draft_publish: {
     type: String,
     enum: ["Draft", "Publish"],

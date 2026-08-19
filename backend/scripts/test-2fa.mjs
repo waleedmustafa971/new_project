@@ -85,6 +85,10 @@ const sweep = async () => {
   for (const u of stale) {
     await db.collection("twofactorchallenges").deleteMany({ user: u._id });
   }
+  for (const u of stale) {
+    await db.collection("loginevents").deleteMany({ user: u._id });
+    await db.collection("notifications").deleteMany({ recipient: u._id });
+  }
   const r = await db.collection("users").deleteMany({ email: EMAIL });
   await db.collection("otptbls").deleteMany({ mobileno: MOBILE });
   return r.deletedCount;
@@ -97,6 +101,9 @@ const baseline = {
   users: await db.collection("users").countDocuments({}),
   challenges: await db.collection("twofactorchallenges").countDocuments({}),
   otps: await db.collection("otptbls").countDocuments({}),
+  // Signing in now writes a login event and, on a new device, an alert.
+  loginEvents: await db.collection("loginevents").countDocuments({}),
+  notifications: await db.collection("notifications").countDocuments({}),
 };
 console.log(`  baseline: ${baseline.users} users, ${baseline.challenges} challenges, ${baseline.otps} otps`);
 
@@ -347,16 +354,21 @@ check("the recovery codes are cleared too", (secretGone.twoFactor?.recoveryCodes
 /* ================================================================== */
 section("Cleanup");
 
+const delLogins = await db.collection("loginevents").deleteMany({ user: UID });
+const delAlerts = await db.collection("notifications").deleteMany({ recipient: UID });
 const delChallenges = await db.collection("twofactorchallenges").deleteMany({ user: UID });
 const delOtps = await db.collection("otptbls").deleteMany({ mobileno: MOBILE });
 const delUser = await db.collection("users").deleteMany({ email: EMAIL });
 console.log(`  removed ${delUser.deletedCount} test account, ${delChallenges.deletedCount} challenges, ` +
-            `${delOtps.deletedCount} otp rows`);
+            `${delOtps.deletedCount} otp rows, ${delLogins.deletedCount} login events, ` +
+            `${delAlerts.deletedCount} alerts`);
 
 const after = {
   users: await db.collection("users").countDocuments({}),
   challenges: await db.collection("twofactorchallenges").countDocuments({}),
   otps: await db.collection("otptbls").countDocuments({}),
+  loginEvents: await db.collection("loginevents").countDocuments({}),
+  notifications: await db.collection("notifications").countDocuments({}),
 };
 for (const key of Object.keys(baseline)) {
   check(`${key} restored to baseline (${baseline[key]})`, after[key] === baseline[key], `now ${after[key]}`);

@@ -8,14 +8,19 @@
 
 import mongoose from "mongoose";
 import User from "../models/users.js";
+import Reels from "../models/Reels.js";
 import {
   AREAS, AUDIENCES, effectiveSettings, visibilityFor,
   needsFollowApproval, relationship, applyProfileMask, isId,
 } from "../helpers/privacy.js";
+import {
+  canViewPost, ageFrom, meetsAgeGate, MINIMUM_AGE, ADULT_AGE, oid,
+} from "../helpers/safety.js";
 import { notify } from "../services/notificationService.js";
 
 const ok = (res, data = {}) => res.json({ success: true, ...data });
-const fail = (res, code, message) => res.status(code).json({ success: false, message });
+const fail = (res, code, message, extra = {}) =>
+  res.status(code).json({ success: false, message, ...extra });
 
 const wrap = (fn) => async (req, res) => {
   try {
@@ -289,4 +294,173 @@ export const updateCloseFriends = wrap(async (req, res) => {
     action === "add" ? { $addToSet: { closeFriends: targetId } } : { $pull: { closeFriends: targetId } }
   );
   ok(res, { message: action === "add" ? "Added to close friends" : "Removed from close friends" });
+});
+
+/* ================================================================== */
+/* Post Visibility Controls                                            */
+/* ================================================================== */
+
+const POST_AUDIENCES = ["everyone", "followers", "closeFriends", "onlyMe"];
+
+/*
+  Set who one post is for.
+
+  This overrides the account-level `privacySettings.posts` rather than combining
+  with it — one public announcement from an otherwise followers-only account is
+  the case the control exists for, and ANDing the two settings makes that
+  impossible to express.
+
+  Changing the audience is retroactive by design: it is the same post, and
+  someone who should no longer see it should no longer see it.
+*/
+export const setPostAudience = wrap(async (req, res) => {
+  const userId = actorId(req);
+  const { id } = req.params;
+  const { audience, ageRestricted } = req.body || {};
+
+  if (!isId(userId) || !isId(id)) {
+    return fail(res, 400, "Valid userId and post id are required");
+  }
+  if (audience === undefined && ageRestricted === undefined) {
+    return fail(res, 400, "Supply audience and/or ageRestricted");
+  }
+  if (audience !== undefined && !POST_AUDIENCES.includes(audience)) {
+    return fail(res, 422, `audience must be one of: ${POST_AUDIENCES.join(", ")}`);
+  }
+
+  // The author on this model is `username`, an ObjectId ref — not `userid`.
+  const post = await Reels.findById(id).select("username audience ageRestricted").lean();
+  if (!post) return fail(res, 404, "Post not found");
+  if (String(post.username) !== String(userId)) {
+    return fail(res, 403, "That is not your post");
+  }
+
+  const set = {};
+  if (audience !== undefined) set.audience = audience;
+  if (ageRestricted !== undefined) set.ageRestricted = !!ageRestricted;
+
+  await Reels.updateOne({ _id: id }, { $set: set });
+  const fresh = await Reels.findById(id).select("audience ageRestricted").lean();
+
+  ok(res, {
+    message: "Visibility updated",
+    postId: id,
+    audience: fresh.audience,
+    ageRestricted: !!fresh.ageRestricted,
+  });
+});
+
+/*
+  Whether a given viewer may see a given post, and why.
+
+  Exposed so the app can ask before rendering rather than each content endpoint
+  growing its own copy of the rule — the reason is what lets it show "Followers
+  only" rather than a blank card.
+*/
+export const postVisibility = wrap(async (req, res) => {
+  const viewerId = actorId(req);
+  const { id } = req.params;
+  if (!isId(id)) return fail(res, 400, "A valid post id is required");
+
+  const post = await Reels.findById(id)
+    .select("username audience ageRestricted status").lean();
+  if (!post) return fail(res, 404, "Post not found");
+
+  const verdict = await canViewPost(viewerId, post);
+  ok(res, {
+    postId: id,
+    audience: post.audience || "everyone",
+    ageRestricted: !!post.ageRestricted,
+    ...verdict,
+  });
+});
+
+/* Every post of the caller's that is not fully public — the "who can see what"
+   screen, which is unanswerable if each post has to be opened one at a time. */
+export const myRestrictedPosts = wrap(async (req, res) => {
+  const userId = actorId(req);
+  if (!isId(userId)) return fail(res, 400, "A valid userId is required");
+
+  const posts = await Reels.find({
+    username: oid(userId),
+    $or: [{ audience: { $ne: "everyone" } }, { ageRestricted: true }],
+  }).select("videoTitle audience ageRestricted xtime media").sort({ xtime: -1 }).lean();
+
+  ok(res, {
+    total: posts.length,
+    byAudience: posts.reduce((acc, p) => {
+      const key = p.audience || "everyone";
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {}),
+    posts,
+  });
+});
+
+/* ================================================================== */
+/* Age Restrictions                                                    */
+/* ================================================================== */
+
+/*
+  The viewer's own age standing.
+
+  `dateofbirth` on this model is free text and arrives in several shapes, so an
+  unreadable value reports `age: null` rather than guessing. Everything
+  downstream treats null as "not old enough", because defaulting the other way
+  would let every account that never filled in a birthday through the gate —
+  which is precisely what the control is for.
+*/
+export const ageStatus = wrap(async (req, res) => {
+  const userId = actorId(req);
+  if (!isId(userId)) return fail(res, 400, "A valid userId is required");
+
+  const user = await User.findById(userId).select("dateofbirth").lean();
+  if (!user) return fail(res, 404, "User not found");
+
+  const age = ageFrom(user.dateofbirth);
+  ok(res, {
+    dateofbirth: user.dateofbirth || null,
+    age,
+    known: age !== null,
+    meetsMinimum: age !== null && age >= MINIMUM_AGE,
+    isAdult: age !== null && age >= ADULT_AGE,
+    minimumAge: MINIMUM_AGE,
+    adultAge: ADULT_AGE,
+    canViewRestricted: meetsAgeGate(user),
+  });
+});
+
+/*
+  Set or correct a date of birth.
+
+  Rejects an age below the platform minimum outright, and refuses a birthday in
+  the future or absurdly far in the past — all three are the same class of
+  mistake and all three produce a nonsense age downstream.
+
+  Deliberately does not delete or suspend an under-age account. That is a
+  moderation decision with consequences for someone's data, and it belongs with
+  a human in the admin panel rather than as a side effect of a profile edit.
+*/
+export const setDateOfBirth = wrap(async (req, res) => {
+  const userId = actorId(req);
+  const { dateofbirth } = req.body || {};
+  if (!isId(userId)) return fail(res, 400, "A valid userId is required");
+  if (!dateofbirth) return fail(res, 400, "A date of birth is required");
+
+  const age = ageFrom(dateofbirth);
+  if (age === null) {
+    return fail(res, 422, "That date of birth could not be read");
+  }
+  if (age < MINIMUM_AGE) {
+    return fail(res, 403, `You must be at least ${MINIMUM_AGE} to use this app`, {
+      age, minimumAge: MINIMUM_AGE,
+    });
+  }
+
+  await User.updateOne({ _id: oid(userId) }, { $set: { dateofbirth: String(dateofbirth) } });
+  ok(res, {
+    message: "Date of birth saved",
+    age,
+    isAdult: age >= ADULT_AGE,
+  });
 });
