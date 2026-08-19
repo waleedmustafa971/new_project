@@ -55,6 +55,34 @@ const NotificationPrefsSchema = new mongoose.Schema({
   shares:       { type: Boolean, default: true },
   live:         { type: Boolean, default: true },
   groups:       { type: Boolean, default: true },
+
+  /* --- added with the Notifications section --- */
+  messages:     { type: Boolean, default: true },
+  // Off by default: being told every time someone watches a story is the
+  // single noisiest thing a social app can do, and the people who want it
+  // will go and switch it on.
+  storyViews:   { type: Boolean, default: false },
+  pages:        { type: Boolean, default: true },
+  subscriptions:{ type: Boolean, default: true },
+  security:     { type: Boolean, default: true },
+
+  /*
+    Quiet hours. Stored as minutes past local midnight so the comparison is
+    integer arithmetic rather than date parsing, and `tzOffsetMinutes` is the
+    viewer's own offset because the server's timezone is not theirs.
+
+    A window that wraps midnight (22:00 to 07:00) is the normal case, not the
+    exception, so the comparison below handles start > end deliberately.
+
+    Quiet hours suppress the *push*, never the record: the notification list
+    still fills, so nothing is lost — it simply does not buzz.
+  */
+  quietHours: {
+    enabled:  { type: Boolean, default: false },
+    start:    { type: Number, default: 22 * 60 },
+    end:      { type: Number, default: 7 * 60 },
+    tzOffsetMinutes: { type: Number, default: 0 },
+  },
 }, { _id: false });
 
 const userSchema = new mongoose.Schema({
@@ -135,6 +163,25 @@ const userSchema = new mongoose.Schema({
   hiddenPosts: [{
     type: mongoose.Schema.ObjectId,
     ref: "Reels"
+  }],
+
+  /*
+    Accounts whose notifications this user does not want.
+
+    Distinct from blocking and from restricting: muted people keep their full
+    relationship — their posts still appear, their messages still arrive — and
+    only the notifications stop. It is the "I follow my sister, I do not need a
+    buzz for all forty of her stories" case.
+  */
+  mutedNotificationsFrom: [{
+    type: mongoose.Schema.ObjectId,
+    ref: "users"
+  }],
+
+  /* Pages (creator/business accounts) this user asked to be notified about. */
+  pageNotificationsFor: [{
+    type: mongoose.Schema.ObjectId,
+    ref: "users"
   }],
   /* --- Two-Factor Authentication (extra login security) --- */
   /*

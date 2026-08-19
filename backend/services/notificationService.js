@@ -89,6 +89,9 @@ const PREF_OF = {
   live_request: "live",
   live_invite: "live",
   live_gift: "live",
+  message: "messages",
+  story_view: "storyViews",
+  page_post: "pages",
   // No such key exists in notificationPrefs, and an unknown key defaults to on
   // — which is the right default for someone paying you money.
   subscription: "subscriptions",
@@ -100,6 +103,32 @@ const PREF_OF = {
   group_invite: "groups",
   group_role: "groups",
   group_post: "groups",
+};
+
+/*
+  Whether the recipient is inside their own quiet hours right now.
+
+  The window is compared in the recipient's local minutes-past-midnight, and a
+  window that wraps midnight (22:00 → 07:00) is the ordinary case rather than
+  an edge one — which is why start > end is handled explicitly instead of being
+  discovered as a bug at 3am.
+
+  Quiet hours suppress the push only. The record is still written, so the
+  notification list fills normally and nothing is lost.
+*/
+export const inQuietHours = (prefs, now = new Date()) => {
+  const q = prefs?.quietHours;
+  if (!q?.enabled) return false;
+
+  const local = new Date(now.getTime() + (Number(q.tzOffsetMinutes) || 0) * 60000);
+  const minutes = local.getUTCHours() * 60 + local.getUTCMinutes();
+
+  const start = Number(q.start) || 0;
+  const end = Number(q.end) || 0;
+  if (start === end) return false;
+  return start < end
+    ? minutes >= start && minutes < end
+    : minutes >= start || minutes < end;   // wraps past midnight
 };
 
 const REACTION_VERB = {
@@ -131,6 +160,12 @@ const copyFor = (type, actorName, extra = {}) => {
       return { title: actorName, body: `${actorName} ${extra.preview || "wants to join your live"}` };
     case "live_invite":
       return { title: actorName, body: `${actorName} ${extra.preview || "invited you onto their live"}` };
+    case "story_view":
+      return { title: actorName, body: `${actorName} watched your story` };
+    case "message":
+      return { title: actorName, body: extra.preview || `${actorName} sent you a message` };
+    case "page_post":
+      return { title: actorName, body: `${actorName} posted something new` };
     case "story_response":
       return { title: actorName, body: `${actorName} answered: ${extra.preview || "your story sticker"}` };
     case "mention_story":
@@ -178,13 +213,21 @@ export const notify = async ({
     if (String(recipient) === String(actor) && type !== "login_alert") return null;
 
     const [target, actorDoc] = await Promise.all([
-      User.findById(recipient).select("notificationPrefs blockedUsers fcm_tokens fcm_token").lean(),
+      User.findById(recipient)
+        .select("notificationPrefs blockedUsers mutedNotificationsFrom fcm_tokens fcm_token").lean(),
       User.findById(actor).select("name image").lean(),
     ]);
     if (!target || !actorDoc) return null;
 
     // A blocked actor cannot reach the recipient's notification list.
     if ((target.blockedUsers || []).some((b) => String(b) === String(actor))) return null;
+
+    /*
+      A muted account reaches the recipient with nothing at all — no record and
+      no push. Unlike blocking, the relationship is untouched: their posts and
+      messages still arrive, only the notifications stop.
+    */
+    if ((target.mutedNotificationsFrom || []).some((m) => String(m) === String(actor))) return null;
 
     const prefs = target.notificationPrefs || {};
     const on = (k, d = true) => (prefs[k] === undefined ? d : prefs[k]);
@@ -207,7 +250,15 @@ export const notify = async ({
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
 
-    if (on("push")) {
+    /*
+      Quiet hours gate the push and nothing else — the record above is already
+      written, so the list still fills while the phone stays silent. A security
+      alert ignores them: the whole point of that notification is to arrive at
+      the moment it matters, which is exactly when someone is asleep.
+    */
+    const quiet = type !== "login_alert" && inQuietHours(prefs);
+
+    if (on("push") && !quiet) {
       const { title, body } = copyFor(type, actorDoc.name || "Someone", { preview, reactionType });
       const sent = await sendNotificationToUser(recipient, {
         title,

@@ -226,10 +226,37 @@ export const getPreferences = wrapn(async (req, res) => {
   });
 });
 
+/*
+  Every switch the settings screen can flip.
+
+  This list is the whole API surface of the preferences model: a key in the
+  schema but missing here is a switch that cannot be reached, which is exactly
+  how `storyViews` — a preference that defaults to *off* — sat unreachable and
+  made story-view notifications impossible to turn on. Adding a field to
+  NotificationPrefsSchema means adding it here in the same change.
+*/
 const PREF_KEYS = [
   "push", "inApp", "likes", "comments", "replies",
   "commentLikes", "mentions", "tags", "follows", "shares", "live",
+  "groups", "messages", "storyViews", "pages", "subscriptions", "security",
 ];
+
+/*
+  A clock time as minutes past midnight.
+
+  Accepts either the number the API stores or the "22:00" a settings screen
+  naturally sends, because requiring the client to do the arithmetic is how it
+  gets done differently on two platforms.
+*/
+const toMinutes = (v) => {
+  if (typeof v === "number" && Number.isFinite(v)) return Math.trunc(v);
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(v || "").trim());
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  if (h > 23 || min > 59) return null;
+  return h * 60 + min;
+};
 
 export const updatePreferences = wrapn(async (req, res) => {
   const userId = who(req);
@@ -239,6 +266,34 @@ export const updatePreferences = wrapn(async (req, res) => {
   for (const k of PREF_KEYS) {
     if (req.body?.[k] !== undefined) set[`notificationPrefs.${k}`] = !!req.body[k];
   }
+
+  /*
+    Quiet hours are set field by field rather than as a whole object, so a
+    client that sends only `{ enabled: true }` keeps the window it set last
+    time instead of silently resetting it to the schema default.
+  */
+  const q = req.body?.quietHours;
+  if (q && typeof q === "object") {
+    if (q.enabled !== undefined) set["notificationPrefs.quietHours.enabled"] = !!q.enabled;
+
+    for (const field of ["start", "end"]) {
+      if (q[field] === undefined) continue;
+      const mins = toMinutes(q[field]);
+      if (mins === null) return failn(res, 400, `quietHours.${field} must be minutes or "HH:MM"`);
+      set[`notificationPrefs.quietHours.${field}`] = mins;
+    }
+
+    if (q.tzOffsetMinutes !== undefined) {
+      const tz = Number(q.tzOffsetMinutes);
+      // ±14h is the real range of world offsets; anything else is a bug in the
+      // client, most likely seconds or milliseconds sent as minutes.
+      if (!Number.isFinite(tz) || Math.abs(tz) > 14 * 60) {
+        return failn(res, 400, "quietHours.tzOffsetMinutes must be within ±840");
+      }
+      set["notificationPrefs.quietHours.tzOffsetMinutes"] = Math.trunc(tz);
+    }
+  }
+
   if (req.body?.tagReview !== undefined) set.tagReview = !!req.body.tagReview;
   if (Object.keys(set).length === 0) return failn(res, 400, "No known preference supplied");
 
@@ -263,4 +318,142 @@ export const unregisterToken = wrapn(async (req, res) => {
   await User.updateOne({ _id: oid(userId), fcm_token: fcmtoken }, { $unset: { fcm_token: "" } });
 
   ok(res, { message: "Token removed" });
+});
+
+/* ------------------------------------------------------------------ */
+/* muting an account's notifications                                   */
+/* ------------------------------------------------------------------ */
+
+/*
+  Mute is the third and quietest option next to blocking and restricting.
+
+  Blocking severs the relationship; restricting hides someone's comments from
+  everyone else. Muting changes nothing anyone can observe: the muted account
+  keeps following you, their posts still reach your feed, their messages still
+  arrive in the thread. Only the notifications stop. It is the "I follow my
+  sister and I do not need a buzz for all forty of her stories" case, and like
+  restricting it must stay invisible to the person muted — there is deliberately
+  no endpoint that answers "has X muted me?".
+
+  Enforcement is in notify(), which drops the record entirely rather than
+  writing it silently, so a muted actor cannot fill the list either.
+*/
+export const muteActor = wrapn(async (req, res) => {
+  const userId = who(req);
+  const targetId = req.body?.targetId || req.body?.mutedId || req.params?.id;
+  if (!isId(userId)) return failn(res, 400, "A valid userId is required");
+  if (!isId(targetId)) return failn(res, 400, "A valid targetId is required");
+  if (String(userId) === String(targetId)) return failn(res, 400, "You cannot mute yourself");
+
+  const target = await User.findById(targetId).select("_id").lean();
+  if (!target) return failn(res, 404, "User not found");
+
+  const user = await User.findByIdAndUpdate(
+    userId,
+    { $addToSet: { mutedNotificationsFrom: oid(targetId) } },
+    { new: true }
+  ).select("mutedNotificationsFrom").lean();
+  if (!user) return failn(res, 404, "User not found");
+
+  ok(res, { message: "Muted", muted: true, mutedCount: (user.mutedNotificationsFrom || []).length });
+});
+
+export const unmuteActor = wrapn(async (req, res) => {
+  const userId = who(req);
+  const targetId = req.body?.targetId || req.body?.mutedId || req.params?.id;
+  if (!isId(userId)) return failn(res, 400, "A valid userId is required");
+  if (!isId(targetId)) return failn(res, 400, "A valid targetId is required");
+
+  const user = await User.findByIdAndUpdate(
+    userId,
+    { $pull: { mutedNotificationsFrom: oid(targetId) } },
+    { new: true }
+  ).select("mutedNotificationsFrom").lean();
+  if (!user) return failn(res, 404, "User not found");
+
+  ok(res, { message: "Unmuted", muted: false, mutedCount: (user.mutedNotificationsFrom || []).length });
+});
+
+/* The caller's own mute list — never anyone else's, see muteActor. */
+export const listMuted = wrapn(async (req, res) => {
+  const userId = who(req);
+  if (!isId(userId)) return failn(res, 400, "A valid userId is required");
+
+  const user = await User.findById(userId)
+    .select("mutedNotificationsFrom")
+    .populate("mutedNotificationsFrom", "name username image verifiedBadge")
+    .lean();
+  if (!user) return failn(res, 404, "User not found");
+
+  ok(res, { muted: user.mutedNotificationsFrom || [] });
+});
+
+/* ------------------------------------------------------------------ */
+/* page notifications                                                  */
+/* ------------------------------------------------------------------ */
+
+/*
+  Subscribing to a page's posts.
+
+  Following a page and asking to be *notified* by it are two different things,
+  which is why this is its own list rather than a flag on the follow. Following
+  is how the page reaches your feed; this is the bell icon on top of it, and
+  most people who follow a page want the first without the second.
+
+  Only creator and business accounts qualify. A personal account already has
+  follow notifications, and letting anyone subscribe to anyone would turn this
+  into a second, noisier follow.
+*/
+const PAGE_TYPES = new Set(["creator", "business"]);
+
+export const subscribeToPage = wrapn(async (req, res) => {
+  const userId = who(req);
+  const pageId = req.body?.pageId || req.params?.id;
+  if (!isId(userId)) return failn(res, 400, "A valid userId is required");
+  if (!isId(pageId)) return failn(res, 400, "A valid pageId is required");
+  if (String(userId) === String(pageId)) return failn(res, 400, "You cannot subscribe to your own page");
+
+  const page = await User.findById(pageId).select("accountType").lean();
+  if (!page) return failn(res, 404, "Page not found");
+  if (!PAGE_TYPES.has(page.accountType)) {
+    return failn(res, 400, "That account is not a page");
+  }
+
+  const user = await User.findByIdAndUpdate(
+    userId,
+    { $addToSet: { pageNotificationsFor: oid(pageId) } },
+    { new: true }
+  ).select("pageNotificationsFor").lean();
+  if (!user) return failn(res, 404, "User not found");
+
+  ok(res, { message: "Subscribed", subscribed: true, count: (user.pageNotificationsFor || []).length });
+});
+
+export const unsubscribeFromPage = wrapn(async (req, res) => {
+  const userId = who(req);
+  const pageId = req.body?.pageId || req.params?.id;
+  if (!isId(userId)) return failn(res, 400, "A valid userId is required");
+  if (!isId(pageId)) return failn(res, 400, "A valid pageId is required");
+
+  const user = await User.findByIdAndUpdate(
+    userId,
+    { $pull: { pageNotificationsFor: oid(pageId) } },
+    { new: true }
+  ).select("pageNotificationsFor").lean();
+  if (!user) return failn(res, 404, "User not found");
+
+  ok(res, { message: "Unsubscribed", subscribed: false, count: (user.pageNotificationsFor || []).length });
+});
+
+export const listPageSubscriptions = wrapn(async (req, res) => {
+  const userId = who(req);
+  if (!isId(userId)) return failn(res, 400, "A valid userId is required");
+
+  const user = await User.findById(userId)
+    .select("pageNotificationsFor")
+    .populate("pageNotificationsFor", "name username image verifiedBadge accountType")
+    .lean();
+  if (!user) return failn(res, 404, "User not found");
+
+  ok(res, { pages: user.pageNotificationsFor || [] });
 });

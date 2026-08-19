@@ -22,6 +22,7 @@ import {
 } from "../helpers/feed.js";
 import { needsFollowApproval } from "../helpers/privacy.js";
 import { notify, notifyMany } from "../services/notificationService.js";
+import { notifyPagePost } from "../helpers/pageNotify.js";
 
 const ok = (res, data = {}) => res.json({ success: true, ...data });
 const fail = (res, code, message) => res.status(code).json({ success: false, message });
@@ -374,8 +375,23 @@ export const markViewed = wrap(async (req, res) => {
     id,
     { $addToSet: { viewedBy: { user: viewerId, at: new Date() } }, $inc: { viewsCount: 1 } },
     { new: true }
-  ).select("viewsCount").lean();
+  ).select("viewsCount username posttype").lean();
   if (!doc) return fail(res, 404, "Content not found");
+
+  /*
+    Story view notification.
+
+    Only on the first view — the branch above returns early for a repeat, so
+    this cannot fire twice for the same watcher — and only for stories, since
+    "someone looked at your post" is not a thing anybody wants told. The
+    `storyViews` preference is off by default: being pinged for every viewer is
+    the noisiest thing a social app can do, so it is opt-in rather than opt-out.
+  */
+  if (POSTTYPE.story.test(String(doc.posttype || ""))) {
+    await notify({
+      recipient: doc.username, actor: viewerId, type: "story_view", post: id,
+    });
+  }
 
   ok(res, { viewed: true, views: doc.viewsCount, counted: true });
 });
@@ -828,6 +844,17 @@ export const createPost = wrap(async (req, res) => {
     const tagged = new Set(cleanTags.map((t) => String(t.user)));
     await notifyMany(mentions.filter((m) => !tagged.has(String(m))), {
       actor: authorId, type: "mention_post", post: doc._id, preview: caption, thumbnail,
+    });
+  }
+
+  /*
+    Subscribers to this page hear about it — but only once it is actually
+    public. A draft notifies nobody, and a scheduled post notifies when
+    runDuePublish releases it, not now.
+  */
+  if (doc.status_draft_publish === "Publish" && !doc.scheduledFor) {
+    await notifyPagePost({
+      authorId, postId: doc._id, preview: caption, thumbnail, posttype: doc.posttype,
     });
   }
 

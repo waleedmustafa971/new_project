@@ -155,6 +155,7 @@ import orderRoute from "./routes/orderRoute.js"
 import testinvoiceRoute from "./routes/testinvoiceRoute.js"
 import productChatRoute from './routes/productchat_route.js'
 import handleSendMessage from './socket/messageHandler.js';
+import { notifyOfflineMessage } from './helpers/messageNotify.js';
 
 
 /* gift transaction */
@@ -302,6 +303,8 @@ app.post("/apis/send-message", async (req, res) => {
     // socket = null because no socket
     //change anything its already called so many where in socket
     await handleSendMessage(io, null, data);
+    // Notify a recipient who is not connected; a connected one already has it.
+    await notifyOfflineMessage(data);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -516,8 +519,14 @@ app.get("/apis/conversations/:userId", async (req, res) => {
 });
 
 
-// Online users
-const onlineUsers = new Set();
+/*
+  Online users.
+
+  The set itself now lives in helpers/presence.js so message notifications can
+  ask whether a recipient is actually connected. This file still owns adding and
+  removing them, which is the only place that knows.
+*/
+import onlineUsers, { markOnline, markOffline } from "./helpers/presence.js";
 io.on("connection", async (socket) => {
   const userId = socket.handshake.query.userId;
   const user = await User.findById(userId).select("-password");
@@ -703,7 +712,7 @@ export const socket = io(SOCKET_URL, {
   /* End Live room */
 
 
-  onlineUsers.add(userId);
+  markOnline(userId);
   io.emit("onlineUsers", Array.from(onlineUsers));
   console.log('online user' + Array.from(onlineUsers))
 
@@ -935,6 +944,8 @@ socket.on("getConversations", async (uid) => {
  
  socket.on("sendMessage", async (data, callback) => {
   await handleSendMessage(io, socket, data, callback);
+  // Notify a recipient who is not connected; a connected one already has it.
+  await notifyOfflineMessage(data);
 }); 
 
   //this is working for tracking offline and online
@@ -1010,7 +1021,7 @@ socket.on("getConversations", async (uid) => {
   });
 
   socket.on("disconnect", async () => {
-    onlineUsers.delete(userId);
+    markOffline(userId);
     io.emit("onlineUsers", Array.from(onlineUsers));
 
     //update live stream when discount its will update also db

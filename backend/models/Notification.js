@@ -30,6 +30,9 @@ export const NOTIFICATION_TYPES = [
   "login_alert",      // your account was signed in to from a new device
   "story_response",   // answered a sticker on your story
   "mention_story",    // mentioned you in their story
+  "story_view",       // watched your story
+  "message",          // sent you a message while you were away
+  "page_post",        // a page you follow posted
 
   /* Groups & Community */
   "group_request",    // asked to join a group you moderate

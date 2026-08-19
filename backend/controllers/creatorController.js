@@ -25,6 +25,7 @@ import AdCampaign, { campaignIsLive, HOLDING_STATUSES } from "../models/AdCampai
 import { isId, AUTHOR_FIELDS } from "../helpers/feed.js";
 import { debitCoins, creditCoins } from "../helpers/monetisation.js";
 import { ageFrom } from "../helpers/safety.js";
+import { notifyPagePost } from "../helpers/pageNotify.js";
 
 /* ------------------------------------------------------------------ */
 /* helpers                                                             */
@@ -514,7 +515,7 @@ export const runDuePublish = async () => {
   const due = await Reels.find({
     status_draft_publish: "Scheduled",
     scheduledFor: { $lte: now, $ne: null },
-  }).select("_id username scheduledFor").limit(200).lean();
+  }).select("_id username scheduledFor videoTitle media posttype").limit(200).lean();
 
   if (!due.length) return { published: 0, posts: [] };
 
@@ -522,6 +523,25 @@ export const runDuePublish = async () => {
     { _id: { $in: due.map((d) => d._id) }, status_draft_publish: "Scheduled" },
     { $set: { status_draft_publish: "Publish", xtime: now } }
   );
+
+  /*
+    A scheduled post notifies a page's subscribers when it goes live, not when
+    it was written — which is the reason notifyPagePost is a helper rather than
+    something createPost does inline.
+
+    Sequential rather than Promise.all: this runs on a one-minute timer with
+    nobody waiting on it, and a batch of due posts each fanning out to their
+    subscribers at once is a burst worth not creating.
+  */
+  for (const d of due) {
+    await notifyPagePost({
+      authorId: d.username,
+      postId: d._id,
+      preview: d.videoTitle,
+      thumbnail: d.media?.[0]?.thumbnail || d.media?.[0]?.url,
+      posttype: d.posttype,
+    });
+  }
 
   return { published: r.modifiedCount, posts: due.map((d) => String(d._id)) };
 };

@@ -4,6 +4,8 @@ import {
   listNotifications, unreadCount, markRead,
   deleteNotification, clearNotifications,
   getPreferences, updatePreferences,
+  muteActor, unmuteActor, listMuted,
+  subscribeToPage, unsubscribeFromPage, listPageSubscriptions,
 } from "../controllers/notificationController.js";
 
 const router = express.Router();
@@ -18,6 +20,16 @@ router.post("/send", sendNotification);
 /* preferences — declared before "/:id" so the word is not read as an id */
 router.get("/preferences", getPreferences);
 router.put("/preferences", updatePreferences);
+
+/* muting an account's notifications (see muteActor — never reveals the mute) */
+router.get("/muted", listMuted);
+router.post("/mute", muteActor);
+router.post("/unmute", unmuteActor);
+
+/* page notification subscriptions — the bell on top of a follow */
+router.get("/pages", listPageSubscriptions);
+router.post("/pages/subscribe", subscribeToPage);
+router.post("/pages/unsubscribe", unsubscribeFromPage);
 
 /* in-app list */
 router.get("/", listNotifications);
