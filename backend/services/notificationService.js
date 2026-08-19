@@ -74,6 +74,7 @@ export const sendNotificationToUser = async (userId, { title, body, data = {} })
    ================================================================ */
 
 import Notification from "../models/Notification.js";
+import { t, DEFAULT_LANGUAGE, normaliseLanguage } from "../helpers/i18n.js";
 
 // Which preference switch governs which notification type.
 const PREF_OF = {
@@ -131,65 +132,92 @@ export const inQuietHours = (prefs, now = new Date()) => {
     : minutes >= start || minutes < end;   // wraps past midnight
 };
 
-const REACTION_VERB = {
-  like: "liked", love: "loved", haha: "laughed at",
-  wow: "was amazed by", sad: "was saddened by", angry: "was angered by",
+/*
+  Push copy, composed in the recipient's language.
+
+  This is the one place the server writes a sentence a person reads. The body of
+  a push arrives while the app is closed, so nothing on the device can translate
+  it afterwards — it has to be built in their language here, at send time.
+
+  Every string goes through `t()` with named placeholders rather than being
+  concatenated, because Arabic puts the actor's name in a different position
+  than English does. A sentence assembled with `${actor} + verb` can only ever
+  come out in English word order, which is how apps end up "translated" and
+  still reading as English.
+*/
+const REACTION_KEY = {
+  like: "notif.like", love: "notif.love", haha: "notif.haha",
+  wow: "notif.wow", sad: "notif.sad", angry: "notif.angry",
 };
 
-const copyFor = (type, actorName, extra = {}) => {
+export const copyFor = (type, actorName, extra = {}, lang = DEFAULT_LANGUAGE) => {
+  const s = (key, vars) => t(key, lang, { actor: actorName, ...vars });
+  const fallback = (key) => t(key, lang);
+
   switch (type) {
     case "like":
-      return { title: actorName, body: `${actorName} ${REACTION_VERB[extra.reactionType] || "liked"} your post` };
+      return { title: actorName, body: s(REACTION_KEY[extra.reactionType] || "notif.like") };
     case "comment":
-      return { title: actorName, body: `${actorName} commented: ${extra.preview || ""}`.trim() };
+      return { title: actorName, body: s("notif.comment", { preview: extra.preview || "" }).trim() };
     case "reply":
-      return { title: actorName, body: `${actorName} replied: ${extra.preview || ""}`.trim() };
+      return { title: actorName, body: s("notif.reply", { preview: extra.preview || "" }).trim() };
     case "comment_like":
-      return { title: actorName, body: `${actorName} hearted your comment` };
+      return { title: actorName, body: s("notif.comment_like") };
     case "mention_post":
-      return { title: actorName, body: `${actorName} mentioned you in a post` };
+      return { title: actorName, body: s("notif.mention_post") };
     case "mention_comment":
-      return { title: actorName, body: `${actorName} mentioned you in a comment` };
-    case "tag":
-      return { title: actorName, body: `${actorName} tagged you in a photo` };
-    case "follow":
-      return { title: actorName, body: `${actorName} started following you` };
-    case "share":
-      return { title: actorName, body: `${actorName} shared your post` };
-    case "live_request":
-      return { title: actorName, body: `${actorName} ${extra.preview || "wants to join your live"}` };
-    case "live_invite":
-      return { title: actorName, body: `${actorName} ${extra.preview || "invited you onto their live"}` };
-    case "story_view":
-      return { title: actorName, body: `${actorName} watched your story` };
-    case "message":
-      return { title: actorName, body: extra.preview || `${actorName} sent you a message` };
-    case "page_post":
-      return { title: actorName, body: `${actorName} posted something new` };
-    case "story_response":
-      return { title: actorName, body: `${actorName} answered: ${extra.preview || "your story sticker"}` };
+      return { title: actorName, body: s("notif.mention_comment") };
     case "mention_story":
-      return { title: actorName, body: `${actorName} mentioned you in their story` };
-    case "login_alert":
-      return { title: "New sign-in", body: `Your account was signed in to from ${extra.preview || "a new device"}` };
-    case "subscription":
-      return { title: "New subscriber", body: `${actorName} ${extra.preview || "subscribed to you"}` };
+      return { title: actorName, body: s("notif.mention_story") };
+    case "tag":
+      return { title: actorName, body: s("notif.tag") };
+    case "follow":
+      return { title: actorName, body: s("notif.follow") };
+    case "share":
+      return { title: actorName, body: s("notif.share") };
+    case "story_view":
+      return { title: actorName, body: s("notif.story_view") };
+    case "page_post":
+      return { title: actorName, body: s("notif.page_post") };
+    case "story_response":
+      return { title: actorName, body: s("notif.story_response", { preview: extra.preview || fallback("notif.fallback.sticker") }) };
+
+    /*
+      A message body is the message itself, and a live request or gift carries
+      copy the caller composed. Those are already in whatever language the
+      sender typed, so they are passed through rather than translated — the one
+      thing worse than an untranslated string is a translated quotation.
+    */
+    case "message":
+      return { title: actorName, body: extra.preview || s("notif.message") };
+    case "live_request":
+      return { title: actorName, body: extra.preview ? `${actorName} ${extra.preview}` : s("notif.live_request") };
+    case "live_invite":
+      return { title: actorName, body: extra.preview ? `${actorName} ${extra.preview}` : s("notif.live_invite") };
     case "live_gift":
-      return { title: actorName, body: `${actorName} ${extra.preview || "sent you a gift"}` };
+      return { title: actorName, body: extra.preview ? `${actorName} ${extra.preview}` : s("notif.live_gift") };
+    case "subscription":
+      return { title: fallback("notif.title.subscription"), body: extra.preview ? `${actorName} ${extra.preview}` : s("notif.subscription") };
+
+    case "login_alert":
+      return {
+        title: fallback("notif.title.login_alert"),
+        body: s("notif.login_alert", { preview: extra.preview || fallback("notif.fallback.new_device") }),
+      };
 
     /* Groups & Community — `preview` carries the group name from the caller. */
     case "group_request":
-      return { title: "New join request", body: `${actorName} asked to join ${extra.preview || "your group"}` };
+      return { title: fallback("notif.title.group_request"), body: s("notif.group_request", { preview: extra.preview || fallback("notif.fallback.group") }) };
     case "group_approved":
-      return { title: "Request approved", body: `You're now a member of ${extra.preview || "the group"}` };
+      return { title: fallback("notif.title.group_approved"), body: s("notif.group_approved", { preview: extra.preview || fallback("notif.fallback.the_group") }) };
     case "group_invite":
-      return { title: "Group invitation", body: `${actorName} invited you to ${extra.preview || "a group"}` };
+      return { title: fallback("notif.title.group_invite"), body: s("notif.group_invite", { preview: extra.preview || fallback("notif.fallback.a_group") }) };
     case "group_role":
-      return { title: "New group role", body: extra.preview || `${actorName} changed your role in a group` };
+      return { title: fallback("notif.title.group_role"), body: extra.preview || s("notif.group_role") };
     case "group_post":
-      return { title: actorName, body: extra.preview || "There's an update on your group post" };
+      return { title: actorName, body: extra.preview || fallback("notif.group_post") };
     default:
-      return { title: actorName, body: "You have a new notification" };
+      return { title: actorName, body: fallback("notif.default") };
   }
 };
 
@@ -214,7 +242,7 @@ export const notify = async ({
 
     const [target, actorDoc] = await Promise.all([
       User.findById(recipient)
-        .select("notificationPrefs blockedUsers mutedNotificationsFrom fcm_tokens fcm_token").lean(),
+        .select("notificationPrefs blockedUsers mutedNotificationsFrom fcm_tokens fcm_token appearance").lean(),
       User.findById(actor).select("name image").lean(),
     ]);
     if (!target || !actorDoc) return null;
@@ -259,7 +287,10 @@ export const notify = async ({
     const quiet = type !== "login_alert" && inQuietHours(prefs);
 
     if (on("push") && !quiet) {
-      const { title, body } = copyFor(type, actorDoc.name || "Someone", { preview, reactionType });
+      // Their language, not the server's. An account that never chose one gets
+      // the default rather than whatever the last request happened to carry.
+      const lang = normaliseLanguage(target.appearance?.language) || DEFAULT_LANGUAGE;
+      const { title, body } = copyFor(type, actorDoc.name || "Someone", { preview, reactionType }, lang);
       const sent = await sendNotificationToUser(recipient, {
         title,
         body,

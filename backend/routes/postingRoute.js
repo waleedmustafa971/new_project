@@ -6,6 +6,7 @@ import {
   editPost, deletePost, restorePost, listDeleted,
   inspectCaption,
   listMusic, trendingMusic, getTrack, attachMusic,
+  musicGenres, saveTrack, unsaveTrack, savedTracks,
   listFilters, getFilter, applyEffects,
 } from "../controllers/postingController.js";
 
@@ -31,10 +32,15 @@ router.get("/deleted", listDeleted);
 /* captions with emojis */
 router.post("/caption/inspect", inspectCaption);
 
-/* music library */
+/* music library — the static words come before "/music/:id" so "trending",
+   "genres" and "saved" are not read as track ids */
 router.get("/music", listMusic);
 router.get("/music/trending", trendingMusic);
+router.get("/music/genres", musicGenres);
+router.get("/music/saved", savedTracks);
 router.get("/music/:id", getTrack);
+router.post("/music/:id/save", saveTrack);
+router.delete("/music/:id/save", unsaveTrack);
 router.post("/posts/:id/music", attachMusic);
 
 /* camera filters & beauty effects */

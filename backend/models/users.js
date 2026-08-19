@@ -183,6 +183,32 @@ const userSchema = new mongoose.Schema({
     type: mongoose.Schema.ObjectId,
     ref: "users"
   }],
+
+  /*
+    How the app should look and speak for this person.
+
+    Server-side because it has to survive a reinstall and follow them onto a
+    second device — settings kept only in device storage are settings each
+    device disagrees about. `theme` is otherwise inert here: the server never
+    renders anything, so it is stored and handed back.
+
+    `language` is not inert. Push notification bodies are composed on the server
+    while the app is closed, so this is the only thing that decides what
+    language they arrive in — see helpers/i18n.js.
+  */
+  appearance: {
+    // "system" means follow the device, and is the honest default: presuming
+    // light for someone whose phone is in dark mode is a worse first launch
+    // than having no opinion.
+    theme:    { type: String, enum: ["light", "dark", "system"], default: "system" },
+    language: { type: String, default: "en" },
+  },
+
+  /* Tracks saved from the music library, newest first. */
+  savedMusic: [{
+    type: mongoose.Schema.ObjectId,
+    ref: "musictbl"
+  }],
   /* --- Two-Factor Authentication (extra login security) --- */
   /*
     TOTP, not SMS: there is no working delivery transport on this server (no

@@ -20,6 +20,7 @@ import path from "path";
 import Reels from "../models/Reels.js";
 import Music from "../models/Music.js";
 import Filter from "../models/Filter.js";
+import User from "../models/users.js";
 import Notification from "../models/Notification.js";
 import {
   isId, AUTHOR_FIELDS,
@@ -701,6 +702,97 @@ export const attachMusic = wrap(async (req, res) => {
   }
 
   ok(res, { message: "Music attached", music });
+});
+
+/* ------------------------------------------------------------------ */
+/* Music Library Integration — genres and a saved list                 */
+/* ------------------------------------------------------------------ */
+
+/*
+  The genres the library actually contains, with a count each.
+
+  Derived from the tracks rather than kept as a fixed list, so a genre cannot
+  appear in the picker with nothing behind it — an empty filter chip is the most
+  irritating kind of dead end. The catalogue carries the genre in two fields
+  (`genre` on newer rows, `music_group` on the ones the admin panel wrote), so
+  both are folded together here rather than making the client know that.
+*/
+export const musicGenres = wrap(async (req, res) => {
+  const rows = await Music.aggregate([
+    { $match: { status: { $ne: "Inactive" } } },
+    { $project: { g: { $ifNull: ["$genre", "$music_group"] } } },
+    { $match: { g: { $nin: [null, ""] } } },
+    { $group: { _id: "$g", count: { $sum: 1 } } },
+    { $sort: { count: -1, _id: 1 } },
+  ]);
+
+  ok(res, { genres: rows.map((r) => ({ genre: r._id, count: r.count })) });
+});
+
+/*
+  Save a track for later.
+
+  Its own list rather than a flag on the track, because "saved" is a fact about
+  a person and the catalogue is shared — a boolean on the track would be the
+  same value for everybody. `$addToSet` so tapping save twice is not two rows.
+*/
+export const saveTrack = wrap(async (req, res) => {
+  const userId = actorId(req);
+  const { id } = req.params;
+  if (!isId(id) || !isId(userId)) return fail(res, 400, "Valid track id and userId are required");
+
+  const track = await Music.findById(id).select("_id status").lean();
+  if (!track) return fail(res, 404, "That track is not in the library");
+  if (track.status === "Inactive") return fail(res, 409, "That track has been retired");
+
+  const user = await User.findByIdAndUpdate(
+    userId, { $addToSet: { savedMusic: oid(id) } }, { new: true }
+  ).select("savedMusic").lean();
+  if (!user) return fail(res, 404, "User not found");
+
+  ok(res, { message: "Track saved", saved: true, count: (user.savedMusic || []).length });
+});
+
+export const unsaveTrack = wrap(async (req, res) => {
+  const userId = actorId(req);
+  const { id } = req.params;
+  if (!isId(id) || !isId(userId)) return fail(res, 400, "Valid track id and userId are required");
+
+  const user = await User.findByIdAndUpdate(
+    userId, { $pull: { savedMusic: oid(id) } }, { new: true }
+  ).select("savedMusic").lean();
+  if (!user) return fail(res, 404, "User not found");
+
+  ok(res, { message: "Track removed", saved: false, count: (user.savedMusic || []).length });
+});
+
+/*
+  The caller's saved tracks.
+
+  A track pulled from the catalogue after it was saved is dropped from the list
+  rather than returned as a broken row — the alternative is a picker offering
+  something that cannot be attached.
+*/
+export const savedTracks = wrap(async (req, res) => {
+  const userId = actorId(req);
+  if (!isId(userId)) return fail(res, 400, "A valid userId is required");
+
+  const user = await User.findById(userId).select("savedMusic").lean();
+  if (!user) return fail(res, 404, "User not found");
+
+  const ids = (user.savedMusic || []).map((m) => oid(m));
+  if (!ids.length) return ok(res, { total: 0, tracks: [] });
+
+  const rows = await Music.find({ _id: { $in: ids }, status: { $ne: "Inactive" } }).lean();
+
+  // Preserve the order they were saved in; $in comes back in storage order.
+  const byId = new Map(rows.map((r) => [String(r._id), r]));
+  const tracks = (user.savedMusic || [])
+    .map((m) => byId.get(String(m)))
+    .filter(Boolean)
+    .map(shapeTrack);
+
+  ok(res, { total: tracks.length, tracks });
 });
 
 /* ------------------------------------------------------------------ */

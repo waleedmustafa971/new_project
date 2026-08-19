@@ -199,6 +199,9 @@ import postingRoute from "./routes/postingRoute.js";
 import liveRoute from "./routes/liveRoute.js";
 import monetisationRoute from "./routes/monetisationRoute.js";
 import creatorRoute from "./routes/creatorRoute.js";
+import settingsRoute from "./routes/settingsRoute.js";
+import editorRoute from "./routes/editorRoute.js";
+import storageRoute from "./routes/storageRoute.js";
 import storyRoute from "./routes/storyRoute.js";
 import messagingRoute from "./routes/messagingRoute.js";
 import groupsRoute from "./routes/groupsRoute.js";
@@ -220,6 +223,13 @@ app.use("/apis/creator", creatorRoute);
 
 /* Stories — stickers, highlights, swipe-up links and mentions. */
 app.use("/apis/stories", storyRoute);
+
+/* Advanced / Optional Features.
+   Appearance and language (dark mode, Arabic/English), the video editor's
+   trim-and-text decision list, and one answer to where uploaded files live. */
+app.use("/apis/settings", settingsRoute);
+app.use("/apis/editor", editorRoute);
+app.use("/apis/storage", storageRoute);
 
 /*
   Publish scheduled posts as they come due.

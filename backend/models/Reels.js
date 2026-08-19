@@ -160,6 +160,64 @@ const EffectsSchema = new mongoose.Schema({
   },
 }, { _id: false });
 
+/*
+  The video editor's decision list.
+
+  Nothing here cuts a frame. The server records *what was decided* — trim these
+  seconds off, put this text at this position from this second to that one — and
+  the device renders it, exactly as `effects` already records a filter it did
+  not apply either.
+
+  Storing decisions rather than a flattened output is what makes the edit
+  reopenable: a trim burned into the file cannot be widened again later, and a
+  caption drawn into the pixels cannot be corrected or translated. It also means
+  the original upload stays the only copy of the media, so editing a post twice
+  does not leave two renders on disk with no way to tell which one a post uses.
+*/
+const TrimSchema = new mongoose.Schema({
+  // Seconds from the start of the source clip. `end` is exclusive.
+  start: { type: Number, default: 0, min: 0 },
+  end:   { type: Number, min: 0 },
+}, { _id: false });
+
+const TextOverlaySchema = new mongoose.Schema({
+  // Client-generated so the editor can address an overlay before it is saved.
+  id:    { type: String, required: true },
+  text:  { type: String, required: true, trim: true, maxlength: 200 },
+
+  /*
+    Position as a 0-1 fraction of the frame, like photo tags — never pixels.
+    A caption placed at x:540 sits in the middle of one phone and off the edge
+    of another, and the same post is rendered on both.
+  */
+  x: { type: Number, default: 0.5, min: 0, max: 1 },
+  y: { type: Number, default: 0.5, min: 0, max: 1 },
+
+  font:       { type: String, default: "default" },
+  fontSize:   { type: Number, default: 24, min: 8, max: 200 },
+  color:      { type: String, default: "#ffffff" },
+  background: { type: String, default: null },   // null means no plate behind it
+  align:      { type: String, enum: ["left", "center", "right"], default: "center" },
+  rotation:   { type: Number, default: 0, min: -180, max: 180 },
+
+  // When it is on screen, in seconds. Absent means the whole clip, which is the
+  // right default for a photo — a photo has no timeline to sit on.
+  startAt: { type: Number, min: 0 },
+  endAt:   { type: Number, min: 0 },
+
+  // Which carousel item it belongs to.
+  mediaIndex: { type: Number, default: 0, min: 0 },
+}, { _id: false });
+
+const EditSchema = new mongoose.Schema({
+  trim:     { type: TrimSchema, default: undefined },
+  overlays: { type: [TextOverlaySchema], default: [] },
+  // Bumped on every save, so a client that reopened the editor from a stale
+  // copy can tell rather than silently overwriting a newer edit.
+  revision:  { type: Number, default: 0 },
+  updatedAt: { type: Date },
+}, { _id: false });
+
 const TaggedUserSchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: "users", required: true },
   // Position on the image as a 0-1 fraction, for photo tags
@@ -316,6 +374,9 @@ const videoSchema = new mongoose.Schema({
 
   // Camera filter / beauty settings used at capture
   effects: { type: EffectsSchema, default: undefined },
+
+  // Video editor decision list — trim and text overlays. See EditSchema above.
+  edit: { type: EditSchema, default: undefined },
 
   // Draft bookkeeping. `status_draft_publish` above holds the state; these
   // record when it last moved, so a drafts list can sort by real recency.
