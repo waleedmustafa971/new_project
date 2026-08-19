@@ -197,6 +197,7 @@ import engagementRoute from "./routes/engagementRoute.js";
 import postingRoute from "./routes/postingRoute.js";
 import liveRoute from "./routes/liveRoute.js";
 import monetisationRoute from "./routes/monetisationRoute.js";
+import creatorRoute from "./routes/creatorRoute.js";
 import messagingRoute from "./routes/messagingRoute.js";
 import groupsRoute from "./routes/groupsRoute.js";
 import discoveryRoute from "./routes/discoveryRoute.js";
@@ -211,6 +212,26 @@ app.use("/apis/live", liveRoute);
 
 /* Monetisation — coins, virtual items, subscriptions, creator earnings. */
 app.use("/apis/monetisation", monetisationRoute);
+
+/* Pages / Creator / Business — analytics, scheduling, boosts and ads. */
+app.use("/apis/creator", creatorRoute);
+
+/*
+  Publish scheduled posts as they come due.
+
+  A plain interval rather than a cron dependency, because the feed already
+  excludes a scheduled post until its date passes — so this running late means
+  a post appears in the feed slightly before its status flips, never the other
+  way round. The endpoint POST /apis/creator/scheduled/publish-due does the same
+  work on demand for a real scheduler, or for a test.
+*/
+import { runDuePublish } from "./controllers/creatorController.js";
+const SCHEDULE_TICK_MS = 60 * 1000;
+setInterval(() => {
+  runDuePublish()
+    .then((r) => { if (r.published) console.log(`🗓  published ${r.published} scheduled post(s)`); })
+    .catch((err) => console.error("[schedule]", err.message));
+}, SCHEDULE_TICK_MS).unref();
 app.use("/apis/messaging", messagingRoute);
 // Groups & Community. Runs alongside the older /api/socialgroup CRUD below,
 // which keeps working against the same collection.

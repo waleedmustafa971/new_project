@@ -225,10 +225,29 @@ const videoSchema = new mongoose.Schema({
   ageRestricted: { type: Boolean, default: false },
   status_draft_publish: {
     type: String,
-    enum: ["Draft", "Publish"],
+    // "Scheduled" is a third resting state: written, not a draft any more, and
+    // not yet public. The feed filters on `$ne: "Draft"`, so a scheduled post
+    // must be excluded by its own date rather than by this field alone.
+    enum: ["Draft", "Publish", "Scheduled"],
     default: "Draft",
     required: true,
   },
+
+  /*
+    When a scheduled post should go public. Null for everything else.
+
+    The feed excludes a post whose `scheduledFor` is still in the future, so a
+    scheduler that fails to run late can never leak a post early — the date is
+    the source of truth, and publishing merely flips the flag to match it.
+  */
+  scheduledFor: { type: Date, default: null },
+
+  /*
+    The live boost, if any. Denormalised onto the post so ranking does not have
+    to join every candidate against the campaign collection.
+  */
+  boostedUntil: { type: Date, default: null },
+  boostCampaign: { type: mongoose.Schema.Types.ObjectId, ref: "adcampaign", default: null },
   sharegroup: { type: Object },
 
   /* ================================================================
@@ -276,6 +295,18 @@ const videoSchema = new mongoose.Schema({
 
   // Reach + story seen-state
   viewsCount: { type: Number, default: 0 },
+
+  /*
+    Impressions are not views.
+
+    `viewsCount` counts distinct accounts, because markViewed() dedupes through
+    `viewedBy` — that figure is the post's reach. An impression is every time the
+    post was put in front of someone, the same person scrolling past it twice
+    included. Analytics needs both: reach without impressions cannot show how
+    hard a post was pushed, and impressions without reach flatters a post shown
+    repeatedly to the same handful of people.
+  */
+  impressions: { type: Number, default: 0 },
   viewedBy: {
     type: [{
       user: { type: mongoose.Schema.Types.ObjectId, ref: "users" },

@@ -194,6 +194,23 @@ const userSchema = new mongoose.Schema({
   deletedAt: { type: Date, default: null },
   moderationNote: { type: String },
   verifiedBadge: { type: Boolean, default: false }, // blue tick
+  /*
+    The professional profile that comes with a creator or business account.
+
+    Kept beside `accountType` rather than inside it because it survives a
+    downgrade: someone who switches back to a personal account and later
+    upgrades again should not have to retype their category and contact
+    details. `accountType` alone decides what they can currently do.
+  */
+  creatorProfile: {
+    category: { type: String, default: "" },
+    contactEmail: { type: String, default: "" },
+    contactPhone: { type: String, default: "" },
+    website: { type: String, default: "" },
+    upgradedAt: { type: Date, default: null },
+    previousType: { type: String, default: null },
+  },
+
   accountType: {
     type: String,
     enum: ["personal", "creator", "business"],

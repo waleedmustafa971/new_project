@@ -240,7 +240,18 @@ export function baseMatch(ctx, { type, includeExpired = false, group = null } = 
   const match = {
     // "deleted" is the soft-delete tombstone written by the posting controller.
     status: { $nin: ["hidden", "deleted"] },
+    /*
+      Drafts never appear. Scheduled posts are excluded by their own date
+      rather than by this field: a post whose time has come is publishable even
+      if the publisher has not run yet, and one whose time has not come must
+      stay out no matter what its status says. The date is the source of truth,
+      so a late scheduler publishes late and never early.
+    */
     status_draft_publish: { $ne: "Draft" },
+    $and: [{ $or: [
+      { status_draft_publish: { $ne: "Scheduled" } },
+      { scheduledFor: { $lte: new Date() } },
+    ] }],
     /*
       Group posts are readable only through the group's own feed, so the public
       timeline asks for `group: null`. Mongo matches a missing field against
