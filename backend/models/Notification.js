@@ -24,6 +24,7 @@ export const NOTIFICATION_TYPES = [
   "follow",           // started following you
   "share",            // shared your post
   "live_request",     // asked to co-host / join your live as a guest
+  "live_invite",      // invited you to co-host / guest on their live
   "live_gift",        // sent a gift on your live
 
   /* Groups & Community */

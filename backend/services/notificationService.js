@@ -87,6 +87,7 @@ const PREF_OF = {
   follow: "follows",
   share: "shares",
   live_request: "live",
+  live_invite: "live",
   live_gift: "live",
   group_request: "groups",
   group_approved: "groups",
@@ -122,6 +123,8 @@ const copyFor = (type, actorName, extra = {}) => {
       return { title: actorName, body: `${actorName} shared your post` };
     case "live_request":
       return { title: actorName, body: `${actorName} ${extra.preview || "wants to join your live"}` };
+    case "live_invite":
+      return { title: actorName, body: `${actorName} ${extra.preview || "invited you onto their live"}` };
     case "live_gift":
       return { title: actorName, body: `${actorName} ${extra.preview || "sent you a gift"}` };
 

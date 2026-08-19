@@ -36,9 +36,14 @@ const liveStreamSchema = new mongoose.Schema({
     },
     micOn: { type: Boolean, default: true },
     videoOn: { type: Boolean, default: true },
+    // "requested" is viewer-initiated (they asked to come up); "invited" is
+    // host-initiated and waits on the invitee instead of on the host. Keeping
+    // both in one enum means a seat is one row whichever direction it started
+    // from, so a person cannot hold a pending request and a pending invite at
+    // the same time and be approved twice.
     status: {
     type: String,
-    enum: ["requested", "approved", "rejected", "left", "removed"],
+    enum: ["requested", "invited", "approved", "rejected", "declined", "left", "removed"],
     default: "requested"
     },
     // A co-host is invited to share the broadcast; a guest is a viewer who
@@ -48,6 +53,8 @@ const liveStreamSchema = new mongoose.Schema({
     enum: ["cohost", "guest"],
     default: "cohost"
     },
+    invitedBy: { type: mongoose.Schema.Types.ObjectId, ref: "users", default: null },
+    invitedAt: { type: Date },
     joinedAt: { type: Date },
     leftAt: { type: Date }
     }
@@ -63,6 +70,57 @@ const liveStreamSchema = new mongoose.Schema({
     }
     ],
     peak_viewers: { type: Number, default: 0 },
+
+    /*
+      Moderation.
+
+      Moderators are appointed by the host for the life of one stream — the role
+      does not follow anyone to the next broadcast, which is why it lives here
+      and not on the user. A moderator can act on viewers but not on another
+      moderator; only the host outranks a moderator.
+    */
+    moderators: [
+    {
+    user: { type: mongoose.Schema.Types.ObjectId, ref: "users", required: true },
+    addedBy: { type: mongoose.Schema.Types.ObjectId, ref: "users" },
+    addedAt: { type: Date, default: Date.now }
+    }
+    ],
+
+    /*
+      Bans and chat mutes, kept as rows with an expiry rather than two arrays of
+      user ids. A timed mute has to lapse on its own — a moderator muting someone
+      for five minutes should not have to remember to come back and undo it — so
+      `until` is read at enforcement time and a null `until` means indefinite.
+      Rows are retained after being lifted (`liftedAt`) so the host can see what
+      was done to whom instead of the record vanishing.
+    */
+    restrictions: [
+    {
+    user: { type: mongoose.Schema.Types.ObjectId, ref: "users", required: true },
+    type: { type: String, enum: ["ban", "mute"], required: true },
+    until: { type: Date, default: null },
+    reason: { type: String, default: "" },
+    by: { type: mongoose.Schema.Types.ObjectId, ref: "users" },
+    at: { type: Date, default: Date.now },
+    liftedAt: { type: Date, default: null },
+    liftedBy: { type: mongoose.Schema.Types.ObjectId, ref: "users", default: null }
+    }
+    ],
+
+    /*
+      Chat controls. Slow mode is seconds between messages from one person;
+      followersOnly restricts chat to accounts that follow the host, which is the
+      usual answer to a raid. `enabled: false` closes chat outright.
+    */
+    chatSettings: {
+    enabled: { type: Boolean, default: true },
+    slowModeSeconds: { type: Number, default: 0, min: 0, max: 300 },
+    followersOnly: { type: Boolean, default: false }
+    },
+
+    // At most one pinned chat message; pinning a second replaces the first.
+    pinnedMessage: { type: mongoose.Schema.Types.ObjectId, ref: "livechatmessage", default: null },
 
     // Running total of gift coins received on this stream.
     gift_coins: { type: Number, default: 0 },
@@ -85,6 +143,7 @@ const liveStreamSchema = new mongoose.Schema({
 liveStreamSchema.index({ status: 1, enteredby: -1 });
 liveStreamSchema.index({ hoster: 1, status: 1 });
 liveStreamSchema.index({ "viewers.user": 1 });
+liveStreamSchema.index({ "restrictions.user": 1 });
 
 const LiveStream = mongoose.model('livestreamtbl', liveStreamSchema);
 
