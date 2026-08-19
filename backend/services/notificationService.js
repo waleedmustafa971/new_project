@@ -89,6 +89,9 @@ const PREF_OF = {
   live_request: "live",
   live_invite: "live",
   live_gift: "live",
+  // No such key exists in notificationPrefs, and an unknown key defaults to on
+  // — which is the right default for someone paying you money.
+  subscription: "subscriptions",
   group_request: "groups",
   group_approved: "groups",
   group_invite: "groups",
@@ -125,6 +128,8 @@ const copyFor = (type, actorName, extra = {}) => {
       return { title: actorName, body: `${actorName} ${extra.preview || "wants to join your live"}` };
     case "live_invite":
       return { title: actorName, body: `${actorName} ${extra.preview || "invited you onto their live"}` };
+    case "subscription":
+      return { title: "New subscriber", body: `${actorName} ${extra.preview || "subscribed to you"}` };
     case "live_gift":
       return { title: actorName, body: `${actorName} ${extra.preview || "sent you a gift"}` };
 

@@ -196,6 +196,7 @@ import feedRoute from "./routes/feedRoute.js";
 import engagementRoute from "./routes/engagementRoute.js";
 import postingRoute from "./routes/postingRoute.js";
 import liveRoute from "./routes/liveRoute.js";
+import monetisationRoute from "./routes/monetisationRoute.js";
 import messagingRoute from "./routes/messagingRoute.js";
 import groupsRoute from "./routes/groupsRoute.js";
 import discoveryRoute from "./routes/discoveryRoute.js";
@@ -207,6 +208,9 @@ app.use("/apis/posting", postingRoute);
 // Agora token and gift-admin endpoints. Registered first, so any path added
 // there that collides with one here would be shadowed — keep them disjoint.
 app.use("/apis/live", liveRoute);
+
+/* Monetisation — coins, virtual items, subscriptions, creator earnings. */
+app.use("/apis/monetisation", monetisationRoute);
 app.use("/apis/messaging", messagingRoute);
 // Groups & Community. Runs alongside the older /api/socialgroup CRUD below,
 // which keeps working against the same collection.

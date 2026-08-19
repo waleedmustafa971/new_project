@@ -26,6 +26,7 @@ export const NOTIFICATION_TYPES = [
   "live_request",     // asked to co-host / join your live as a guest
   "live_invite",      // invited you to co-host / guest on their live
   "live_gift",        // sent a gift on your live
+  "subscription",     // subscribed to one of your paid tiers
 
   /* Groups & Community */
   "group_request",    // asked to join a group you moderate

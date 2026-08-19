@@ -24,6 +24,7 @@ import GiftTransaction from "../models/GiftTransaction.js";
 import { isId, AUTHOR_FIELDS } from "../helpers/feed.js";
 import { notify } from "../services/notificationService.js";
 import { isBanned, isMuted, isModerator, canModerate } from "../helpers/live.js";
+import { recordEarning } from "../helpers/monetisation.js";
 
 import pkg from "agora-access-token";
 const { RtcTokenBuilder, RtcRole } = pkg;
@@ -566,7 +567,6 @@ export const sendGift = wrap(async (req, res) => {
     return fail(res, 402, `Not enough coins — ${me?.coins || 0} available, ${cost} needed`);
   }
 
-  await User.updateOne({ _id: oid(stream.hoster) }, { $inc: { coins: cost } });
   await LiveStream.updateOne({ _id: id }, { $inc: { gift_coins: cost, coins: cost } });
 
   const tx = await GiftTransaction.create({
@@ -575,6 +575,20 @@ export const sendGift = wrap(async (req, res) => {
     gift: gift._id,
     channelName: stream.channelName,
     coins: cost,
+  });
+
+  /*
+    The host is paid through the earnings ledger rather than by a direct credit.
+
+    This used to add the whole gift to the host's wallet, which left the
+    platform taking nothing and left no record explaining where a creator's
+    balance came from. recordEarning() writes the gross, the fee and the net,
+    and credits the net — so a gift is now auditable and a payout is
+    reconstructible from the events behind it.
+  */
+  const earning = await recordEarning({
+    creator: stream.hoster, type: "gift", grossCoins: cost,
+    from: senderId, sourceId: tx._id, note: gift.name,
   });
 
   await notify({
@@ -597,6 +611,8 @@ export const sendGift = wrap(async (req, res) => {
     coinsSpent: cost,
     senderCoins: me?.coins || 0,
     hostCoins: host?.coins || 0,
+    hostEarned: earning?.netCoins ?? cost,
+    platformFee: earning?.feeCoins ?? 0,
     streamGiftCoins: totals?.gift_coins || 0,
   });
 });

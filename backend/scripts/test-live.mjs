@@ -109,7 +109,34 @@ const coinsBefore = Object.fromEntries(
   (await db.collection("users").find({ _id: { $in: FIXTURES.map(OID) } }, { projection: { coins: 1 } }).toArray())
     .map((u) => [String(u._id), u.coins || 0])
 );
+
+/*
+  Put the coin balances back even if this run falls over.
+
+  Two crashed runs in development drifted the demo data exactly this way: the
+  suite died part-way, the cleanup at the bottom never ran, and the *next* run
+  then snapshotted the already-wrong balances and faithfully restored those —
+  so the drift looked like the baseline and survived. A crash must not be able
+  to leave the owner's demo accounts holding coins they never had.
+*/
+let coinsRestored = false;
+const restoreCoins = async () => {
+  if (coinsRestored) return;
+  coinsRestored = true;
+  for (const [id, coins] of Object.entries(coinsBefore)) {
+    await db.collection("users").updateOne({ _id: OID(id) }, { $set: { coins } });
+  }
+};
+for (const event of ["uncaughtException", "unhandledRejection"]) {
+  process.on(event, async (err) => {
+    console.error(`\n  !! ${event} — restoring coin balances before exiting\n`, err);
+    try { await restoreCoins(); } catch { /* nothing more we can do */ }
+    process.exit(1);
+  });
+}
+
 const baseline = {
+  earnings: await db.collection("earningsentries").countDocuments({}),
   streams: await db.collection("livestreamtbls").countDocuments({}),
   chat: await db.collection("livechatmessages").countDocuments({}),
   reactions: await db.collection("livereactions").countDocuments({}),
@@ -565,6 +592,17 @@ await call("POST", `/streams/${forced.stream?._id}/end`, { as: U.layla });
 section("Cleanup");
 
 const streamIds = created.streams.filter(Boolean).map(OID);
+
+/*
+  Gifts now write to the creator earnings ledger, so the rows this suite's
+  gifting creates have to be swept too — otherwise every run leaves an earnings
+  entry behind and the demo data drifts a little further each time.
+*/
+const giftTxIds = (await db.collection("giftstransactions")
+  .find({ channelName: { $regex: TEST_CHANNEL } }).toArray()).map((t) => t._id);
+const delEarnings = await db.collection("earningsentries")
+  .deleteMany({ sourceId: { $in: giftTxIds } });
+
 const delChat = await db.collection("livechatmessages").deleteMany({ stream: { $in: streamIds } });
 const delReactions = await db.collection("livereactions").deleteMany({ stream: { $in: streamIds } });
 const delTx = await db.collection("giftstransactions").deleteMany({ channelName: { $regex: TEST_CHANNEL } });
@@ -574,14 +612,13 @@ const delNotifs = await db.collection("notifications").deleteMany({
   type: { $in: ["live_invite", "live_request", "live_gift"] },
 });
 
-console.log(`  removed ${delStreams.deletedCount} streams, ${delChat.deletedCount} chat rows, ` +
+console.log(`  removed ${delEarnings.deletedCount} earnings rows, ` +
+            `${delStreams.deletedCount} streams, ${delChat.deletedCount} chat rows, ` +
             `${delReactions.deletedCount} reaction rows, ${delGifts.deletedCount} gifts, ` +
             `${delTx.deletedCount} gift transactions, ${delNotifs.deletedCount} notifications`);
 
 /* Gifting moved real coins between two demo accounts — put them back. */
-for (const [id, coins] of Object.entries(coinsBefore)) {
-  await db.collection("users").updateOne({ _id: OID(id) }, { $set: { coins } });
-}
+await restoreCoins();
 const coinsAfter = Object.fromEntries(
   (await db.collection("users").find({ _id: { $in: FIXTURES.map(OID) } }, { projection: { coins: 1 } }).toArray())
     .map((u) => [String(u._id), u.coins || 0])
@@ -591,6 +628,7 @@ check("every demo coin balance is back to where it started",
   JSON.stringify(coinsAfter));
 
 const after = {
+  earnings: await db.collection("earningsentries").countDocuments({}),
   streams: await db.collection("livestreamtbls").countDocuments({}),
   chat: await db.collection("livechatmessages").countDocuments({}),
   reactions: await db.collection("livereactions").countDocuments({}),
