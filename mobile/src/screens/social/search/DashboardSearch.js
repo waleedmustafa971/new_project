@@ -69,10 +69,18 @@ const DashboardSearch = () => {
             setUserid(userData._id);
             setIsloading(true);
 
+            /*
+              /apis/auth/findunknownperson has never existed on the server — this
+              screen has been 404ing on every search. notInfriends is the endpoint
+              that does this job: same { users, total, currentPage, totalPages }
+              shape, same `search` parameter, and it already excludes people you
+              follow and yourself. It needs userId, which is why it is passed here.
+            */
             const response = await api.get(
-                `/apis/auth/findunknownperson`,
+                `/apis/auth/notInfriends`,
                 {
                     params: {
+                        userId: userData._id,
                         page,
                         limit: 10,
                         search: searchTerm,
