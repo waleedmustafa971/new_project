@@ -3,6 +3,11 @@ import jwt from "jsonwebtoken";
 import bodyParser from "body-parser";
 import User from "../models/users.js"; // import model user
 import Reel from "../models/Reels.js";
+import { canViewPost } from "../helpers/safety.js";
+import mongoose from "mongoose";
+
+const isId = (v) => mongoose.Types.ObjectId.isValid(v);
+import { canView, hiddenUserIds, relationship } from "../helpers/privacy.js";
 import multer from "multer";
 import AWS from 'aws-sdk';
 import sharp from 'sharp';
@@ -529,9 +534,44 @@ export const getPosts = async (req, res) => {
     const loginUserId = req.query.username;
     const userid = req.query.userid;
 
-    const reels = await Reel.find({
-      posttype: "Post",
-    })
+    /*
+      The feed used to be `Reel.find({ posttype: "Post" })` — every post from
+      every account, newest first. No privacy, no blocking, no relationship of
+      any kind. A private account's posts were served to strangers, a blocked
+      person's posts kept arriving, and hiding a post did nothing to the feed it
+      was hidden from.
+
+      Three things happen here instead:
+
+        1. Authors the viewer can't see are removed in the query — people either
+           side of a block, and anyone the viewer restricted.
+        2. What survives is checked twice per post: canViewPost for the post's
+           own audience, moderation state and age gate, and canView(..., "posts")
+           for the author's account-level privacy, which is what makes a private
+           account private. The post-level check alone lets a private account's
+           "everyone" post through, which is exactly the leak that was reported.
+        3. What remains is ordered by relationship before recency, so the people
+           the viewer actually follows lead the feed.
+
+      It over-fetches and then filters, because filtering after a .limit() would
+      hand back a short page and look like the end of the feed.
+    */
+    const viewerId = isId(userid) ? String(userid) : null;
+
+    const excludedAuthors = viewerId ? await hiddenUserIds(viewerId) : [];
+    const viewer = viewerId
+      ? await User.findById(viewerId)
+          .select("following hiddenPosts dateofbirth blockedUsers")
+          .lean()
+      : null;
+    const hiddenPostIds = (viewer?.hiddenPosts || []).map(String);
+    const followingIds = new Set((viewer?.following || []).map(String));
+
+    const query = { posttype: "Post" };
+    if (excludedAuthors.length) query.username = { $nin: excludedAuthors };
+    if (hiddenPostIds.length) query._id = { $nin: hiddenPostIds };
+
+    const candidates = await Reel.find(query)
       .populate({
         path: "sharepost.originalPost",
         populate: {
@@ -539,10 +579,54 @@ export const getPosts = async (req, res) => {
           select: "name email image bio",
         },
       })
-      .sort({ xtime: -1 }) // descending order by createdAt
+      .sort({ xtime: -1 })
       .skip(skip)
-      .limit(limit)
+      .limit(Math.max(Number(limit) || 10, 10) * 4)
       .lean();
+
+    // One read per distinct author rather than per post.
+    const authorIds = [...new Set(candidates.map((r) => String(r.username)).filter(Boolean))];
+    const authorDocs = await User.find({ _id: { $in: authorIds } })
+      .select("followers closeFriends blockedUsers privacy privacySettings followRequests")
+      .lean();
+    const authors = new Map(authorDocs.map((a) => [String(a._id), a]));
+
+    const visible = [];
+    for (const reel of candidates) {
+      const author = authors.get(String(reel.username));
+      if (!author) continue;
+
+      const postCheck = await canViewPost(viewerId, reel, { author, viewer });
+      if (!postCheck.allowed) continue;
+
+      const rel = await relationship(viewerId, author);
+      if (!(await canView(viewerId, author, "posts", rel))) continue;
+
+      visible.push({ reel, rel });
+    }
+
+    /*
+      Ranking. Deliberately simple and explainable rather than a black box:
+      someone you follow outranks a stranger, and within each group the newest
+      post wins. Engagement is the tie-break, so a post that people actually
+      responded to surfaces above one that nobody touched.
+    */
+    visible.sort((a, b) => {
+      const score = (x) => {
+        const followed = followingIds.has(String(x.reel.username)) ? 2 : 0;
+        const known = x.rel === "follower" ? 1 : 0;
+        return followed + known;
+      };
+      const byRank = score(b) - score(a);
+      if (byRank) return byRank;
+      const byTime = new Date(b.reel.xtime) - new Date(a.reel.xtime);
+      if (byTime) return byTime;
+      const engagement = (x) =>
+        (x.reel.likes?.length || 0) + (x.reel.comments?.length || 0) * 2;
+      return engagement(b) - engagement(a);
+    });
+
+    const reels = visible.slice(0, Number(limit) || 10).map((v) => v.reel);
 
     if (reels.length === 0) {
       return res.status(201).json({ message: "No posts found" });
