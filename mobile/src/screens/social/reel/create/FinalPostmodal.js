@@ -51,7 +51,22 @@ const FinalPostModal = ({
     };
     //shareNow
     const shareNow = async () => {
-        const userid = await AsyncStorage.getItem("username");
+        /*
+          The author's id, not their email.
+
+          This read AsyncStorage "username", which holds the email address —
+          authSlice stores it as setItem("username", email). The server's Reels
+          schema declares `username` as an ObjectId ref, so every story upload
+          died with "Cast to ObjectId failed for value waleed...@gmail.com".
+          The reel path next door already reads userdata._id; this matches it.
+        */
+        const raw = await AsyncStorage.getItem("userdata");
+        const userid = raw ? (JSON.parse(raw)?._id || null) : null;
+        if (!userid) {
+            Alert.alert("Not signed in", "Sign in again to post a story.");
+            setIsloading(false);
+            return;
+        }
         console.log("..JSON..." + JSON.stringify(imageurl)); //imageurl 
         setIsloading(true);
         if (!imageurl) {

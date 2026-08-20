@@ -55,6 +55,15 @@ export const registerPushToken = async (tokenArg) => {
     const userId = await userIdFromStorage();
     if (!userId) return false; // not signed in yet — login will call this again
 
+    /*
+      An auth token has to exist too. userdata can outlive the token when a
+      session dies, and without this the call goes out with no Authorization
+      header and comes back "Access denied, no token provided" — an alarming
+      line for something that is simply not signed in yet.
+    */
+    const authToken = await AsyncStorage.getItem('token');
+    if (!authToken) return false;
+
     const fcmtoken =
       tokenArg ||
       (await AsyncStorage.getItem('fcmtoken')) ||

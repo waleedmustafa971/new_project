@@ -38,10 +38,25 @@ const ReelItem = ({ reel, isActive, onClose, navigation }) => {
 
 
   const hasSound = !!reel.sound;
-  //const isVideo = reel.videoUrl?.endsWith(".mp4");
-  const isVideo = reel.videoUrl?.endsWith('.mp4') || reel.videoUrl?.endsWith('.m3u8');
+  /*
+    Decide the media type from the URL, defensively.
 
-  const isImage = reel.videoUrl?.endsWith(".png") || reel.videoUrl?.endsWith(".jpg") || reel.videoUrl?.endsWith(".webp");
+    `?.` only guards against null and undefined. Some rows come back with
+    videoUrl as an array rather than a string, and then `.endsWith` is not a
+    function — which crashed the whole reel list with
+    "_reel$videoUrl.endsWith is not a function". Coercing to a string first
+    makes an unexpected shape render as neither video nor image instead of
+    taking the screen down.
+  */
+  const mediaUrl = Array.isArray(reel.videoUrl)
+    ? String(reel.videoUrl[0] || '')
+    : typeof reel.videoUrl === 'string'
+      ? reel.videoUrl
+      : '';
+  const endsWithAny = (exts) => exts.some((e) => mediaUrl.toLowerCase().endsWith(e));
+
+  const isVideo = endsWithAny(['.mp4', '.m3u8']);
+  const isImage = endsWithAny(['.png', '.jpg', '.jpeg', '.webp']);
 
   const {
     videoRef,

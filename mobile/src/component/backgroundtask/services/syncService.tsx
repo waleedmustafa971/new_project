@@ -68,9 +68,19 @@ export const sendLocaltoCloud = async (): Promise<void> => {
 };
 
 export const uploadVoiceFile = async (audioUri: string) => {
+  /*
+    react-native-audio-recorder-player hands back "file:////data/..." on Android
+    — four slashes, one too many. React Native cannot open that path, so the
+    multipart body arrived with no file attached, the server answered
+    "No file uploaded", and the caller logged "Upload failed, skipping message"
+    and dropped the voice note. Collapsing the slashes is the whole fix.
+  */
+  const uri = String(audioUri || "").replace(/^file:\/{2,}/, "file:///");
+  if (!uri) throw new Error("No audio file to upload");
+
   const formData = new FormData();
   formData.append("file", {
-    uri: audioUri,
+    uri,
     type: "audio/mp4", // adjust if needed
     name: "voice.mp4",
   } as any);
