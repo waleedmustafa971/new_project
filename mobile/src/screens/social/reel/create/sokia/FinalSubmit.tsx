@@ -171,7 +171,7 @@ const FinalSubmit = ({ visible, onSelect, onClose,
             } else {
                 Toast.show({
                     type: "error",
-                    text1: "Image Updated",
+                    text1: data?.message || "Your reel was not posted",
                     position: "bottom",
                 });
                 setIsloading(false);
@@ -245,14 +245,34 @@ const FinalSubmit = ({ visible, onSelect, onClose,
             formData.append("status_draft_publish", status); 
 
             console.log("..formdata..", JSON.stringify(formData))
-             const response = await fetch(
-                base.BASE_URL + "/api/videoprocessing/export-music-video",
-                {
-                    method: "POST",
-                    body: formData,
+            let data: any = {};
+            try {
+                const response = await fetch(
+                    base.BASE_URL + "/api/videoprocessing/export-music-video",
+                    {
+                        method: "POST",
+                        body: formData,
+                    }
+                );
+                /* A failure here used to land in the same branch as a
+                   successful-but-unexpected reply, so the composer stayed up
+                   with a toast reading "Image Updated" — it looked like the
+                   screen had simply reloaded, and nothing said the post had
+                   not been made. */
+                data = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    throw new Error(
+                        data?.error || data?.message || `Upload failed (${response.status})`
+                    );
                 }
-            );
-            const data = await response.json();
+            } catch (e: any) {
+                setIsloading(false);
+                Alert.alert(
+                    "Could not post your reel",
+                    e?.message || "The upload did not go through. Please try again."
+                );
+                return;
+            }
             console.log("Exported video URL:", data.videoUrl);
             if (data.message == "Reel uploaded, processing HLS in background") {
                 setIsloading(false)

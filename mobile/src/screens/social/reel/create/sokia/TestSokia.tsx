@@ -273,6 +273,11 @@ const TestSokia = () => {
               setVideoUri(`file://${video.path}`);
               setCurrentMode('VIDEO'); //EDITOR  currentMode
               setVideoUrilocal(`file://${video.path}`);
+              /* Only the gallery-pick path set this, so a clip recorded
+                 with the camera kept the initial 'PHOTO' and was stored on
+                 the reel as a photo — the log read "final image file
+                 ......PHOTO" for a .mov. */
+              setIsimage('VIDEO');
             },
             onRecordingError: (error) => console.error(error),
           });
@@ -290,6 +295,9 @@ const TestSokia = () => {
       setTimeout(() => {
         setPhotoPath(uri);
         setCurrentMode('PHOTO');
+        /* The counterpart to setting VIDEO on a recording: taking a photo
+           after recording a clip would otherwise keep the earlier value. */
+        setIsimage('PHOTO');
       }, 600);
     } catch (e) { console.error(e); }
   };
@@ -405,8 +413,19 @@ const TestSokia = () => {
     //videoUrilocal
    // setVideoUrilocal(videoUrilocal)
   }
+  /*
+    FinalSubmit calls this after a reel posts successfully. It was a leftover
+    stub that raised an empty "Close Modal" alert — so the one moment the
+    composer worked ended with a debug dialog. It now clears the capture so
+    coming back to the camera does not still hold the clip just published.
+  */
   const closeReelmodal = () => {
-    Alert.alert("Close Modal")
+    setShowPostModal(false);
+    setPhotoPath(null);
+    setVideoUri(null);
+    setVideoUrilocal(null);
+    cleanupTempFiles();
+    setCurrentMode('CAMERA');
   }
 
   return (
