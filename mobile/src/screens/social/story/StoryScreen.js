@@ -108,6 +108,46 @@ const fetchStory = useCallback(async () => {
   }
 }, []);
 
+  /*
+    Stored paths are relative to the API host ("uploads/..."), and the avatar
+    <Image>s were handed them unchanged — and handed `null` when there was no
+    image at all. Both render nothing, which is why the rail was a wall of grey.
+  */
+  const AVATAR_FALLBACK = require("../../../assets/user.png");
+  const resolveUri = (path) => {
+    if (!path) return null;
+    const p = String(path);
+    if (/^(https?:|file:|data:)/.test(p)) return p;
+    return `${base.BASE_URL}/${p.replace(/^\/+/, "")}`;
+  };
+  const avatarSource = (path) => {
+    const uri = resolveUri(path);
+    return uri ? { uri } : AVATAR_FALLBACK;
+  };
+
+  /*
+    Story media arrives in more than one shape: a plain string from the app, and
+    { url, type } from rows the in-app tester wrote. Normalising here means both
+    render, and anything unrecognised degrades to a placeholder rather than a
+    broken request.
+  */
+  const storyMedia = (item) => {
+    const raw = item?.videoUrl;
+    const value = Array.isArray(raw) ? raw[0] : raw;
+    const path =
+      typeof value === "string"
+        ? value
+        : value && typeof value === "object"
+          ? value.url || value.uri || ""
+          : "";
+    const declaredVideo =
+      value && typeof value === "object" && value.type === "video";
+    return {
+      uri: resolveUri(path),
+      isVideo: declaredVideo || /\.(mp4|mov|webm|avi|m3u8)$/i.test(path || ""),
+    };
+  };
+
   const renderStoryItem = ({ item, index }) => {
 
     if (item.isCreateStory) {
@@ -132,10 +172,25 @@ const fetchStory = useCallback(async () => {
               a 108x148 tile, so the tile became a giant cropped head. With no
               photo we draw a plain tile and a small centred glyph instead.
             */}
-            {resolveUri(image) ? (
+            {/*
+              With a live story the tile shows that story, not your avatar —
+              it is the thing you are being invited to look at. Your avatar is
+              only the cover when there is nothing to show yet.
+            */}
+            {(() => {
+              const ownCover = item.ring
+                ? storyMedia((item.ring.items || [])[0] || {}).uri
+                : null;
+              return ownCover || resolveUri(image);
+            })() ? (
               <>
                 <Image
-                  source={{ uri: resolveUri(image) }}
+                  source={{
+                    uri:
+                      (item.ring
+                        ? storyMedia((item.ring.items || [])[0] || {}).uri
+                        : null) || resolveUri(image),
+                  }}
                   style={styles.storyImage}
                   resizeMode="cover"
                 />
