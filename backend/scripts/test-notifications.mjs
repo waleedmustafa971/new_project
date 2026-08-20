@@ -77,6 +77,10 @@ await mongoose.connect(process.env.MONGO_URI);
 const db = mongoose.connection;
 const OID = (v) => new mongoose.Types.ObjectId(String(v));
 
+/* Stamped before anything runs, so the end-of-run drift check can tell this
+   suite's leftovers apart from rows the app wrote while it was running. */
+const RUN_START = new Date();
+
 /*
   The quiet-hours window is pure arithmetic on the recipient's own clock, and
   the case that matters — a window running past midnight — cannot be observed
@@ -699,7 +703,23 @@ for (const id of FIXTURES) {
 }
 check("every demo account is back to where it started", drift.length === 0, drift.join(", "));
 
-const survivors = await db.collection("notifications").countDocuments({ type: { $ne: "follow" } });
+/*
+  Scoped to this run, by time.
+
+  It used to count every non-follow notification in the database, so anyone
+  using the app on a real device while the suite ran failed it — signing in
+  writes a login_alert, sending a message writes a message row. Scoping by
+  account does not help either, because a real user messaging a demo account
+  produces a row that names one.
+
+  What the check actually means is "this run cleaned up after itself", and that
+  is a question about rows this run created. Anything written before it started
+  belongs to somebody else.
+*/
+const survivors = await db.collection("notifications").countDocuments({
+  type: { $ne: "follow" },
+  createdAt: { $gte: RUN_START },
+});
 check("only the seeded follow notifications remain", survivors === 0, `${survivors} others left`);
 
 await mongoose.disconnect();

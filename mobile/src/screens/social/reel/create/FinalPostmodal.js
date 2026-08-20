@@ -113,11 +113,22 @@ const FinalPostModal = ({
             );
 
             console.log("User updated:", response.data);
-            if (response.data.message == "File uploaded successfully") {
+            /*
+              Judge success by the status code, not by matching a sentence.
+
+              This compared the message to "File uploaded successfully" while the
+              server answers "Image uploaded & optimized successfully", so the
+              success branch never ran once. The upload worked every time — the
+              record is in the database and the file on disk — but the modal
+              never closed and an error toast said "Image Updated", which is why
+              posting a story looked like the same screen repeating forever.
+            */
+            const uploaded = response.status >= 200 && response.status < 300;
+            if (uploaded) {
 
                 Toast.show({
                     type: "success",
-                    text1: "Post is processing waiting for rechecking",
+                    text1: posttype === "Story" ? "Story posted" : "Posted",
                     position: "bottom",
                 });
                 setIsloading(false);
@@ -127,7 +138,7 @@ const FinalPostModal = ({
             } else {
                 Toast.show({
                     type: "error",
-                    text1: "Image Updated",
+                    text1: response.data?.message || "Could not post that",
                     position: "bottom",
                 });
                 setIsloading(false);

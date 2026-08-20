@@ -1032,7 +1032,22 @@ export const updateReelpost = async (req, res) => {
         .jpeg({ quality: 80 })
         .toFile(filepath);
       const imageUrl = `/uploads/reels/${filename}`;
+
+      /*
+        A story is a post that stops existing after a day.
+
+        This route never set `expiresAt`, so stories written through it relied
+        entirely on storyController's age-based fallback. That fallback works,
+        but it is a compatibility shim for rows written before the field
+        existed — new ones should carry their own expiry so the story feed can
+        filter on it in the query rather than after loading everything.
+      */
+      const STORY_TTL_MS = 24 * 60 * 60 * 1000;
+      const isStory = String(posttype || "").toLowerCase() === "story";
+      const expiresAt = isStory ? new Date(Date.now() + STORY_TTL_MS) : undefined;
+
       const newReel = new Reel({
+        ...(expiresAt ? { expiresAt } : {}),
         videoUrl: imageUrl, videoTitle,username,sound,posttype,location,posttypechild,ispost,
         videosound,tagpeople: JSON.parse(tagpeople || "[]"),
         sharegroup: JSON.parse(sharegroup || "[]"),textoverlays: JSON.parse(textoverlays || "[]"),emojioverlays: JSON.parse(emojioverlays || "[]"),
