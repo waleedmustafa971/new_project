@@ -33,6 +33,7 @@ backend/backup/profilepicture/
 .env.development
 *.env
 google-services.json
+google-services.json.*
 GoogleService-Info.plist
 
 # ── Android signing ────────────────────────────────────────────
@@ -86,6 +87,11 @@ yarn-error.log*
 *.orig
 
 # Local runtime artefacts and env backups (added 2026-08-18)
-.env.backup-*
+# Every .env variant — backups, per-machine copies, whatever a future session
+# names one. The narrow .env.backup-* rule this replaces only covered the one
+# backup that existed when it was written, and a differently-named backup
+# containing the same secrets slipped straight past it on 20 Aug.
+.env.*
+!.env.example
 backend/server_out.txt
 backend/server_err.txt
