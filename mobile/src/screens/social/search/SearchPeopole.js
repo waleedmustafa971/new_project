@@ -63,7 +63,7 @@ const SearchPeopole = ({ search, products }) => {
 
             <FlatList
                 data={products}
-                keyExtractor={(item) => item._id}
+                keyExtractor={(item, index) => String(item?._id ?? `row-${index}`)}
                 renderItem={renderItem}
                 onEndReached={handleLoadMore}
                 onEndReachedThreshold={0.5}

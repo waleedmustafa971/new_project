@@ -54,7 +54,28 @@ const PeopleYouMayKnowSection = ({ navigation }) => {
       });
 
       const { users, totalPages } = res.data;
-      setProducts((prev) => (pageNum === 1 ? users : [...prev, ...users]));
+
+      /*
+        Merge by id, never by concatenation.
+
+        notInfriends excludes people you already follow, so the result set
+        shrinks the moment you follow someone from this very list. Offset
+        pagination then slides: the window for page 2 overlaps page 1 and hands
+        back somebody already on screen. React saw two children with the same
+        key and warned that one of them may be dropped — which is exactly the
+        run of "Encountered two children with the same key" in the log, always
+        straight after a successful follow.
+      */
+      setProducts((prev) => {
+        const merged = pageNum === 1 ? users : [...prev, ...users];
+        const seen = new Set();
+        return merged.filter((u) => {
+          const id = String(u?._id ?? "");
+          if (!id || seen.has(id)) return false;
+          seen.add(id);
+          return true;
+        });
+      });
       setTotalPages(totalPages);
     } catch (error) {
       console.error("Failed to fetch users:", error);
@@ -66,7 +87,8 @@ const PeopleYouMayKnowSection = ({ navigation }) => {
   const handleFollow = (followId) => {
     if (!userid) return;
     dispatch(followUserAsync({ userId: userid, followId }));
-    setFollowedUsers((prev) => [...prev, followId]);
+    // Guard against a double tap adding the same id twice.
+    setFollowedUsers((prev) => (prev.includes(followId) ? prev : [...prev, followId]));
   };
 
   const renderItem = ({ item }) => (
@@ -111,7 +133,7 @@ const PeopleYouMayKnowSection = ({ navigation }) => {
       <FlatList
         data={products}
         horizontal
-        keyExtractor={(item) => item._id}
+        keyExtractor={(item, index) => String(item?._id ?? `row-${index}`)}
         renderItem={renderItem}
         onEndReached={() => fetchUsers(page + 1)}
         onEndReachedThreshold={0.5}

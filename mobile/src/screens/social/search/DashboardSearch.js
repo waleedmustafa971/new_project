@@ -90,9 +90,19 @@ const DashboardSearch = () => {
 
             const { users, totalPages } = response.data;
 
-            setProducts((prev) =>
-                page === 1 ? users : [...prev, ...users]
-            );
+            /* Same de-duplication as the suggestions list: notInfriends
+               excludes people you follow, so following someone mid-scroll
+               shifts the offset window and repeats a row. */
+            setProducts((prev) => {
+                const merged = page === 1 ? users : [...prev, ...users];
+                const seen = new Set();
+                return merged.filter((u) => {
+                    const id = String(u?._id ?? "");
+                    if (!id || seen.has(id)) return false;
+                    seen.add(id);
+                    return true;
+                });
+            });
             setTotalPages(totalPages);
         } catch (error) {
             console.error("Error fetching users:", error?.response?.data || error.message);
