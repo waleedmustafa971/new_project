@@ -548,7 +548,16 @@ export const getUsersReels = async (req, res) => {
     // Fetch user info for each reel
     const processedReels = await Promise.all(
       reels.map(async (reel) => {
-        const user = await User.findOne({ email: reel.username }).lean();
+        /*
+          reel.username holds an email on older rows and a user id on anything
+          the reel composer wrote — it sends userData._id. Looking up by email
+          alone found nobody for those, so userInfo came back null and every
+          new reel played with a blank name and the default avatar, next to a
+          Follow button offering to follow no one.
+        */
+        const user = mongoose.Types.ObjectId.isValid(reel.username)
+          ? await User.findById(reel.username).lean()
+          : await User.findOne({ email: reel.username }).lean();
 
         let isFollowing = false;
         if (user && user.followers) {
@@ -786,7 +795,11 @@ export const getReels = async (req, res) => {
     // Fetch user info for each reel
     const processedReels = await Promise.all(
       reels.map(async (reel) => {
-        const user = await User.findOne({ email: reel.username }).lean();
+        /* Same as getUsersReels: reel.username is an email on older rows
+           and a user id on anything the composer wrote. */
+        const user = mongoose.Types.ObjectId.isValid(reel.username)
+          ? await User.findById(reel.username).lean()
+          : await User.findOne({ email: reel.username }).lean();
 
         let isFollowing = false;
         if (user && user.followers) {
