@@ -157,17 +157,28 @@ const UserProfile = () => {
               elevation: 2,
               marginLeft: 8,
             }} onPress={() => {
-              const userdata = {
-                _id: item._id, // No conversation yet
+              /*
+                This referenced `item` and `me`, neither of which exists on this
+                screen — there is no list here, so there is no item. Tapping
+                Message threw "Property 'item' doesn't exist" and took the app
+                down. The person being viewed comes from the route params, and
+                the person viewing comes from the user context.
+              */
+              const partnerId = userid;
+              const myId = user?._id;
+              if (!partnerId || !myId) return;
+
+              const convo = {
+                _id: partnerId, // no conversation yet; the id stands in for one
                 type: "private",
                 partner: {
-                  _id: item._id,
-                  name: item.name,
-                  image: item.image || ""
+                  _id: partnerId,
+                  name: fullname || name || "",
+                  image: image || "",
                 },
-                lastMsg: null, // or {} if you want to initialize an empty object
+                lastMsg: null,
               };
-              navigation.navigate("ChatDetails", { me: me, partner: item._id, userinfo: userdata });
+              navigation.navigate("ChatDetails", { me: myId, partner: partnerId, userinfo: convo });
             }}
           >
             <Text style={{ fontSize: 14, color: 'white' }}>Message</Text>

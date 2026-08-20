@@ -702,18 +702,32 @@ const ChatDetails = () => {
       quality: 0.8,
       saveToPhotos: false,
     };
-    launchCamera(options, (response) => {
+    launchCamera(options, async (response) => {
       if (response.didCancel) {
         console.log('User cancelled camera');
         return;
       }
       if (response.errorCode) {
         console.log('Camera Error: ', response.errorMessage);
+        Alert.alert('Camera error', response.errorMessage || 'Could not take that photo.');
         return;
       }
 
       if (response.assets && response.assets.length > 0) {
-        submitLocalImages(response.assets); // send assets to your function
+        /*
+          Save it, then push it — the second half was missing.
+
+          submitLocalImages only writes the row to SQLite with status "pending";
+          syncPendingMessages is what uploads the file and emits the message.
+          The gallery path called both, the camera path called only the first,
+          so a photo taken with the camera was stored on the device and never
+          sent. It looked like the camera was broken when the send step simply
+          was not there.
+        */
+        await submitLocalImages(response.assets);
+        const net = await NetInfo.fetch();
+        if (!net.isConnected) return; // stays pending; the sync loop picks it up
+        syncPendingMessages();
       }
     });
   };
@@ -1103,25 +1117,55 @@ const ChatDetails = () => {
 
   };
 
-  const handleLocationSelected = (location: any) => {
-    console.log("Selected location:", location);
+  /*
+    Share a pinned location.
 
-    // Send message to chat
+    The coordinates were concatenated onto a string — `"📍 Shared Location" +
+    location` — which stringifies the object to "[object Object]", so whatever
+    was sent could never be read back as a place. The row also omitted
+    imageUrl/audioUrl/videoUrl/type, and was neither awaited nor sent: it went
+    into SQLite and stopped there, so the other person never received it.
+
+    Coordinates travel as JSON in `text`, the way the contact type already does,
+    so the renderer has something structured to work with.
+  */
+  const handleLocationSelected = async (location: any) => {
+    const lat = Number(location?.latitude);
+    const lng = Number(location?.longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      Alert.alert("No location picked", "Drop a pin on the map first.");
+      return;
+    }
+
+    const id = Date.now().toString();
     const message = {
-      id: Date.now().toString(),
-      _id: Date.now().toString(),
+      id,
+      _id: id,
       convoId: `${me}_${partner}`,
       sender: me,
       receiver: partner,
-      text: "📍 Shared Location" + location,
+      text: JSON.stringify({ latitude: lat, longitude: lng }),
+      imageUrl: "",
+      audioUrl: "",
+      videoUrl: "",
       status: "pending",
+      type: "private",
       createdAt: new Date().toISOString(),
       msgByUserId: me,
-      messagetype: "location"
+      messagetype: "location",
     };
 
-    insertMessage(message);
-    setMessages(prev => [...prev, message]);
+    await insertMessage(message);
+    setMessages(prev => (prev.some(m => m._id === message._id) ? prev : [...prev, message]));
+    setShowLocationModal(false);
+
+    const net = await NetInfo.fetch();
+    if (!(net.isConnected && socket?.connected)) {
+      console.log("📴 Offline → location stays pending");
+      return;
+    }
+    sendWithAck(message);
+    setTimeout(() => scrollToBottom(), 100);
   };
 
   const onEmojiSelected = (emoji: string) => {

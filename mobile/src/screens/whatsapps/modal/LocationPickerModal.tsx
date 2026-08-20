@@ -2,7 +2,23 @@
 import React, { useState, useEffect } from "react";
 import { Modal, View, Text, TouchableOpacity, StyleSheet, Platform, Alert } from "react-native";
 import MapView, { Marker } from "react-native-maps";
-import Geolocation from "react-native-geolocation-service";
+/*
+  Uses @react-native-community/geolocation, not react-native-geolocation-service.
+
+  The latter crashed the app outright — not a JS error, a hard native one:
+
+    java.lang.IncompatibleClassChangeError: Found interface
+    com.google.android.gms.location.FusedLocationProviderClient,
+    but class was expected
+      at com.agontuk.RNFusedLocation.FusedLocationProvider.getCurrentLocation
+
+  It was built when that type was a class; the Play Services version Firebase 34
+  pulls in makes it an interface, and the two cannot meet. The community module
+  is already a dependency, is already linked, and takes the same
+  (success, error, options) signature with the same position.coords — so this is
+  a swap rather than a rewrite, and needs no native rebuild.
+*/
+import Geolocation from "@react-native-community/geolocation";
 import { PermissionsAndroid } from "react-native";
 
 const LocationPickerModal = ({ visible, onClose, onLocationSelected } : any) => {
