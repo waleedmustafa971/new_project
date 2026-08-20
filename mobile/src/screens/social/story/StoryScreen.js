@@ -63,6 +63,21 @@ const fetchStory = useCallback(async () => {
 
     if (res.data?.message === "No story found") {
       setHasMore(false);
+      /*
+        Keep the "Your story" tile even when nobody has an active story.
+
+        It used to be prepended only in the branch below, so an empty rail
+        rendered nothing at all — and since stories expire, that is the normal
+        state most of the time. The entry point for creating one disappeared
+        exactly when it was most needed.
+      */
+      if (requestedPage === 1) {
+        setGetstory((prev) =>
+          prev.some((x) => String(x._id) === "create_story")
+            ? prev
+            : [{ _id: "create_story", isCreateStory: true }, ...prev]
+        );
+      }
     } else {
       const newData =
         requestedPage === 1
@@ -90,8 +105,51 @@ const fetchStory = useCallback(async () => {
   }
 }, [hasMore]);
 
+  /*
+    Stored image paths are relative to the API host ("uploads/..."), and the two
+    avatar <Image>s here passed them through unchanged — and passed `null` as the
+    source when there was no image at all. Both render nothing, which is why the
+    story rail was a wall of grey boxes. The story media itself already prefixed
+    BASE_URL; the avatars never did.
+  */
+  const AVATAR_FALLBACK = require("../../../assets/user.png");
+  const resolveUri = (path) => {
+    if (!path) return null;
+    const p = String(path);
+    if (/^(https?:|file:|data:)/.test(p)) return p;
+    return `${base.BASE_URL}/${p.replace(/^\/+/, "")}`;
+  };
+  const avatarSource = (path) => {
+    const uri = resolveUri(path);
+    return uri ? { uri } : AVATAR_FALLBACK;
+  };
+
+  /*
+    Story media comes back in more than one shape: the app writes videoUrl as a
+    string, while rows created by the in-app tester write { url, type }. The old
+    code concatenated it onto BASE_URL regardless, so an object became the URL
+    "http://host/[object Object]" and the tile stayed grey. Normalising here
+    means either shape renders, and anything unrecognised degrades to a plain
+    placeholder rather than a broken request.
+  */
+  const storyMedia = (item) => {
+    const raw = item?.videoUrl;
+    const value = Array.isArray(raw) ? raw[0] : raw;
+    const path =
+      typeof value === "string"
+        ? value
+        : value && typeof value === "object"
+          ? value.url || value.uri || ""
+          : "";
+    const declaredVideo =
+      value && typeof value === "object" && value.type === "video";
+    return {
+      uri: resolveUri(path),
+      isVideo: declaredVideo || /\.(mp4|mov|webm|avi|m3u8)$/i.test(path || ""),
+    };
+  };
+
   const renderStoryItem = ({ item, index }) => {
-    const isVideo = (url) => /\.(mp4|mov|webm|avi|m3u8)$/i.test(url);
 
     if (item.isCreateStory) {
       return (
@@ -102,25 +160,20 @@ const fetchStory = useCallback(async () => {
       })}
 
         >
-          <View style={[styles.storyBox, { width: 130, height: 160 }]}>
-            <Image
-              source={
-                image
-                  ? {
-                      uri: image,
-                    }
-                  : null //require("../../../assets/user.png")
-              }
-              style={styles.storyImage}
-            />
+          <View style={[styles.storyBox, styles.storyBoxSize]}>
+            <Image source={avatarSource(image)} style={styles.storyImage} resizeMode="cover" />
+            {/* A scrim so the button reads against any photo underneath it. */}
+            <View style={styles.createScrim} />
             <View style={styles.plusIconContainer}>
-              <AntDesign name="plus" size={24} color="white" />
+              <AntDesign name="plus" size={18} color="#fff" />
             </View>
           </View>
-          <Text style={styles.createStoryText}>Create Story</Text>
+          <Text style={styles.createStoryText} numberOfLines={1}>Your story</Text>
         </TouchableOpacity>
       );
     }
+
+    const media = storyMedia(item);
 
     return (
       <TouchableOpacity
@@ -130,23 +183,18 @@ const fetchStory = useCallback(async () => {
       
       }
       >
-        <View style={[styles.storyBox, { width: 130, height: 160, position: "relative" }]}>
+        <View style={[styles.storyBox, styles.storyBoxSize, { position: "relative" }]}>
           <View style={styles.profileImageContainer}>
             <Image
-              source={
-                item?.userInfo?.image
-                  ? {
-                      uri: item.userInfo.image,
-                    }
-                  : null //require("../../../assets/user.png")
-              }
+              source={avatarSource(item?.userInfo?.image)}
               style={styles.profileImage}
+              resizeMode="cover"
             />
           </View>
-          {isVideo(item.videoUrl) ? (
+          {media.isVideo && media.uri ? (
             <Video
               ref={(ref) => (videoRefs.current[index] = ref)}
-              source={{ uri: item?.videoUrl }}
+              source={{ uri: media.uri }}
               style={{ width: "100%", height: "100%" }}
               resizeMode="cover"
               muted={true}
@@ -159,15 +207,13 @@ const fetchStory = useCallback(async () => {
               }}
               onError={(err) => console.log("Story Section ....Video load/playback error:", err)}
             />
-          ) : (
-            <>
+          ) : media.uri ? (
             <Image
-              source={{ uri: base.BASE_URL + item.videoUrl }}
+              source={{ uri: media.uri }}
               style={styles.storyImage}
               resizeMode="cover"
             />
-            </>
-          )}
+          ) : null}
         </View>
         <Text style={styles.userNameText} numberOfLines={1}>{item.userInfo?.name}</Text>
       </TouchableOpacity>
@@ -206,12 +252,20 @@ const styles = StyleSheet.create({
     marginRight: 12,
     alignItems: "center",
   },
+  /* One place to change the rail's proportions. 108x148 keeps the 3:4 shape but
+     gives back roughly a third of the vertical space the old 130x160 tiles ate
+     before the first post was reachable. */
+  storyBoxSize: { width: 108, height: 148 },
   storyBox: {
-    backgroundColor: "#E5E7EB", // gray-200
-    borderRadius: 16,
+    backgroundColor: "#E9EBEE",
+    borderRadius: 14,
     overflow: "hidden",
     justifyContent: "center",
     alignItems: "center",
+  },
+  createScrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.18)",
   },
   storyImage: {
     width: "100%",
@@ -220,34 +274,47 @@ const styles = StyleSheet.create({
   },
   plusIconContainer: {
     position: "absolute",
-    bottom: 12,
-    padding: 4,
+    bottom: 10,
     borderRadius: 9999,
-    width: 48,
-    height: 48,
+    width: 32,
+    height: 32,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.5)",
+    backgroundColor: "#2563EB",
+    borderWidth: 2,
+    borderColor: "#fff",
   },
   createStoryText: {
-    fontSize: 12,
-    marginTop: 4,
+    fontSize: 11,
+    marginTop: 6,
+    fontWeight: "600",
+    color: "#374151",
+    maxWidth: 108,
+    textAlign: "center",
   },
+  /* The author badge sits inset with a white ring, the way every story rail
+     does it — flush in the corner it looked like a rendering mistake. */
   profileImageContainer: {
     position: "absolute",
     zIndex: 10,
+    left: 8,
+    top: 8,
     borderRadius: 9999,
-    right: 0,
-    top: 0,
+    borderWidth: 2,
+    borderColor: "#fff",
   },
   profileImage: {
-    width: 30,
-    height: 30,
-    borderRadius: 16,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "#D1D5DB",
   },
   userNameText: {
-    fontSize: 12,
-    marginTop: 4,
+    fontSize: 11,
+    marginTop: 6,
+    color: "#374151",
+    maxWidth: 108,
+    textAlign: "center",
   },
 });
 

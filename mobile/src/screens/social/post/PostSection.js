@@ -84,6 +84,9 @@ const PostSection = ({ post: initialPost, navigation, userid }) => {
     post?.followStatus === "follow" ||
     followedUsersing.includes(post?.userInfo?.userid);
 
+  // Your own post never offers a follow button.
+  const isOwnPost = String(post?.userInfo?.userid || "") === String(userid || "");
+
   const handleFollow = (followId) => {
     if (followedUsersing.includes(followId)) return;
 
@@ -304,39 +307,34 @@ const PostSection = ({ post: initialPost, navigation, userid }) => {
                   </Text>
                 </TouchableOpacity>
               </View>
-             {/*  <Text>x: {post?.followStatus}</Text> */}
-               {
-                post?.followStatus == "not follow" ?
-                  <TouchableOpacity
-                    style={{ backgroundColor: '#000', paddingHorizontal: 16, paddingVertical: 4, borderRadius: 9999 }}
-                    onPress={() => {
-                      handleFollow(post?.userInfo?.userid)
-                    }}
-                    disabled={followedUsersing.includes(post?.userInfo?.userid)}
-                  >
-                    <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600' }}>
-                      {post?.followStatus === "follow" ? 'following' : 'Follow'}
-                    </Text>
-                  </TouchableOpacity>
-                  : null
-              } 
-              {
-                !isFollowing ? (
-                  <TouchableOpacity onPress={() => handleFollow(post?.userInfo?.userid)} 
-                    style={{ backgroundColor: '#000', paddingHorizontal: 16, 
-                    paddingVertical: 4, borderRadius: 9999 }}>
-                     <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600' }}>
-                      follow
-                    </Text>
-                  </TouchableOpacity>
-                ) : (
-                  <View   
-                  style={{ backgroundColor: '#f2f2f2', paddingHorizontal: 16, 
-                  paddingVertical: 4, borderRadius: 9999 }}>
-                    <Text>Following</Text>
+              {/*
+                One follow control, not two.
+
+                There were two blocks here rendering side by side — one keyed on
+                followStatus == "not follow", the other on !isFollowing — so a
+                post from someone you do not follow showed both "Follow" and
+                "follow" next to each other. `isFollowing` already folds in the
+                optimistic local list, so it is the single source of truth.
+
+                It is also hidden on your own posts, where offering to follow
+                yourself made no sense.
+              */}
+              {!isOwnPost && (
+                isFollowing ? (
+                  <View style={styles.followingChip}>
+                    <Text style={styles.followingChipText}>Following</Text>
                   </View>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.followBtn}
+                    onPress={() => handleFollow(post?.userInfo?.userid)}
+                    disabled={followedUsersing.includes(post?.userInfo?.userid)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.followBtnText}>Follow</Text>
+                  </TouchableOpacity>
                 )
-              }
+              )}
 
             </View>
 
@@ -553,6 +551,29 @@ const PostSection = ({ post: initialPost, navigation, userid }) => {
 export default PostSection;
 
 const styles = StyleSheet.create({
+  /* Follow control — one pill, two states. Sized so the row height does not
+     jump when it flips between them. */
+  followBtn: {
+    backgroundColor: '#111827',
+    paddingHorizontal: 14,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  followBtnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
+  followingChip: {
+    paddingHorizontal: 14,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#fff',
+  },
+  followingChipText: { color: '#6B7280', fontSize: 13, fontWeight: '600' },
+
   viewcolor: {
     width: '100%',
     padding: 10,

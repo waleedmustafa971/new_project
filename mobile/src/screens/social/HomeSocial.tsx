@@ -245,14 +245,18 @@ const styles = StyleSheet.create({
     padding: 0
     //paddingTop: Platform.OS === "android" ? 0 : 0, // ✅ number, not string
   },
+  /* Dev-only, so it should sit quietly out of the way rather than compete with
+     the feed. It was large and fully opaque, landing on top of whichever post's
+     overflow menu happened to scroll under it. */
   labButton: {
     position: 'absolute',
-    right: 14,
-    bottom: 92,
+    left: 12,
+    bottom: 100,
+    opacity: 0.75,
     backgroundColor: '#6f74e8',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
     elevation: 6,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
