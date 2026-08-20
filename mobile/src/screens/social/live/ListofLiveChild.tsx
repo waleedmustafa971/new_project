@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import api from '../../../component/api';
 import { 
   View, 
   Text, 
@@ -82,7 +83,7 @@ const ListofLiveChild: React.FC<LiveItemProps> = ({ item, isActive, userid }) =>
       });
 
       // 4. Fetch dynamic token from your backend
-      const res = await axios.get(base.BASE_URL + `/apis/live/get-token`, {
+      const res = await api.get('/apis/live/get-token', {
         params: { channelName: item.channelName }
       });
       

@@ -1,4 +1,5 @@
 import React from "react";
+import * as base from '../../component/global';
 import {
   View,
   Text,
@@ -24,13 +25,20 @@ interface HosterInfo {
 
 interface Props {
   hosterinfo: HosterInfo;
+  isHost?: boolean;
   activeGift: number;
   viewerCount: number;
   onClose: () => void; // Added onClose prop, which was in your usage
 }
 
 
-const HosterHeader: React.FC<Props> = ({ hosterinfo, onClose, activeGift, viewerCount }) => {
+/* Stored paths are relative; the header rendered them raw. */
+const absoluteImage = (p?: string) =>
+  !p ? undefined
+  : /^(https?:|file:|data:)/.test(p) ? p
+  : `${base.BASE_URL}/${String(p).replace(/^[/]+/, '')}`;
+
+const HosterHeader: React.FC<Props> = ({ hosterinfo, onClose, activeGift, viewerCount, isHost = false }) => {
   // 🚨 FIX 2: Use insets to determine the actual safe top starting point
   const insets = useSafeAreaInsets();
   
@@ -47,7 +55,7 @@ const HosterHeader: React.FC<Props> = ({ hosterinfo, onClose, activeGift, viewer
         <View style={styles.left}>
           {hosterinfo?.hoster?.image ? (
             <Image
-              source={{ uri: hosterinfo.hoster.image }}
+              source={{ uri: absoluteImage(hosterinfo.hoster.image) }}
               style={styles.avatar}
             />
           ) : (
@@ -60,12 +68,14 @@ const HosterHeader: React.FC<Props> = ({ hosterinfo, onClose, activeGift, viewer
             <Text style={styles.hostName} numberOfLines={1}>
               {hosterinfo.hoster.name}
             </Text>
-
-            <TouchableOpacity style={styles.followButton}>
-              <Text style={styles.followText}>
-                {hosterinfo.hoster.is_following ? "Following" : "+ Follow"}
-              </Text>
-            </TouchableOpacity>
+            {!isHost && (
+  
+              <TouchableOpacity style={styles.followButton}>
+                <Text style={styles.followText}>
+                  {hosterinfo.hoster.is_following ? "Following" : "+ Follow"}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 

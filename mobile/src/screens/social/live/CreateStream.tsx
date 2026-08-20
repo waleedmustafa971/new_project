@@ -12,6 +12,7 @@ import {
   ScrollView
 } from 'react-native';
 import axios from 'axios';
+import api from '../../../component/api';
 import {
   createAgoraRtcEngine,
   ChannelProfileType,
@@ -222,6 +223,8 @@ const CreateStream = () => {
     initSocket();
 
     return () => {
+      endStream();
+
       if (engineRef.current) {
         engineRef.current.leaveChannel();
         engineRef.current.release();
@@ -253,6 +256,26 @@ const CreateStream = () => {
 
 
   // --- STREAM START/JOIN LOGIC ---
+  /*
+    The backend has had POST /apis/live/end-stream all along and nothing ever
+    called it, so every broadcast stayed status:'live' forever. The LIVE tab
+    then listed streams nobody was hosting, and tapping one sat on 'Waiting
+    for Host...' indefinitely. A ref rather than state, because the unmount
+    cleanup below runs with the values it closed over on mount.
+  */
+  const liveRef = useRef<{ hostId: string; channelName: string } | null>(null);
+
+  const endStream = async () => {
+    const current = liveRef.current;
+    if (!current) return;
+    liveRef.current = null;
+    try {
+      await api.post('/apis/live/end-stream', { ...current, status: 'ended' });
+    } catch (e) {
+      console.warn('Could not mark the stream ended:', e);
+    }
+  };
+
   const joinChannel = async () => {
     if (!engineReady || !engineRef.current) return;
     setJoinLoading(true);
@@ -270,8 +293,8 @@ const CreateStream = () => {
       setMessage('Requesting token...');
       const channelToJoin = `room_${Math.floor(Math.random() * 10000)}`;
 
-      const res = await axios.post(
-        base.BASE_URL + '/apis/live/create-stream',
+      const res = await api.post(
+        '/apis/live/create-stream',
         {
           hostId: userData._id,
           channelName: channelToJoin,
@@ -283,6 +306,8 @@ const CreateStream = () => {
       if (res.data.success) {
         const backendToken = res.data.token;
         const backendChannel = res.data.data.channelName;
+
+        liveRef.current = { hostId: userData._id, channelName: backendChannel };
 
         setToken(backendToken);
         setChannel(backendChannel);
@@ -380,6 +405,8 @@ const CreateStream = () => {
   };
 
   const handleCloseStream = () => {
+    endStream();
+
     if (engineRef.current && isJoined) {
       engineRef.current.leaveChannel();
       engineRef.current.stopPreview();
@@ -459,7 +486,7 @@ const renderVideos = () => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-      <HosterHeader hosterinfo={hosterinfo} 
+      <HosterHeader hosterinfo={hosterinfo} isHost 
       onClose={handleCloseStream} activeGift={activeGift} 
       viewerCount={viewerCount}/>
       </View>

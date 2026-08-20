@@ -70,59 +70,78 @@ const ListofLive: React.FC<Props> = ({ navigation }) => {
 
   /* ===================== FETCH DATA ===================== */
 
-  const fetchReels = useCallback(async () => {
-    if (loading || !hasMore) return;
+  /*
+    A ref rather than the loading state, because the guard has to be read and
+    written synchronously. Two things call this — onEndReached and the refresh
+    button — and a state flag set in one render is still false to the other.
+  */
+  const inFlight = useRef(false);
 
-    setLoading(true);
-    const jsonValue = await AsyncStorage.getItem('userdata');
-    if (jsonValue != null) {
-      const userData = JSON.parse(jsonValue);
-      setUserid(userData._id);
-   
+  const fetchReels = useCallback(
+    async (reset = false) => {
+      if (inFlight.current) return;
+      if (!reset && !hasMore) return;
 
-    try {
-      const res = await api.get("/apis/live/get-live-stream", {
-        params: { page, limit: 2 },
-      });
+      inFlight.current = true;
+      setLoading(true);
 
-      if (res.data?.success) {
-        const { data = [], currentPage, totalPages } = res.data;
-        
-        if (data.length === 0) {
-          setHasMore(false);
-        } else {
-          // Filter out duplicates based on _id
-          setReels(prev => {
-            const newItems = data.filter(
-              (item: LiveStream) => !prev.some(p => p._id === item._id)
-            );
-            return [...prev, ...newItems];
-          });
-          
-          setTotalPage(totalPages);
-          setPage(currentPage + 1);
-          
-          if (currentPage >= totalPages) {
+      const nextPage = reset ? 1 : page;
+
+      try {
+        const jsonValue = await AsyncStorage.getItem('userdata');
+        if (jsonValue) setUserid(JSON.parse(jsonValue)._id);
+
+        const res = await api.get('/apis/live/get-live-stream', {
+          params: { page: nextPage, limit: 2 },
+        });
+
+        if (res.data?.success) {
+          const { data = [], currentPage, totalPages } = res.data;
+
+          if (data.length === 0) {
+            if (reset) setReels([]);
             setHasMore(false);
+          } else {
+            setReels(prev => {
+              const seed = reset ? [] : prev;
+              const newItems = data.filter(
+                (item: LiveStream) => !seed.some(p => p._id === item._id)
+              );
+              return [...seed, ...newItems];
+            });
+
+            setTotalPage(totalPages);
+            setPage(currentPage + 1);
+            setHasMore(currentPage < totalPages);
           }
         }
+      } catch (err) {
+        console.error('Fetch live streams error:', err);
+      } finally {
+        /* This used to sit inside the 'if (jsonValue)' block, so a missing
+           session left loading stuck at true forever — and the empty state
+           renders nothing while loading, which is a blank screen with no
+           error anywhere to explain it. */
+        setLoading(false);
+        inFlight.current = false;
       }
-    } catch (err) {
-      console.error("Fetch reels error:", err);
-    } finally {
-      setLoading(false);
-    }
-     }
-  }, [loading, page, hasMore]);
+    },
+    [page, hasMore]
+  );
 
   /* ===================== NAVIGATION FOCUS ===================== */
 
+  /*
+    Always refetch, not just when the list is empty. Whether anyone is
+    broadcasting changes minute to minute, and the old condition meant that
+    once you had seen 'No Live Streams' the screen never asked again —
+    hasMore was false by then, so even coming back showed the same nothing.
+  */
   useFocusEffect(
     useCallback(() => {
-      if (reels.length === 0) {
-        fetchReels();
-      }
-    }, [reels.length, fetchReels])
+      fetchReels(true);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
   );
 
   /* ===================== RENDER ITEM ===================== */
@@ -139,11 +158,7 @@ const ListofLive: React.FC<Props> = ({ navigation }) => {
         </Text>
         <TouchableOpacity 
           style={styles.refreshBtn} 
-          onPress={() => {
-            setPage(1);
-            setHasMore(true);
-            fetchReels();
-          }}
+          onPress={() => fetchReels(true)}
         >
           <Text style={styles.refreshText}>Refresh</Text>
         </TouchableOpacity>
@@ -171,9 +186,10 @@ const ListofLive: React.FC<Props> = ({ navigation }) => {
         data={reels}
         keyExtractor={(item) => item._id}
         renderItem={renderItem}
-        onEndReached={fetchReels}
+        onEndReached={() => fetchReels()}
         onEndReachedThreshold={0.5}
         ListEmptyComponent={renderEmptyComponent}
+        contentContainerStyle={reels.length ? undefined : { flexGrow: 1 }}
         // Vertical Paging Configuration
         snapToInterval={height}
         snapToAlignment="start"
@@ -198,6 +214,20 @@ const ListofLive: React.FC<Props> = ({ navigation }) => {
         maxToRenderPerBatch={3}
         windowSize={5}
       />
+
+      {/*
+        Starting a stream was reachable only from Social > your profile > Live,
+        four taps away and in a list of unrelated shortcuts. The tab that shows
+        everyone else's broadcasts is where you decide to make one.
+      */}
+      <TouchableOpacity
+        style={styles.goLive}
+        activeOpacity={0.85}
+        onPress={() => navigation.navigate('CreateStream')}
+      >
+        <MaterialIcons name="videocam" size={20} color="#fff" />
+        <Text style={styles.goLiveText}>Go live</Text>
+      </TouchableOpacity>
     </View>
   );
 };
@@ -239,7 +269,25 @@ const styles = StyleSheet.create({
   refreshText: {
     color: '#fff',
     fontWeight: 'bold'
-  }
+  },
+  goLive: {
+    position: 'absolute',
+    right: 18,
+    bottom: 34,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#E1156C',
+    paddingHorizontal: 20,
+    paddingVertical: 13,
+    borderRadius: 28,
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+  },
+  goLiveText: { color: '#fff', fontWeight: '700', fontSize: 14.5 }
 });
 
 export default ListofLive;
