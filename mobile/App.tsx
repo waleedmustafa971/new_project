@@ -183,7 +183,7 @@ useEffect(() => {
           measures its own on-screen position, so a nested one resolves to 0. */}
       <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }} edges={['top']}>
         <NavigationContainer ref={navigationRef}>
-          <StripeProvider publishableKey="pk_test_dXSih2GWiQmhH7myqOlpeWos">
+          <StripeProvider publishableKey="pk_test_51U6RZqEInLcNzXu3abPcT4NuqcNLIQsLEc7n3LwrzbuE29dJkvyhMvOU6DLAOoeJYxEJIFN7aT30ShIwMrUnTY1r00KcFlsGeM">
             <StackNavigator />
           </StripeProvider>
         </NavigationContainer>

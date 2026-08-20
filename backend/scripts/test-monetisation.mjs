@@ -191,7 +191,19 @@ const pack = await db.collection("depositscoins").insertOne({
 created.packageId = String(pack.insertedId);
 
 const packages = await call("GET", "/packages");
-check("the coin packages list", packages.total === 1 && packages.packages[0].coins === 500);
+/*
+  Look for this suite's own fixture rather than asserting it is the only row.
+  The check used to require `total === 1`, which quietly assumed the catalogue
+  was empty — true only while no real coin packages existed. Creating the real
+  ones (which is what makes purchases possible at all) broke it. The suite's
+  before/after snapshot already guards against leaving rows behind, so this is
+  the only place that needed to stop counting.
+*/
+check(
+  "the coin packages list",
+  packages.packages.some((p) => String(p._id) === created.packageId && p.coins === 500),
+  `looked for fixture ${created.packageId} among ${packages.total} package(s)`
+);
 
 const badIntent = await call("POST", "/purchase/intent", { as: U.ali, body: { packageId: U.layla } });
 check("an unknown package is refused", badIntent._http === 404);
