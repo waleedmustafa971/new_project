@@ -135,6 +135,9 @@ const EditProfile = () => {
       );
 
       if (res.data?.userdata) {
+        // Swap the local preview for the stored path, so reopening the screen
+        // shows the saved picture rather than a cache file that may be gone.
+        if (res.data?.image) setProfileImage(res.data.image);
         await AsyncStorage.multiRemove(['userdata', 'userinfo']);
         await AsyncStorage.multiSet([
           ['userdata', JSON.stringify(res.data.userdata)],
@@ -168,14 +171,33 @@ const EditProfile = () => {
 
 
   const handleSave = async () => {
-    if (!name || !username || !bio || !mobileno) {
-      Alert.alert("Error", "All fields are required!");
+    /*
+      Only what the server actually needs.
+
+      This refused to save unless name, email, bio AND mobile were all filled,
+      so a fresh account — which has no bio and no mobile number — met
+      "All fields are required!" and could not change anything at all, including
+      the name. Requiring a biography before you may correct your own name is
+      the wrong way round; the optional fields are optional.
+    */
+    if (!name?.trim()) {
+      Alert.alert("Name required", "Your profile needs a name.");
       return;
     }
-    const email = username;
+    if (!username?.trim()) {
+      Alert.alert("Email required", "Your profile needs an email address.");
+      return;
+    }
+    const email = username.trim();
     setIsloading(true);
 
-    dispatch(profileUserupdate({ id, email, name, bio, mobileno }))
+    dispatch(profileUserupdate({
+      id,
+      email,
+      name: name.trim(),
+      bio: (bio || "").trim(),
+      mobileno: (mobileno || "").trim(),
+    }))
       .unwrap()
       .then(() => {
         setIsloading(false);
@@ -188,10 +210,14 @@ const EditProfile = () => {
       })
       .catch((err) => {
         setIsloading(false);
-
+        // err can be an object from rejectWithValue; a toast rendering one
+        // shows nothing at all, which reads as the button doing nothing.
         Toast.show({
           type: 'error',
-          text1: err,
+          text1:
+            typeof err === 'string'
+              ? err
+              : err?.message || 'Could not save your profile',
           position: 'bottom',
         });
       });
@@ -210,9 +236,20 @@ const EditProfile = () => {
                 <ActivityIndicator />
                 :
                 <Image
+                  /*
+                    A freshly picked photo is a local file:// path, and this
+                    prepended the API host to it — producing
+                    "http://host/file:///data/..." — so the preview broke the
+                    moment you chose a picture. Only a server-relative path
+                    needs the host.
+                  */
                   source={
                     profileImage
-                      ? { uri: base.BASE_URL + '/' + profileImage }
+                      ? {
+                          uri: /^(file:|content:|https?:)/.test(String(profileImage))
+                            ? String(profileImage)
+                            : `${base.BASE_URL}/${String(profileImage).replace(/^\/+/, '')}`,
+                        }
                       : require("../../../assets/user.png")
                   }
                   style={styles.profileImage}

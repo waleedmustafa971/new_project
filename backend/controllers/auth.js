@@ -1551,8 +1551,16 @@ export const updateProfileImageaws = async (req, res) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ message: "Email required" });
 
-    const fileExt = path.extname(req.file.originalname); // e.g., .jpg
-    const optimizedFileName = `optimized-${Date.now()}${fileExt}`;
+    /*
+      Name the file for what it contains.
+
+      The extension was copied from whatever was uploaded while sharp writes
+      WebP below, so the server produced .jpg and .png files holding WebP bytes.
+      Most clients sniff the content and cope, but anything that trusts the
+      extension — a CDN setting Content-Type, an image tool, a browser
+      download — gets it wrong.
+    */
+    const optimizedFileName = `optimized-${Date.now()}.webp`;
     const optimizedPath = path.join(uploadDir, optimizedFileName);
 
     // 🔥 Optimize with Sharp

@@ -28,11 +28,22 @@ const StoryItem = ({ reel, isActive, navigation, onVideoEnd, onClose }) => {
 
     const [emojiEnable, setEmojiEnable] = useState(false)
     const hasSound = !!reel.sound;
-    //const isVideo = reel.videoUrl?.endsWith(".mp4");
-    const isVideo = reel.videoUrl?.endsWith('.mp4') || reel.videoUrl?.endsWith('.m3u8');
+    /*
+      Same guard as the reel list. `?.` protects against null and undefined, not
+      against a value that simply is not a string — and videoUrl arrives as an
+      array from some rows and as { url, type } from others. Calling .endsWith on
+      those throws "_reel$videoUrl.endsWith is not a function" and takes the
+      story viewer down, which is what happened opening your own story.
+    */
+    const mediaUrl = Array.isArray(reel?.videoUrl)
+        ? String(reel.videoUrl[0]?.url || reel.videoUrl[0] || '')
+        : typeof reel?.videoUrl === 'string'
+            ? reel.videoUrl
+            : String(reel?.videoUrl?.url || '');
+    const endsWithAny = (exts) => exts.some((e) => mediaUrl.toLowerCase().endsWith(e));
 
-    const isImage =
-        reel.videoUrl?.endsWith(".png") || reel.videoUrl?.endsWith(".jpg") || reel.videoUrl?.endsWith(".webp");
+    const isVideo = endsWithAny(['.mp4', '.m3u8', '.mov', '.webm']);
+    const isImage = endsWithAny(['.png', '.jpg', '.jpeg', '.webp', '.gif']);
     const {
         videoRef,
         isVideoMuted,
