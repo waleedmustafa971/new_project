@@ -12,6 +12,7 @@ import LiveStream from "../models/LiveStream.js";
 import GiftModal from "../models/GiftModal.js";
 import DepositStream from '../models/DepositBalanceModal.js';
 import Transaction from '../models/Transaction.js';
+import CoinPurchase from '../models/CoinPurchase.js';
 import { getIO } from "../socket/socket.js";
 // livestream.controller.js
 // Put these in your .env file!
@@ -539,67 +540,164 @@ export const listDepost = async (req, res) => {
   }
 };
 
+/*
+  Start a coin purchase.
+
+  It used to take `amount` straight from the request body and open a Stripe
+  intent for whatever the client asked for, with no record of who was buying or
+  what they were buying. That made the credit step unverifiable: nothing tied an
+  intent to a user or a package, so the only thing left to trust was the client.
+
+  Now the price comes from the package, and the intent carries `userId` and
+  `packageId` in its metadata. walletAdd reads that metadata back out of Stripe,
+  which is what makes crediting safe.
+*/
 export const createPayment = async (req, res) => {
   try {
-    const { amount, currency } = req.body;
-    if (!amount) {
-      return res.status(400).json({ error: 'Amount is required' });
+    const userId = req.user?.userId || req.user?._id;
+    if (!userId) return res.status(401).json({ message: 'Sign in to buy coins' });
+
+    const { packageId } = req.body || {};
+    if (!packageId) {
+      return res.status(400).json({
+        message: 'A packageId is required. Call GET /apis/monetisation/packages for the list.',
+      });
     }
+
+    const pack = await DepositStream.findById(packageId).lean();
+    if (!pack || pack.status !== 'active') {
+      return res.status(404).json({ message: 'That coin package is not available' });
+    }
+
+    // Stripe charges in the smallest currency unit.
+    const amount = Math.round(Number(pack.priceAED) * 100);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return res.status(422).json({ message: 'That package has no valid price' });
+    }
+
     const paymentIntent = await stripe.paymentIntents.create({
-      amount, // ⚠️ REQUIRED (in cents)
-      currency: currency || 'usd',
-      payment_method_types: ['card'], // ✅ REQUIRED
+      amount,
+      currency: (pack.currency || 'usd').toLowerCase(),
+      payment_method_types: ['card'],
+      metadata: { userId: String(userId), packageId: String(pack._id) },
     });
 
-    res.json({
+    return res.json({
       clientSecret: paymentIntent.client_secret,
+      paymentIntentId: paymentIntent.id,
+      amount,
+      currency: (pack.currency || 'usd').toLowerCase(),
+      coins: pack.coins,
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
+    console.error('createPayment:', err);
+    if (err?.type === 'StripeInvalidRequestError') {
+      return res.status(422).json({ message: `That package cannot be charged: ${err.message}` });
+    }
+    return res.status(500).json({ message: 'Server error', error: err.message });
   }
 };
 
+/*
+  Credit the coins for a purchase Stripe agrees actually happened.
+
+  What this used to do: read `userId`, `amount` and `paymentStatus` from the
+  request body, look up a package whose price matched the claimed amount, and
+  add its coins to whichever account the body named. Every one of those inputs
+  came from the caller, so any signed-in user could mint coins — for themselves
+  or for somebody else — by posting a number. It survived only because
+  `depositscoins` was empty and the package lookup always missed; the moment a
+  package existed it was live.
+
+  It now verifies the same four things confirmPurchase does, and for the same
+  reasons:
+    - the intent really succeeded, per Stripe rather than per the client
+    - it belongs to the caller, per the metadata Stripe holds
+    - the amount paid matches the package being claimed
+    - it has not already been credited
+
+  The last is enforced by the unique index on CoinPurchase.paymentIntentId
+  rather than a lookup, because two confirmations racing would both pass a
+  lookup. Sharing that collection with confirmPurchase is deliberate: it means
+  the two routes cannot be played against each other to credit one payment
+  twice.
+
+  The legacy Transaction row is still written, because the admin panel's
+  transactions list reads it.
+*/
 export const walletAdd = async (req, res) => {
   try {
-    const { userId, paymentType, currency, amount, paymentStatus } = req.body;
+    // The caller, from their token. Never from the body — that was the hole.
+    const userId = req.user?.userId || req.user?._id;
+    if (!userId) return res.status(401).json({ message: 'Sign in to buy coins' });
 
-    if (!userId || !paymentType || !currency || !amount) {
-      return res.status(400).json({ message: 'Missing required fields' });
+    const { paymentIntentId, paymentType } = req.body || {};
+    if (!paymentIntentId) {
+      return res.status(400).json({
+        message: 'A paymentIntentId is required. Pay first with POST /apis/live/createPayment.',
+      });
     }
 
-    // Convert amount from smallest unit (e.g. cents) to main currency unit
-    const realAmount = amount / 100;
-    // 2️⃣ Find the deposit package for this amount
-    const deposit = await DepositStream.findOne({ priceAED: realAmount });
-    if (!deposit) {
-      return res.status(404).json({ message: 'No deposit package found for this amount' });
+    let intent;
+    try {
+      intent = await stripe.paymentIntents.retrieve(String(paymentIntentId));
+    } catch {
+      return res.status(404).json({ message: 'That payment could not be found' });
     }
 
-    const coinsToAdd = deposit.coins;
+    if (intent.status !== 'succeeded') {
+      return res.status(402).json({ message: `That payment has not completed (status: ${intent.status})` });
+    }
+    if (String(intent.metadata?.userId || '') !== String(userId)) {
+      return res.status(403).json({ message: 'That payment belongs to someone else' });
+    }
 
-    // 1️⃣ Save Transaction
-    const transaction = new Transaction({
+    const pack = await DepositStream.findById(intent.metadata?.packageId).lean();
+    if (!pack) {
+      return res.status(404).json({ message: 'The package for that payment no longer exists' });
+    }
+
+    const expected = Math.round(Number(pack.priceAED) * 100);
+    if (Number(intent.amount_received) !== expected) {
+      return res.status(422).json({ message: 'The amount paid does not match that package' });
+    }
+
+    try {
+      await CoinPurchase.create({
+        user: userId,
+        package: pack._id,
+        paymentIntentId: intent.id,
+        coins: pack.coins,
+        amount: intent.amount_received,
+        currency: intent.currency,
+      });
+    } catch (err) {
+      // Duplicate key: this intent has already been credited.
+      if (err?.code === 11000) {
+        const me = await User.findById(userId).select('coins').lean();
+        return res.status(409).json({
+          message: 'That payment has already been credited',
+          newCoinBalance: me?.coins || 0,
+        });
+      }
+      throw err;
+    }
+
+    const transaction = await Transaction.create({
       userId,
-      paymentType,
-      currency,
-      amount: realAmount, coins: coinsToAdd,
-      paymentStatus: paymentStatus || 'approved',
+      paymentType: paymentType || 'card',
+      currency: (intent.currency || 'usd').toUpperCase(),
+      amount: intent.amount_received / 100,
+      coins: pack.coins,
+      paymentStatus: 'approved',
     });
 
-    await transaction.save();
-
-
-    // 3️⃣ Update User wallet
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    // Update coins safely
-    user.coins = (user.coins || 0) + coinsToAdd;
-
-    await user.save();
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { $inc: { coins: pack.coins } },
+      { new: true, select: 'coins' }
+    );
+    if (!user) return res.status(404).json({ message: 'User not found' });
 
     return res.status(201).json({
       message: 'Transaction saved and wallet updated',
@@ -627,7 +725,6 @@ export const paymentBuysell = async (req, res) => {
   */
   try {
     const {
-      userId,
       paymentType,
       currency,
       amount,
@@ -635,9 +732,19 @@ export const paymentBuysell = async (req, res) => {
       id,          // Property ad ID (your custom id field)
       packageid,   // Package ID
     } = req.body;
-    console.log('.... from.... ', req.body)
+
+    /*
+      The buyer is the caller, taken from their token. It used to come from the
+      request body, which let one signed-in account file a payment against
+      another. Note that this route still trusts the client for the amount and
+      the payment status, so an ad can be activated without a verified payment —
+      it needs the same paymentIntentId treatment walletAdd now has.
+    */
+    const userId = req.user?.userId || req.user?._id;
+    if (!userId) return res.status(401).json({ message: 'Sign in to pay' });
+
     // 1️⃣ Validation
-    if (!userId || !paymentType || !currency || !amount || !id || !packageid) {
+    if (!paymentType || !currency || !amount || !id || !packageid) {
       return res.status(400).json({ message: 'Missing required fields' });
     }
 

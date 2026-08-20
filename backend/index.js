@@ -2,8 +2,9 @@ import express from "express";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 import cors from "cors";
-import multer from "multer";
 import cookieParser from "cookie-parser";
+import helmet from "helmet";
+import { authLimiter, adminAuthLimiter, apiLimiter } from "./middleware/rateLimit.js";
 import { fileURLToPath } from "url";
 import { createServer } from "http";
 import { Server } from "socket.io";
@@ -13,6 +14,25 @@ import { setIO } from "./socket/socket.js";
 dotenv.config();
 
 const app = express();
+
+/*
+  Security headers.
+
+  CSP is deliberately off: the admin panel builds markup with inline onerror
+  handlers, and a default policy blocks those, so turning it on here would
+  silently break the panel rather than protect it. Enabling it properly means
+  removing those handlers from public/admin/app.js first.
+
+  Cross-origin resource policy is relaxed for the same practical reason —
+  /uploads has to be loadable by the app and by the admin panel, which are not
+  always the same origin as the API.
+*/
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  crossOriginEmbedderPolicy: false,
+}));
+
 // Create a router
 app.use(express.json({ type: ['application/json', 'application/vnd.api+json'] }));
 
@@ -62,17 +82,13 @@ app.use((req, res, next) => {
   next();
 });
 
-// Multer File Upload Setup
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    //  cb(null, "../client/public/upload");
-    cb(null, "uploads/");
-  },
-  filename: function (req, file, cb) {
-    cb(null, Date.now() + file.originalname);
-  }
-});
-const upload = multer({ storage });
+/*
+  The unused multer instance that used to sit here has been removed. It built
+  filenames as Date.now() + file.originalname, which multer joins onto the
+  destination verbatim — a name containing ../ escaped uploads/. Nothing
+  referenced it, so it was a loaded gun with no trigger attached. The real
+  uploaders are middleware/upload.js and middleware/multerConfig.js.
+*/
 
 // Get the equivalent of __dirname in ES module
 const __filename = fileURLToPath(import.meta.url);
@@ -181,6 +197,14 @@ app.use("/api/videoprocessing", videoprocessing_route);
 /* Admin Panel API (backs the UI at /admin) */
 import adminPanelRoute from "./routes/adminPanelRoute.js";
 import adminUsersRoute from "./routes/adminUsersRoute.js";
+/*
+  A ceiling on API traffic per IP. High enough that no real client or test run
+  reaches it, low enough that enumerating the API is not free.
+*/
+app.use("/apis", apiLimiter);
+app.use("/api", apiLimiter);
+
+app.use("/api/adminpanel/login", adminAuthLimiter);
 app.use("/api/adminpanel", adminPanelRoute);
 // Extended user management (audit, bulk, export, safe delete). Mounted on its
 // own path so the panel's existing /api/adminpanel/users routes keep working.
@@ -273,8 +297,10 @@ app.use("/api/test", testinvoiceRoute)
   matched here rather than falling through to the broader auth router.
 */
 import twoFactorRoute from "./routes/twoFactorRoute.js";
+app.use("/apis/auth/2fa", authLimiter);
 app.use("/apis/auth/2fa", twoFactorRoute);
 
+app.use("/apis/auth", authLimiter);
 app.use("/apis/auth", authRoute); 
 app.use("/apis/categories", categoryRoutes); //list
 //app.use("/apis/jobcategories", JobcategoryRoutes); //list
@@ -1050,6 +1076,56 @@ socket.on("getConversations", async (uid) => {
     //end
   });
 
+});
+
+/* ------------------------------------------------------------------ */
+/* Error handling — must be last, after every route is mounted.         */
+/* ------------------------------------------------------------------ */
+
+/*
+  404 for an API path that matched no route. Without it these fall through to
+  Express's HTML "Cannot POST /apis/typo" page, which a JSON client cannot read.
+*/
+app.use("/apis", (req, res) => {
+  res.status(404).json({ success: false, message: `No such endpoint: ${req.method} ${req.originalUrl}` });
+});
+
+/*
+  Anything a route throws lands here.
+
+  Without this, Express falls back to its own handler, which serves the stack
+  trace to the client whenever NODE_ENV is not "production" — and NODE_ENV has
+  never been set on this server. So every unhandled throw was publishing file
+  paths and internals to whoever triggered it.
+
+  Multer failures are translated rather than passed through, because "file too
+  large" and "unsupported type" are things the person uploading can act on,
+  and a 500 tells them nothing.
+*/
+// eslint-disable-next-line no-unused-vars -- Express needs all four parameters
+app.use((err, req, res, next) => {
+  const isProduction = process.env.NODE_ENV === "production";
+
+  if (err?.code === "LIMIT_FILE_SIZE") {
+    return res.status(413).json({ success: false, message: "That file is too large (100MB maximum)" });
+  }
+  if (err?.code === "LIMIT_FILE_COUNT" || err?.code === "LIMIT_UNEXPECTED_FILE") {
+    return res.status(400).json({ success: false, message: "Too many files in one upload" });
+  }
+  if (typeof err?.message === "string" && err.message.startsWith("Unsupported file type")) {
+    return res.status(415).json({ success: false, message: err.message });
+  }
+
+  const status = err?.status || err?.statusCode || 500;
+
+  // The full error goes to the log, where it is useful; the client gets a
+  // description and nothing about how the server is built.
+  console.error("[unhandled]", req.method, req.originalUrl, err);
+
+  res.status(status).json({
+    success: false,
+    message: status === 500 && isProduction ? "Something went wrong" : (err?.message || "Something went wrong"),
+  });
 });
 
 // Do NOT use `app.listen()` in a serverless environment
