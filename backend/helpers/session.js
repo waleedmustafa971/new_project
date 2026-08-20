@@ -38,6 +38,36 @@ const REFRESH_SECRET = () => process.env.JWT_REFRESH_SECRET;
   Failures are swallowed. An alert is a courtesy; it must never be the reason a
   legitimate sign-in fails.
 */
+/*
+  A device description a person would recognise.
+
+  The alert used to fall back to the raw user agent, so the notification read
+  "Your account was signed in to from okhttp/4.12.0" — the HTTP client library
+  the phone happens to use. That is meaningless to the person being warned, and
+  a security alert nobody understands is worse than none: it teaches them to
+  ignore the next one.
+
+  A name the client sends wins; failing that we recognise the platform; failing
+  that we say plainly that we do not know.
+*/
+const describeDevice = ({ deviceName, platform, userAgent } = {}) => {
+  if (deviceName && String(deviceName).trim()) return String(deviceName).trim();
+
+  const p = String(platform || "").toLowerCase();
+  if (p.includes("android")) return "an Android device";
+  if (p.includes("ios") || p.includes("iphone")) return "an iPhone";
+  if (p.includes("ipad")) return "an iPad";
+  if (p.includes("web")) return "a web browser";
+
+  const ua = String(userAgent || "");
+  if (/android/i.test(ua)) return "an Android device";
+  if (/iphone|ipad|ios/i.test(ua)) return "an iOS device";
+  if (/okhttp/i.test(ua)) return "a mobile app";
+  if (/mozilla|chrome|safari|firefox|edge/i.test(ua)) return "a web browser";
+
+  return "a new device";
+};
+
 export const recordLogin = async (userId, req, method = "password") => {
   try {
     if (!req) return null;
@@ -77,7 +107,7 @@ export const recordLogin = async (userId, req, method = "password") => {
     if (isNewDevice) {
       await notify({
         recipient: userId, actor: userId, type: "login_alert",
-        preview: device.platform || device.userAgent || "a new device",
+        preview: describeDevice(device),
       });
     }
 

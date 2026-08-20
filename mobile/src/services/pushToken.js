@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import messaging from '@react-native-firebase/messaging';
+import { getApp } from '@react-native-firebase/app';
+import { getMessaging, getToken } from '@react-native-firebase/messaging';
 import api from '../component/api';
 import * as base from '../component/global';
 
@@ -53,7 +54,10 @@ const userIdFromStorage = async () => {
 export const registerPushToken = async (tokenArg) => {
   try {
     const userId = await userIdFromStorage();
-    if (!userId) return false; // not signed in yet — login will call this again
+    if (!userId) {
+      console.log('[push] skipped: no userdata in storage (not signed in yet)');
+      return false; // login will call this again
+    }
 
     /*
       An auth token has to exist too. userdata can outlive the token when a
@@ -62,19 +66,28 @@ export const registerPushToken = async (tokenArg) => {
       line for something that is simply not signed in yet.
     */
     const authToken = await AsyncStorage.getItem('token');
-    if (!authToken) return false;
+    if (!authToken) {
+      console.log('[push] skipped: signed in as', userId, 'but no auth token stored');
+      return false;
+    }
 
     const fcmtoken =
       tokenArg ||
       (await AsyncStorage.getItem('fcmtoken')) ||
-      (await messaging().getToken());
+      (await getToken(getMessaging(getApp())));
 
-    if (!fcmtoken) return false;
+    if (!fcmtoken) {
+      console.log('[push] skipped: no FCM token available');
+      return false;
+    }
 
     // Keyed on both, so a second account signing in on this handset registers
     // too instead of being skipped as "already done".
     const mark = `${userId}:${fcmtoken}`;
-    if ((await AsyncStorage.getItem(MARKER)) === mark) return true;
+    if ((await AsyncStorage.getItem(MARKER)) === mark) {
+      console.log('[push] already registered for', userId);
+      return true;
+    }
 
     await api.post('/apis/notification/register-token', { userId, fcmtoken });
     await AsyncStorage.setItem(MARKER, mark);
