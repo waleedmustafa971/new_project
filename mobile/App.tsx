@@ -12,7 +12,19 @@ import { Alert, PermissionsAndroid, Platform } from 'react-native';
 import Geolocation from '@react-native-community/geolocation';
 import { StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import messaging from '@react-native-firebase/messaging';
+/*
+  Modular Firebase API.
+
+  Every messaging() call used the v22-deprecated namespaced form, and
+  react-native-firebase logs a full stack trace for each one — seven call sites
+  in this file, which buried real errors under screens of warnings on every app
+  start. Same calls, same behaviour, in the form the library now expects.
+*/
+import { getApp } from '@react-native-firebase/app';
+import {
+  getMessaging, getToken, requestPermission,
+  onMessage, onTokenRefresh,
+} from '@react-native-firebase/messaging';
 import notifee from '@notifee/react-native';
 import { registerPushToken } from './src/services/pushToken';
 
@@ -37,12 +49,12 @@ useEffect(() => {
 }, []);
   
  async function requestPermission() {
-    const authStatus = await messaging().requestPermission();
+    const authStatus = await requestPermission(getMessaging(getApp()));
     console.log('Permission status:', authStatus);
   }
 
   async function getFCMToken() {
-    const token = await messaging().getToken();
+    const token = await getToken(getMessaging(getApp()));
     console.log('FCM Token:', token);
      await AsyncStorage.setItem("fcmtoken", token);
     // Send token to backend
@@ -51,7 +63,7 @@ useEffect(() => {
 
 
 useEffect(() => {
-  const unsubscribe = messaging().onMessage(async remoteMessage => {
+  const unsubscribe = onMessage(getMessaging(getApp()), async remoteMessage => {
     console.log('Foreground message:', remoteMessage);
     Alert.alert(
       remoteMessage.notification?.title || 'Notification',
@@ -81,7 +93,7 @@ useEffect(() => {
   // ----------------------------
   const requestNotificationPermission = async () => {
     try {
-      const authStatus = await messaging().requestPermission();
+      const authStatus = await requestPermission(getMessaging(getApp()));
       console.log('Notification permission:', authStatus);
     } catch (error) {
       console.log('Permission error:', error);
@@ -104,22 +116,27 @@ useEffect(() => {
   const getFCMToken = async () => {
     try {
       const storedToken = await AsyncStorage.getItem('fcmtoken');
-      const currentToken = await messaging().getToken();
+      const currentToken = await getToken(getMessaging(getApp()));
 
       console.log('FCM Token:', currentToken);
 
-      // First install
-      if (!storedToken) {
-        await AsyncStorage.setItem('fcmtoken', currentToken);
-        sendTokenToServer(currentToken);
-        return;
-      }
-
-      // Token changed
       if (storedToken !== currentToken) {
         await AsyncStorage.setItem('fcmtoken', currentToken);
-        sendTokenToServer(currentToken);
       }
+
+      /*
+        Register every time, not only when the token is new.
+
+        The old shape only told the server about a token that had just changed,
+        which quietly skipped the commonest case there is: a device that already
+        had a token cached, signing in as a different account. FCM had nothing
+        new to say, so nothing was sent, and that account ended up with an empty
+        fcm_tokens array and no way to receive anything.
+
+        registerPushToken keys its marker on userId + token, so calling it on
+        every start costs one AsyncStorage read once it has already run.
+      */
+      registerPushToken(currentToken);
     } catch (error) {
       console.log('FCM token error:', error);
     }
@@ -129,7 +146,7 @@ useEffect(() => {
   // TOKEN REFRESH LISTENER
   // ----------------------------
   useEffect(() => {
-    const unsubscribe = messaging().onTokenRefresh(async token => {
+    const unsubscribe = onTokenRefresh(getMessaging(getApp()), async token => {
       console.log('FCM Token refreshed:', token);
 
       await AsyncStorage.setItem('fcmtoken', token);
@@ -143,7 +160,7 @@ useEffect(() => {
   // FOREGROUND NOTIFICATIONS
   // ----------------------------
   useEffect(() => {
-    const unsubscribe = messaging().onMessage(async remoteMessage => {
+    const unsubscribe = onMessage(getMessaging(getApp()), async remoteMessage => {
       console.log('Foreground message:', remoteMessage);
       Alert.alert(
         remoteMessage.notification?.title || 'Notification',

@@ -529,10 +529,32 @@ export const updateDateofbirth = async (req, res) => {
         { new: true }
       );
 
+      /*
+        Finish signing them in.
+
+        This step completes registration, and it returned only `usersdata` — no
+        token. The app stored the user and navigated on, leaving every account
+        created this way permanently half-signed-in: screens saw a user so
+        nothing prompted a login, while every authenticated request answered
+        401. Device-token registration was one of the casualties, which is why
+        those accounts could never receive a push.
+
+        Routed through issueSession like every other session in this file, so
+        the two-factor gate is not skipped here either.
+      */
+      const session = await issueSession(updatedUser, {
+        payload: { userId: updatedUser._id, email: updatedUser.email },
+        expiresIn: "1h",
+      });
+      if (session.twoFactorRequired) return twoFactorPending(res, session.challengeToken);
+
       console.log("User verified:", updatedUser);
-      return res
-        .status(201)
-        .json({ message: "birthdate updated", usersdata: updatedUser });
+      return res.status(201).json({
+        message: "birthdate updated",
+        token: session.token,
+        refreshToken: session.refreshToken,
+        usersdata: updatedUser,
+      });
     }
     else {
       return res
@@ -569,10 +591,32 @@ export const updateDateofbirthbyemail = async (req, res) => {
         { new: true }
       );
 
+      /*
+        Finish signing them in.
+
+        This step completes registration, and it returned only `usersdata` — no
+        token. The app stored the user and navigated on, leaving every account
+        created this way permanently half-signed-in: screens saw a user so
+        nothing prompted a login, while every authenticated request answered
+        401. Device-token registration was one of the casualties, which is why
+        those accounts could never receive a push.
+
+        Routed through issueSession like every other session in this file, so
+        the two-factor gate is not skipped here either.
+      */
+      const session = await issueSession(updatedUser, {
+        payload: { userId: updatedUser._id, email: updatedUser.email },
+        expiresIn: "1h",
+      });
+      if (session.twoFactorRequired) return twoFactorPending(res, session.challengeToken);
+
       console.log("User verified:", updatedUser);
-      return res
-        .status(201)
-        .json({ message: "birthdate updated", usersdata: updatedUser });
+      return res.status(201).json({
+        message: "birthdate updated",
+        token: session.token,
+        refreshToken: session.refreshToken,
+        usersdata: updatedUser,
+      });
     }
     else {
       const generateReferralCode = crypto.randomBytes(4).toString('hex').toUpperCase();

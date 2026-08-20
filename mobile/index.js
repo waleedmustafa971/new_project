@@ -14,7 +14,8 @@ import { TranslationProvider } from './src/screens/lang/TranslationContext';
 import backgroundSync from "./src/component/backgroundtask/backgroundTask";
 import { SocketProvider } from './src/screens/context/SocketContext';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import messaging from '@react-native-firebase/messaging';
+import { getApp } from '@react-native-firebase/app';
+import { getMessaging, setBackgroundMessageHandler } from '@react-native-firebase/messaging';
 import notifee, { EventType } from '@notifee/react-native';
 
 function Main() {
@@ -42,7 +43,9 @@ function Main() {
 }
 
 // FCM background handler
-messaging().setBackgroundMessageHandler(async remoteMessage => {
+// Modular form; the namespaced call is deprecated in v22 and logs a stack
+// trace at startup.
+setBackgroundMessageHandler(getMessaging(getApp()), async remoteMessage => {
   await notifee.displayNotification({
     title: remoteMessage.notification?.title,
     body: remoteMessage.notification?.body,

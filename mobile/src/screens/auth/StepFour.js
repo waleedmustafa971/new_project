@@ -1,5 +1,6 @@
 /* Date of Birth */
 import React, { useState, useEffect } from 'react';
+import { registerPushToken } from "../../services/pushToken";
 import {
   View, Text, StyleSheet, TouchableOpacity,
   KeyboardAvoidingView, Alert,
@@ -134,9 +135,24 @@ const StepFour = ({ navigation }) => {
           await AsyncStorage.setItem('password', password);
           await AsyncStorage.setItem('userdata', JSON.stringify(data.usersdata));
           await AsyncStorage.setItem('userinfo', JSON.stringify(data.usersdata));
-          //  await AsyncStorage.setItem("token", data.token);
 
-          // navigation.navigate("HomeScreen");
+          /*
+            Store the session this step now returns.
+
+            The line below used to be commented out because the endpoint sent no
+            token — so finishing signup left the app with a user and no
+            credentials, and every authenticated request failed from that moment
+            on. The server issues a session here now, so keep it, and register
+            the device for push while there is one.
+          */
+          if (data.token) {
+            await AsyncStorage.setItem("token", data.token);
+            if (data.refreshToken) {
+              await AsyncStorage.setItem("refreshToken", data.refreshToken);
+            }
+            registerPushToken();
+          }
+
           navigation.navigate("YourInterestScreen");
         } else if (data.message == "All fields are required") {
           Toast.show({
