@@ -40,14 +40,11 @@ const ShowReel = ({ route, navigation }) => {
         );
     }
 
-    useFocusEffect(
-        useCallback(() => {
-            return () => {
-                fetchReels();
-                console.log('console clear show reel');
-            };
-        }, [])
-    );
+    /*
+      This used to return fetchReels as the cleanup, so the feed loaded a page
+      on blur — appending into a screen being navigated away from. The initial
+      load belongs to the mount effect below.
+    */
 
     const fetchReels = useCallback(async () => {
         console.log('....fetch is loaded')
@@ -63,7 +60,21 @@ const ShowReel = ({ route, navigation }) => {
                 setHasMore(false);
             } else {
                 // console.log('reel show.....' + JSON.stringify(res.data.reels))
-                setReels((prev) => [...prev, ...res.data.reels]);
+                /*
+                   Appending blindly produced "Encountered two children with
+                   the same key": the list is seeded with the reel you tapped,
+                   and the first page returns it again. React then omits or
+                   duplicates children, so the item the viewability config
+                   reports as active is not the one on screen and the video
+                   never plays.
+                */
+                setReels((prev) => {
+                    const seen = new Set(prev.map((r) => String(r._id)));
+                    const fresh = (res.data.reels || []).filter(
+                        (r) => !seen.has(String(r._id))
+                    );
+                    return [...prev, ...fresh];
+                });
                 setTotalPage(res.data.totalPages)
                 setPage((prev) => prev + 1);
             }
@@ -79,8 +90,10 @@ const ShowReel = ({ route, navigation }) => {
         console.log('...got this....' + JSON.stringify(reels))
         if (reels.length > 0) {
             // console.log('reel is started from dashboard' + JSON.stringify(reels))
-            setReels(reels);
-            setPage(0);
+            /* setPage(0) asked the API for page zero, which serves page one —
+               the same reels already seeded here. Start at one and let the
+               de-duplication above absorb the overlap. */
+            setPage(1);
         }
         else {
             fetchReels();

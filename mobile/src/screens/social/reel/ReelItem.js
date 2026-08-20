@@ -50,11 +50,36 @@ const ReelItem = ({ reel, itemHeight, isActive, onClose, navigation }) => {
     makes an unexpected shape render as neither video nor image instead of
     taking the screen down.
   */
-  const mediaUrl = Array.isArray(reel.videoUrl)
-    ? String(reel.videoUrl[0] || '')
-    : typeof reel.videoUrl === 'string'
-      ? reel.videoUrl
-      : '';
+  const rawMedia = Array.isArray(reel.videoUrl) ? reel.videoUrl[0] : reel.videoUrl;
+  /*
+    Three shapes reach here: a plain string, an array, and { url, type } —
+    the last written by older rows. Only the first two were handled, so an
+    object collapsed to '' and matched neither the video nor the image
+    branch: the reel rendered as a bare caption on black and never played.
+  */
+  const mediaUrl =
+    typeof rawMedia === 'string'
+      ? rawMedia
+      : rawMedia && typeof rawMedia === 'object'
+        ? String(rawMedia.url || rawMedia.uri || '')
+        : '';
+
+  /*
+    HLS output is stored with a leading slash and older files without one, so
+    concatenating BASE_URL + '/' + path gave a double slash for the new reels.
+    Absolute urls are left alone.
+  */
+  const mediaSrc = !mediaUrl
+    ? null
+    : /^(https?:|file:|data:)/.test(mediaUrl)
+      ? mediaUrl
+      : `${base.BASE_URL}/${mediaUrl.replace(/^[/]+/, '')}`;
+
+  const avatarSrc = reel.userInfo?.image
+    ? /^(https?:|file:|data:)/.test(reel.userInfo.image)
+      ? reel.userInfo.image
+      : `${base.BASE_URL}/${String(reel.userInfo.image).replace(/^[/]+/, '')}`
+    : null;
   const endsWithAny = (exts) => exts.some((e) => mediaUrl.toLowerCase().endsWith(e));
 
   const isVideo = endsWithAny(['.mp4', '.m3u8']);
@@ -243,7 +268,7 @@ const ReelItem = ({ reel, itemHeight, isActive, onClose, navigation }) => {
         <Pressable onPress={togglePause} style={styles.flexFull}>
           <Video
             ref={videoRef}
-            source={{ uri: base.BASE_URL + '/' + reel.videoUrl }}
+            source={{ uri: mediaSrc }}
             style={styles.flexFull}
             resizeMode="cover"
             repeat
@@ -254,7 +279,7 @@ const ReelItem = ({ reel, itemHeight, isActive, onClose, navigation }) => {
       ) : isImage ? (
         <>
           <Image
-            source={{ uri: reel.videoUrl }}
+            source={{ uri: mediaSrc }}
             style={styles.flexFull}
             resizeMode="cover"
           />
@@ -282,7 +307,9 @@ const ReelItem = ({ reel, itemHeight, isActive, onClose, navigation }) => {
           >
             {reel.videoTitle}
           </Text>
-          {reel.videoTitle.length > 100 && (
+          {/* A reel posted without a caption has no videoTitle, and reading
+              .length off it took the whole feed down. */}
+          {(reel.videoTitle?.length || 0) > 100 && (
             <TouchableOpacity onPress={() => setExpanded(!expanded)}>
               <Text style={styles.readMoreText}>
                 {expanded ? "Read less" : "Read more"}
@@ -295,7 +322,11 @@ const ReelItem = ({ reel, itemHeight, isActive, onClose, navigation }) => {
       {/* Right Side Actions */}
       <View style={styles.rightActions}>
         <Image
-          source={{ uri: reel.userInfo?.image }}
+          source={
+            avatarSrc
+              ? { uri: avatarSrc }
+              : require("../../../assets/user.png")
+          }
           style={styles.userImage}
         />
 
