@@ -118,8 +118,16 @@ const PostSection = ({ post: initialPost, navigation, userid }) => {
   useEffect(() => {
   }, []);
 
+  /*
+    dayjs().fromNow() happily renders a future timestamp as "in 2 minutes",
+    which is what a post carrying a slightly-ahead server clock looks like in
+    the feed. Nothing in a timeline is ever legitimately in the future, so
+    anything at or after now reads as "just now" instead.
+  */
   const getTimeAgo = (time) => {
-    return dayjs(time).fromNow();
+    const t = dayjs(time);
+    if (!t.isValid()) return "";
+    return t.isAfter(dayjs()) ? "just now" : t.fromNow();
   };
 
   useEffect(() => {

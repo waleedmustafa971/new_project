@@ -181,26 +181,33 @@ const ReelsFeed = ({userid}) => {
               bottom: 0,
               left: 0,
               right: 0,
-              padding: 8,
-              backgroundColor: 'rgba(0, 0, 0, 0.2)',
+              paddingHorizontal: 8,
+              paddingTop: 14,
+              paddingBottom: 8,
+              backgroundColor: 'rgba(0, 0, 0, 0.55)',
             }}>
-              <View style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginTop: 8,
-              }}>
-                <View style={{
-                  flexDirection: 'row',
-                }}>
-                  <Text style={{ color: '#ffffff' }}>
-                    {item.videoTitle.length > 50
-                      ? `${item.videoTitle.substring(0, 50)}...`
-                      : item.videoTitle}
-                  </Text>
+              {/*
+                The caption used to be cut at 50 characters and dropped into a
+                row that could not shrink, so a long title rendered wider than
+                the card and was clipped mid-word — "Best shawarm / in the city
+                #fo / #dubai". Two lines with a real ellipsis keeps it inside the
+                tile, and the scrim is dark enough for white text to sit on.
 
-                </View>
-              </View>
+                videoTitle is also read defensively: it was dereferenced with
+                .length, which throws outright on a reel saved without one.
+              */}
+              <Text
+                numberOfLines={2}
+                ellipsizeMode="tail"
+                style={{
+                  color: '#fff',
+                  fontSize: 12,
+                  lineHeight: 16,
+                  fontWeight: '500',
+                }}
+              >
+                {item?.videoTitle || ''}
+              </Text>
             </View>
           </View>
         </Pressable>

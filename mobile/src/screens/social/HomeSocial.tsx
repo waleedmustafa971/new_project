@@ -248,11 +248,17 @@ const styles = StyleSheet.create({
   /* Dev-only, so it should sit quietly out of the way rather than compete with
      the feed. It was large and fully opaque, landing on top of whichever post's
      overflow menu happened to scroll under it. */
+  /*
+    Parked in the dead space in the middle of a post's action row — the icons
+    sit at the far left (like, comment, share) and far right (save), so the
+    centre is the one horizontal band that never holds a tap target. On the
+    right it covered the save button; on the left it covered the like button.
+  */
   labButton: {
     position: 'absolute',
-    left: 12,
+    left: '44%',
     bottom: 100,
-    opacity: 0.75,
+    opacity: 0.6,
     backgroundColor: '#6f74e8',
     paddingHorizontal: 10,
     paddingVertical: 5,

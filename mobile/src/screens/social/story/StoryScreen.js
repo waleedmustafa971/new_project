@@ -161,9 +161,26 @@ const fetchStory = useCallback(async () => {
 
         >
           <View style={[styles.storyBox, styles.storyBoxSize]}>
-            <Image source={avatarSource(image)} style={styles.storyImage} resizeMode="cover" />
-            {/* A scrim so the button reads against any photo underneath it. */}
-            <View style={styles.createScrim} />
+            {/*
+              Only a real photo is used as the cover. Feeding the placeholder
+              silhouette through resizeMode="cover" blew a 100px asset up to fill
+              a 108x148 tile, so the tile became a giant cropped head. With no
+              photo we draw a plain tile and a small centred glyph instead.
+            */}
+            {resolveUri(image) ? (
+              <>
+                <Image
+                  source={{ uri: resolveUri(image) }}
+                  style={styles.storyImage}
+                  resizeMode="cover"
+                />
+                <View style={styles.createScrim} />
+              </>
+            ) : (
+              <View style={styles.createEmpty}>
+                <AntDesign name="user" size={30} color="#9CA3AF" />
+              </View>
+            )}
             <View style={styles.plusIconContainer}>
               <AntDesign name="plus" size={18} color="#fff" />
             </View>
@@ -266,6 +283,12 @@ const styles = StyleSheet.create({
   createScrim: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0,0,0,0.18)",
+  },
+  createEmpty: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F1F3F5",
   },
   storyImage: {
     width: "100%",
