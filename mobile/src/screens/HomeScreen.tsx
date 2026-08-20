@@ -48,7 +48,9 @@ const GRID_DATA: GridItem[] = [
   { key: 'home_Motors', value: "Motors", icon: 'car-sport-outline', backgroundColor: '#FF7043' },
   { key: 'home_Classified', value: "Classified", icon: 'pricetags-outline', backgroundColor: '#BA68C8' },
   { key: 'home_Job', value: "Job", icon: 'briefcase-outline', backgroundColor: '#64B5F6' },
-  { key: 'home_Furniture', value: "furniture", icon: 'briefcase-outline', backgroundColor: '#64B5F6' },
+  /* Furniture was a briefcase in the same blue as Job — two tiles that looked
+     identical at a glance, in a grid whose whole job is to be scannable. */
+  { key: 'home_Furniture', value: "Furniture", icon: 'bed-outline', backgroundColor: '#26A69A' },
   { key: 'home_Shopping', value: "Shopping", icon: 'cart-outline', backgroundColor: '#FFD54F' },
   { key: 'home_Food', value: "Food", icon: 'restaurant-outline', backgroundColor: '#E57373' },
 ];

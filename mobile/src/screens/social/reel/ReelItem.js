@@ -21,9 +21,11 @@ import api from "../../../component/api";
 import SaveModal from "../post/SaveModal";
 import Toast from "react-native-toast-message";
 
+import LinearGradient from "react-native-linear-gradient";
+
 const screenHeight = Dimensions.get("window").height;
 
-const ReelItem = ({ reel, isActive, onClose, navigation }) => {
+const ReelItem = ({ reel, itemHeight, isActive, onClose, navigation }) => {
   const [isShareModalVisible, setIsShareModalVisible] = useState(false);
   const [username, setUsername] = useState(null);
   const [userid,setUserid] = useState(null)
@@ -202,7 +204,28 @@ const ReelItem = ({ reel, isActive, onClose, navigation }) => {
 
 
   return (
-    <View style={[styles.container, { height: screenHeight }]}>
+    <View style={[styles.container, { height: itemHeight || screenHeight }]}>
+      {/*
+        Scrims.
+
+        Every control on this screen is white, and it was painted straight onto
+        the media with nothing behind it — so on a light video, or on the plain
+        placeholder shown when a reel has no media at all, the whole interface
+        turned white-on-white and effectively disappeared. These two gradients
+        sit above the media and below the controls, which is how the text stays
+        readable whatever is playing underneath.
+      */}
+      <LinearGradient
+        pointerEvents="none"
+        colors={["rgba(0,0,0,0.55)", "rgba(0,0,0,0)"]}
+        style={styles.scrimTop}
+      />
+      <LinearGradient
+        pointerEvents="none"
+        colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.75)"]}
+        style={styles.scrimBottom}
+      />
+
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={handleClose}>
@@ -366,6 +389,25 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     position: "relative",
+    // Media covers this; where a reel has none, black is what makes the white
+    // overlay text legible instead of invisible.
+    backgroundColor: "#000",
+  },
+  scrimTop: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 160,
+    zIndex: 1,
+  },
+  scrimBottom: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 340,
+    zIndex: 1,
   },
   flexFull: {
     width: "100%",
@@ -392,8 +434,10 @@ const styles = StyleSheet.create({
   },
   bottomLeft: {
     position: "absolute",
-    bottom: 96,
+    bottom: 128,
     left: 16,
+    right: 90,   // keep clear of the action rail on the right
+    zIndex: 5,
   },
   userRow: {
     flexDirection: "row",
@@ -432,9 +476,10 @@ const styles = StyleSheet.create({
   },
   rightActions: {
     position: "absolute",
-    right: 16,
-    bottom: 112,
+    right: 12,
+    bottom: 128,
     alignItems: "center",
+    zIndex: 5,
   },
   userImage: {
     width: 40,
@@ -451,9 +496,10 @@ const styles = StyleSheet.create({
   },
   bottomSponsored: {
     position: "absolute",
-    bottom: 40,
+    bottom: 28,
     width: "100%",
     paddingHorizontal: 16,
+    zIndex: 5,
   },
   sponsoredContainer: {
     backgroundColor: "rgba(255, 255, 255, 0.1)",

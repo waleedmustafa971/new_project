@@ -6,7 +6,7 @@ import {
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import ReelItem from './ReelItem'
-const { height } = Dimensions.get("window");
+const { height } = Dimensions.get("window"); // starting guess only; replaced by onLayout
 import axios from 'axios';
 import * as base from '../../../component/global'
 import { useFocusEffect } from "@react-navigation/native";
@@ -23,6 +23,7 @@ const ShowReel = ({ route, navigation }) => {
     const [hasMore, setHasMore] = useState(true);
     const [activeIndex, setActiveIndex] = useState(0);
     const flatListRef = useRef(null);
+    const [listHeight, setListHeight] = useState(height);
 
     const onViewableItemsChanged = useRef(({ viewableItems }) => {
         if (viewableItems.length > 0) {
@@ -87,15 +88,29 @@ const ShowReel = ({ route, navigation }) => {
     }, []);
 
 
+    /*
+      Measure the list rather than trusting Dimensions.
+
+      Item height came from Dimensions.get("window").height while the app draws
+      edge to edge under the status bar (targetSdk 35), so each reel was shorter
+      than the viewport and the next one's header peeked in at the bottom —
+      two close buttons visible at once. Measuring the container makes the item,
+      the snap interval and getItemLayout agree with what is actually on screen.
+    */
     return (
         <View style={{ flex: 1 }}>
                 <FlatList
+                    onLayout={(e) => {
+                        const h = e.nativeEvent.layout.height;
+                        if (h && Math.abs(h - listHeight) > 1) setListHeight(h);
+                    }}
                     ref={flatListRef}
                     data={reels}
                     keyExtractor={(item) => item._id}
                     renderItem={({ item, index }) => (
                         <ReelItem
                             reel={item}
+                            itemHeight={listHeight}
                             isActive={index === activeIndex}
                             onClose={() => navigation.goBack()}
                         //   shouldStop={shouldStop}
@@ -103,16 +118,15 @@ const ShowReel = ({ route, navigation }) => {
                     )}
                     onEndReached={fetchReels}
                     onEndReachedThreshold={0.5}
-                    snapToInterval={height} // Full screen scroll
+                    snapToInterval={listHeight}
                     decelerationRate="fast"
                     keyboardShouldPersistTaps="always" // Ensures touch events are passed to FlatList
                     scrollEnabled={true} // Explicitly enable scrolling
                     pagingEnabled
                     //   contentContainerStyle={{ flexGrow: 1 }} // Ensures list content takes full height
-                    contentContainerStyle={{
-                        flexGrow: 1,
-                        paddingBottom: 20, // Adjust this value to match or exceed the header height + bottom spacing
-                    }}
+                    /* No bottom padding: on a paged list it shifts the last
+                       snap point and lets the previous item bleed in. */
+                    contentContainerStyle={{ flexGrow: 1 }}
                     showsVerticalScrollIndicator={false}
                     ListFooterComponent={loading ? (
                         <ActivityIndicator />
@@ -120,8 +134,8 @@ const ShowReel = ({ route, navigation }) => {
                     onViewableItemsChanged={onViewableItemsChanged.current}
                     viewabilityConfig={{ itemVisiblePercentThreshold: 80 }}
                     getItemLayout={(data, index) => ({
-                        length: height,
-                        offset: height * index,
+                        length: listHeight,
+                        offset: listHeight * index,
                         index,
                     })}
                 />

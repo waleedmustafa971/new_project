@@ -142,11 +142,33 @@ const VideoDashboard = () => {
 
                 </ScrollView>
             </View>
-            <SearchVideo search={search} products={products} />
+            {/*
+              Something to look at while there is nothing to look at.
 
-            <View style={{ marginBottom: 100, marginTop: 50 }}>
-
-            </View>
+              The screen rendered the list and then a blank spacer, so with no
+              videos — which is the state of a fresh install, and of this
+              database right now — the whole tab was an empty white void with no
+              spinner, no message and no hint that anything had even been tried.
+            */}
+            {isloading && products.length === 0 ? (
+                <View style={styles.stateBox}>
+                    <ActivityIndicator size="large" color="#007bff" />
+                </View>
+            ) : products.length === 0 ? (
+                <View style={styles.stateBox}>
+                    <Ionicons name="videocam-outline" size={46} color="#C7CBD1" />
+                    <Text style={styles.stateTitle}>
+                        {search ? "No videos match that search" : "No videos yet"}
+                    </Text>
+                    <Text style={styles.stateHint}>
+                        {search
+                            ? "Try a different title, or clear the search."
+                            : "Videos posted to this channel will show up here."}
+                    </Text>
+                </View>
+            ) : (
+                <SearchVideo search={search} products={products} />
+            )}
             {/* Example Content */}
             {/*    <View style={styles.content}>
                 <Text style={{ fontSize: 16 }}>Selected Tab: {selectedTab}</Text>
@@ -160,6 +182,26 @@ export default VideoDashboard;
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#fff' },
+    stateBox: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 40,
+        paddingBottom: 80,
+    },
+    stateTitle: {
+        marginTop: 14,
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#3C4048',
+    },
+    stateHint: {
+        marginTop: 6,
+        fontSize: 13,
+        lineHeight: 19,
+        color: '#8A8F98',
+        textAlign: 'center',
+    },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
