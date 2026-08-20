@@ -1907,7 +1907,7 @@ VIEWS.monetisation = () => {
             <tbody>${d.rows.map((p, i) => `<tr>
               <td><strong>${esc(p.groupname || "Coin pack")}</strong></td>
               <td class="num">${num(p.coins)}</td>
-              <td class="num">$${Number(p.priceUSD || 0).toFixed(2)}</td>
+              <td class="num">${Number(p.priceAED || 0).toFixed(2)} ${esc((p.currency || "aed").toUpperCase())}</td>
               <td><span class="badge ${p.status === "active" ? "green" : ""}">${esc(p.status || "active")}</span></td>
               <td><div class="cell-actions">
                 <button class="btn btn-sm" data-editpack="${i}">Edit</button>
@@ -2000,8 +2000,14 @@ VIEWS.monetisation = () => {
       <label class="field"><span>Package name</span><input id="pName" value="${esc(p?.groupname || "")}" placeholder="Starter pack" /></label>
       <div class="form-row">
         <label class="field"><span>Coins</span><input type="number" id="pCoins" value="${esc(p?.coins ?? 100)}" /></label>
-        <label class="field"><span>Price (USD)</span><input type="number" step="0.01" id="pPrice" value="${esc(p?.priceUSD ?? 0.99)}" /></label>
+        <label class="field"><span>Price</span><input type="number" step="0.01" id="pPrice" value="${esc(p?.priceAED ?? 10)}" /></label>
       </div>
+      <label class="field"><span>Currency</span>
+        <select id="pCurrency">
+          <option value="aed" ${(p?.currency || "aed") === "aed" ? "selected" : ""}>AED</option>
+          <option value="usd" ${p?.currency === "usd" ? "selected" : ""}>USD</option>
+        </select>
+      </label>
       <label class="field"><span>Thumbnail URL</span><input id="pThumb" value="${esc(p?.thumbnail || "")}" placeholder="https://…" /></label>
       <label class="field"><span>Status</span>
         <select id="pStatus">
@@ -2019,7 +2025,8 @@ VIEWS.monetisation = () => {
             body: {
               groupname: $("#pName", root).value,
               coins: $("#pCoins", root).value,
-              priceUSD: $("#pPrice", root).value,
+              priceAED: $("#pPrice", root).value,
+              currency: $("#pCurrency", root).value,
               thumbnail: $("#pThumb", root).value,
               status: $("#pStatus", root).value,
             },

@@ -34,6 +34,7 @@ import LiveStream from "../models/LiveStream.js";
 import GiftModal from "../models/GiftModal.js";
 import GiftTransaction from "../models/GiftTransaction.js";
 import CoinsModal from "../models/CoinsModal.js";
+import DepositStream from "../models/DepositBalanceModal.js";
 import Transaction from "../models/Transaction.js";
 import Music from "../models/Music.js";
 import Verification from "../models/Verification.js";
@@ -984,8 +985,19 @@ export const deleteHashtag = wrap(async (req, res) => {
 /* monetisation: coin packages, gifts, transactions                    */
 /* ------------------------------------------------------------------ */
 
+/*
+  Coin packages.
+
+  These read and write `depositscoins` (DepositStream), not the `coins`
+  collection they used to. That was a real disconnect rather than a preference:
+  the app buys from depositscoins — GET /apis/monetisation/packages lists it,
+  purchase/intent prices from it, and the legacy wallet route verifies against
+  it — while this screen edited a parallel collection nothing else read. An
+  admin could add, price and publish packages here all day and the app would
+  still show nothing.
+*/
 export const listCoinPackages = wrap(async (req, res) => {
-  const rows = await CoinsModal.find().sort({ priceUSD: 1 }).lean();
+  const rows = await DepositStream.find().sort({ priceAED: 1 }).lean();
   ok(res, { rows, total: rows.length });
 });
 
@@ -994,26 +1006,33 @@ export const saveCoinPackage = wrap(async (req, res) => {
   const data = {
     groupname: req.body.groupname,
     thumbnail: req.body.thumbnail,
-    priceUSD: parseFloat(req.body.priceUSD) || 0,
+    priceAED: parseFloat(req.body.priceAED) || 0,
     coins: parseInt(req.body.coins, 10) || 0,
+    /*
+      Lower-cased because this value is handed to Stripe verbatim. Defaulting it
+      rather than leaving it blank matters: a package with no currency is charged
+      in the account default, which is how an AED price ends up billed in dollars.
+    */
+    currency: String(req.body.currency || "aed").toLowerCase(),
     status: req.body.status || "active",
-    updateby: new Date(),
   };
 
+  if (data.priceAED <= 0) return fail(res, 422, "Price must be greater than zero");
+  if (data.coins <= 0) return fail(res, 422, "Coins must be greater than zero");
+
   if (id && isId(id)) {
-    const row = await CoinsModal.findByIdAndUpdate(id, data, { new: true });
+    const row = await DepositStream.findByIdAndUpdate(id, data, { new: true });
     if (!row) return fail(res, 404, "Package not found");
     return ok(res, { row });
   }
-  // userid is required by the schema — attribute new packages to the acting admin's id
-  const row = await CoinsModal.create({ ...data, userid: req.body.userid || req.admin._id });
+  const row = await DepositStream.create(data);
   ok(res, { row });
 });
 
 export const deleteCoinPackage = wrap(async (req, res) => {
   const { id } = req.params;
   if (!isId(id)) return fail(res, 400, "Invalid id");
-  await CoinsModal.findByIdAndDelete(id);
+  await DepositStream.findByIdAndDelete(id);
   ok(res, { message: "Package deleted" });
 });
 

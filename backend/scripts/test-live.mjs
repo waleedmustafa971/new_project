@@ -532,7 +532,16 @@ const CROWN = String(giftRows.insertedIds[1]);
 created.gifts.push(giftRows.insertedIds[0], giftRows.insertedIds[1]);
 
 const catalogue = await call("GET", "/gifts");
-check("the gift catalogue lists the seeded gifts", catalogue.total === 2);
+/*
+  Look for this suite's own two gifts rather than asserting the catalogue holds
+  nothing else. `total === 2` quietly assumed an empty catalogue, which stopped
+  being true the moment the admin panel got a real gift list seeded into it —
+  the same assumption that broke the coin-packages check.
+*/
+const catalogueIds = (catalogue.gifts || []).map((g) => String(g._id));
+check("the gift catalogue lists the seeded gifts",
+  catalogueIds.includes(ROSE) && catalogueIds.includes(CROWN),
+  `looked for the 2 fixtures among ${catalogue.total} gift(s)`);
 check("the catalogue is grouped", !!catalogue.byGroup?.Premium);
 
 const nadiaBefore = coinsBefore[U.nadia];
