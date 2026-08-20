@@ -2,6 +2,7 @@ import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as base from "../../component/global";
 import api from "../../component/api";
+import { registerPushToken, unregisterPushToken } from "../../services/pushToken";
 
 // Get user data from AsyncStorage
 export const getUserData = createAsyncThunk('auth/getLocalstoragedata', async () => {
@@ -37,6 +38,16 @@ export const loginUser = createAsyncThunk(
         await AsyncStorage.setItem("userinfo", JSON.stringify(data.usersdata));
         await AsyncStorage.setItem("token", data.token);
         await AsyncStorage.setItem("refreshToken", data.refreshToken);
+
+        /*
+          Register this device for push now that there is an account to attach it
+          to. Sign-up sends `fcmtoken` in its own payload, but sign-in never did,
+          so an existing user on a new phone was never registered and could not
+          be reached. Deliberately not awaited: push is a convenience and must
+          not be able to delay or fail a sign-in.
+        */
+        registerPushToken();
+
         return data;
       } else {
         return rejectWithValue({ message: data.message || "Login failed" });
@@ -127,6 +138,16 @@ const authSlice = createSlice({
   initialState,
   reducers: {
     logoutUser: (state) => {
+      /*
+        Drop this device from the account first, while its keys are still in
+        storage — the removeItem calls below are what it needs to read. Issued
+        before them so the native storage queue serves the read first.
+
+        Without this the tokens pile up on the first account and the next person
+        to sign in on this handset keeps receiving the previous user's pushes.
+      */
+      unregisterPushToken();
+
       state.user = null;
       state.token = null;
       AsyncStorage.removeItem("username");

@@ -7,13 +7,32 @@ import { sendNotificationToUser } from "../services/notificationService.js";
 /* device tokens                                                       */
 /* ------------------------------------------------------------------ */
 
+/*
+  Attach a device token to the signed-in account.
+
+  The account comes from the caller's own token. It used to come from the
+  request body on an unauthenticated route, which meant anyone could attach
+  their own device to somebody else's account and start receiving that person's
+  push notifications. Nothing called this route while push was disabled, so the
+  hole was inert — configuring Firebase is exactly what would have armed it.
+
+  A body userId is still accepted, but only when it matches the caller.
+*/
 export const registerToken = async (req, res) => {
   try {
-    const { userId, fcmtoken } = req.body;
+    const caller = req.user?.userId || req.user?._id;
+    const { userId: bodyUserId, fcmtoken } = req.body;
 
-    if (!userId || !fcmtoken) {
-      return res.status(400).json({ message: "userId and fcmtoken are required" });
+    if (!caller) {
+      return res.status(401).json({ message: "Sign in to register a device" });
     }
+    if (bodyUserId && String(bodyUserId) !== String(caller)) {
+      return res.status(403).json({ message: "You can only register a device for yourself" });
+    }
+    if (!fcmtoken) {
+      return res.status(400).json({ message: "fcmtoken is required" });
+    }
+    const userId = caller;
 
     const updatedUser = await User.findByIdAndUpdate(
       userId,
@@ -309,9 +328,17 @@ export const updatePreferences = wrapn(async (req, res) => {
 });
 
 /* Drop a device token on logout, so a shared phone stops receiving. */
+/* The mirror of registerToken, and gated the same way. */
 export const unregisterToken = wrapn(async (req, res) => {
-  const { userId, fcmtoken } = req.body || {};
-  if (!isId(userId) || !fcmtoken) return failn(res, 400, "userId and fcmtoken are required");
+  const caller = req.user?.userId || req.user?._id;
+  const { userId: bodyUserId, fcmtoken } = req.body || {};
+
+  if (!caller) return failn(res, 401, "Sign in to remove a device");
+  if (bodyUserId && String(bodyUserId) !== String(caller)) {
+    return failn(res, 403, "You can only remove a device from your own account");
+  }
+  if (!fcmtoken) return failn(res, 400, "fcmtoken is required");
+  const userId = caller;
 
   await User.findByIdAndUpdate(userId, { $pull: { fcm_tokens: fcmtoken } });
   // Clear the single-token field only when it is the token being removed.

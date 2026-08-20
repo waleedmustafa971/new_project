@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect } from "react";
+import { registerPushToken } from "../../services/pushToken";
 import {
   View,
   Text,
@@ -103,6 +104,9 @@ const OtpScreen = ({ route }: any) => {
             await AsyncStorage.setItem("userinfo", JSON.stringify(data.usersdata));
             await AsyncStorage.setItem("token", data.token);
             await AsyncStorage.setItem("refreshToken", data.refreshToken);
+            // Same reason as the password sign-in: this is a session starting,
+            // so the device has to be registered for push.
+            registerPushToken();
           navigation.navigate("StepTwo", { mobileno });
 
         } else {
@@ -113,6 +117,9 @@ const OtpScreen = ({ route }: any) => {
             await AsyncStorage.setItem("userinfo", JSON.stringify(data.usersdata));
             await AsyncStorage.setItem("token", data.token);
             await AsyncStorage.setItem("refreshToken", data.refreshToken);
+            // Same reason as the password sign-in: this is a session starting,
+            // so the device has to be registered for push.
+            registerPushToken();
 
           navigation.navigate("HomeScreen");
         }

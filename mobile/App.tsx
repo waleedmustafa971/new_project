@@ -14,6 +14,7 @@ import { StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import messaging from '@react-native-firebase/messaging';
 import notifee from '@notifee/react-native';
+import { registerPushToken } from './src/services/pushToken';
 
 
 export default function App() {
@@ -153,13 +154,20 @@ useEffect(() => {
   }, []);
 
   // ----------------------------
-  // BACKEND API (replace with your API)
+  // BACKEND API
   // ----------------------------
-  const sendTokenToServer = (token: string) => {
-    console.log('Send token to backend:', token);
+  /*
+    Hand the device token to the server.
 
-    // Example:
-    // axios.post('/api/save-token', { token })
+    This was a console.log, so no token ever reached the backend and push could
+    not be addressed to anybody. It delegates to the push service because the
+    interesting part is the ordering, not the request: initApp() runs at mount,
+    before sign-in, so there is usually no account to attach the token to yet.
+    registerPushToken() returns false in that case and the sign-in path calls it
+    again once there is a user.
+  */
+  const sendTokenToServer = (token: string) => {
+    registerPushToken(token);
   };
   return (
     <>

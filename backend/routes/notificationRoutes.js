@@ -8,14 +8,22 @@ import {
   subscribeToPage, unsubscribeFromPage, listPageSubscriptions,
 } from "../controllers/notificationController.js";
 
+import authMiddleware from "../middleware/auth.js";
+import adminAuth from "../middleware/adminAuth.js";
+
 const router = express.Router();
 
-/* device tokens */
-router.post("/register-token", registerToken);
-router.post("/unregister-token", unregisterToken);
+/* device tokens — a device may only be attached to the caller's own account */
+router.post("/register-token", authMiddleware, registerToken);
+router.post("/unregister-token", authMiddleware, unregisterToken);
 
-/* direct send (admin / server-to-server) */
-router.post("/send", sendNotification);
+/*
+  Direct send. This was open to anyone, which with push disabled did nothing and
+  with push configured would let a stranger deliver arbitrary notifications to
+  any user. It is an admin/server-to-server operation, so it is behind the admin
+  token now — the same gate the admin panel's own send already uses.
+*/
+router.post("/send", adminAuth, sendNotification);
 
 /* preferences — declared before "/:id" so the word is not read as an id */
 router.get("/preferences", getPreferences);
