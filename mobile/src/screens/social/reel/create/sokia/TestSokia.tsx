@@ -294,17 +294,11 @@ const TestSokia = () => {
     } catch (e) { console.error(e); }
   };
 
-  const handleRecordPress = () => {
-    if (isRecording) {
-      // stop recording
-      console.log('Stop recording');
-    } else {
-      // start recording
-      console.log('Start recording');
-    }
-
-    setIsRecording(!isRecording);
-  };
+  /*
+    handleRecordPress was removed. It toggled isRecording and logged, without
+    touching the camera at all — a decoy that looked like the record handler and
+    silently broke every recording it was attached to.
+  */
 
   const playMusicFromChild = (item: any) => {
     console.log('music list', item);
@@ -391,7 +385,22 @@ const TestSokia = () => {
   if (!device) return <View style={styles.center}><ActivityIndicator color="white" /></View>;
 
   const NextProcess = () => {
-    console.log("Next Process......",videoUrilocal)
+    console.log("Next Process......", videoUrilocal);
+    /*
+      Refuse to continue without a file.
+
+      Nothing checked, so a null path travelled all the way into the multipart
+      body as "uri": null and the server was asked to save a video that did not
+      exist. Failing here says what is wrong while the person is still on the
+      screen that can fix it.
+    */
+    if (!videoUrilocal && !photoPath) {
+      Alert.alert(
+        "Nothing recorded yet",
+        "Record a clip or take a photo before continuing."
+      );
+      return;
+    }
     setShowPostModal(true)
     //videoUrilocal
    // setVideoUrilocal(videoUrilocal)
@@ -442,12 +451,24 @@ const TestSokia = () => {
                   <AntIcon name="picture" size={18} color="white" />
                 </TouchableOpacity>
                 <View style={styles.captureContainer}>
+                  {/*
+                    While recording, CameraIcon renders its own Pressable and so
+                    wins the tap — this outer cameraProcess never runs. It used
+                    to be handed handleRecordPress, which only logged
+                    "Stop recording" and flipped a flag: it never called
+                    cameraRef.stopRecording(), so onRecordingFinished never
+                    fired, videoUri stayed null, and Share posted a form with
+                    "uri": null. currentMode stayed on PHOTO for the same
+                    reason, which is why a recorded video announced itself as
+                    "final image file......PHOTO". Both handlers are the real
+                    one now.
+                  */}
                   <TouchableOpacity onPress={cameraProcess} style={styles.captureOuter}>
                     {
                       isRecording ?
                         <CameraIcon
                           isRecording={isRecording}
-                          onPress={handleRecordPress}
+                          onPress={cameraProcess}
                         />
                         :
                         <View style={[
