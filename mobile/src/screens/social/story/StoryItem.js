@@ -15,6 +15,7 @@ import AntDesign from "react-native-vector-icons/AntDesign"; //Entypo
 import Entypo from "react-native-vector-icons/Entypo"; //Entypo
 import { MaterialIcons } from "react-native-vector-icons/MaterialIcons"; // for mute/unmute icon
 import { useVideoController } from "../../hooks/useVideoController";
+import * as base from "../../../component/global";
 //import EmojiGrid from "../../component/emoji/EmojiGrid";
 
 const { width, height } = Dimensions.get("window");
@@ -44,6 +45,25 @@ const StoryItem = ({ reel, isActive, navigation, onVideoEnd, onClose }) => {
 
     const isVideo = endsWithAny(['.mp4', '.m3u8', '.mov', '.webm']);
     const isImage = endsWithAny(['.png', '.jpg', '.jpeg', '.webp', '.gif']);
+
+    /*
+      mediaUrl above only decided which branch to render; the branches
+      themselves still handed the raw videoUrl to source.uri. When that value
+      is the { url, type } object the API sends, React Native gets a map where
+      it requires a string and the whole app red-screens with 'Value for uri
+      cannot be cast from ReadableNativeMap to String'. The normalised string
+      is what has to reach the view, made absolute for the relative paths the
+      server stores.
+    */
+    const absolute = (p) =>
+        !p ? null
+        : /^(https?:|file:|data:)/.test(p) ? p
+        : `${base.BASE_URL}/${String(p).replace(/^[/]+/, '')}`;
+    const mediaSrc = absolute(mediaUrl);
+
+    /* The header avatar was pointed at videoUrl — the story's own media —
+       so every story showed itself as a 40px circle beside the name. */
+    const avatarSrc = absolute(reel?.userInfo?.image);
     const {
         videoRef,
         isVideoMuted,
@@ -83,7 +103,7 @@ const StoryItem = ({ reel, isActive, navigation, onVideoEnd, onClose }) => {
                     <Pressable onPress={togglePause}>
                         <Video
                             ref={videoRef}
-                            source={{ uri: reel.videoUrl }}
+                            source={{ uri: mediaSrc }}
                             style={{
                                 //  ...StyleSheet.absoluteFillObject,
                                 width: '100%',
@@ -97,7 +117,7 @@ const StoryItem = ({ reel, isActive, navigation, onVideoEnd, onClose }) => {
                     </Pressable>
                 ) : isImage ? (
                     <Image
-                        source={{ uri: reel.videoUrl }}
+                        source={{ uri: mediaSrc }}
                         style={{ width: '100%', height: '100%' }}
                         resizeMode="cover"
                     />
@@ -119,7 +139,7 @@ const StoryItem = ({ reel, isActive, navigation, onVideoEnd, onClose }) => {
                 >
                     <View style={{ flexDirection: "row", alignItems: "center" }}>
                         <Image
-                            source={{ uri: reel?.videoUrl }}
+                            source={avatarSrc ? { uri: avatarSrc } : require("../../../assets/user.png")}
                             style={{ width: 40, height: 40, borderRadius: 20, marginRight: 10 }}
                         />
                         <Text style={{ color: "#fff", fontSize: 16 }}>
