@@ -33,7 +33,15 @@ const ModalFooter = ({ onClose, navigation }) => {
     } else if (type === "Story") {
       navigation.navigate("CreateStory", { itemdata: [] });
     } else if (type === "Live") {
-      navigation.navigate("LiveScrollingstream", { itemdata: [] });
+      /*
+        This pointed at LiveScrollingstream, a second live list that renders
+        LiveItem — a static card with no Agora engine, no joinChannel and no
+        RtcSurfaceView, so it could never play a stream. With nobody live it
+        also had no empty state, and its container sets no background: a
+        white screen with nothing in the log. Social now opens the same
+        working list as the LIVE tab rather than a parallel broken copy.
+      */
+      navigation.navigate("ListofLive");
     }
     else if (type === "AI") {
       navigation.navigate("AIReelsScreen", { itemdata: [] });
