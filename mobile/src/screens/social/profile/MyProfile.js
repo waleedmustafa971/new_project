@@ -534,6 +534,31 @@ const MyProfile = ({ navigation }) => {
                         </TouchableOpacity>
 
 
+                        {/*
+                          Account privacy, reachable at last.
+
+                          Everything behind this row already existed on the
+                          server — private mode, per-area audiences, follow
+                          requests, blocking — and nothing in the app linked to
+                          any of it. The only "Privacy" screen belonged to the
+                          messenger and was a static list of nineteen rows that
+                          did nothing.
+                        */}
+                        <TouchableOpacity
+                            style={styles.optionContainer}
+                            onPress={() => navigation.navigate("AccountPrivacy")}
+                        >
+                            <View style={[styles.leftSection, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                                <Ionicons name="lock-closed" size={22} color="#000" style={styles.icon} />
+                                <View>
+                                    <Text style={styles.optionTitle}>Account privacy</Text>
+                                    <Text style={styles.optionSubtitle}>Go private, control who sees what, manage blocks</Text>
+                                </View>
+                            </View>
+                            <AntDesign name="right" size={18} color="silver" />
+                        </TouchableOpacity>
+
+
                         <TouchableOpacity
                             style={styles.optionContainer}
                             onPress={() => navigation.navigate("SavedReelsScreen")}

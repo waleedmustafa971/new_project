@@ -34,6 +34,7 @@ import SaveIcon from "../../../assets/post/save.svg";
 import Toast from "react-native-toast-message";
 import SaveModal from "./SaveModal";
 import Ionicons from "react-native-vector-icons/Ionicons";
+import ReportSheet from "./ReportSheet";
 
 const PostSection = ({ post: initialPost, navigation, userid }) => {
   // console.log('..get post data...' + post.userInfo.userid)
@@ -86,6 +87,43 @@ const PostSection = ({ post: initialPost, navigation, userid }) => {
 
   // Your own post never offers a follow button.
   const isOwnPost = String(post?.userInfo?.userid || "") === String(userid || "");
+
+  const [reportOpen, setReportOpen] = useState(false);
+  const [hidden, setHidden] = useState(false);
+
+  const openReport = () => {
+    toggleDropdown(null);
+    setReportOpen(true);
+  };
+
+  /* Hiding is optimistic: the card goes immediately and only comes back if the
+     server refuses, because waiting on a round trip to remove something you
+     asked to stop seeing feels broken. */
+  const hideThisPost = async () => {
+    toggleDropdown(null);
+    setHidden(true);
+    try {
+      await api.post("/apis/safety/hide-post", { userId: userid, postId: post._id });
+    } catch (e) {
+      if (e?.response?.status !== 409) {
+        setHidden(false);
+        Toast.show({ type: "error", text1: "Could not hide that post" });
+      }
+    }
+  };
+
+  const unfollowAuthor = async () => {
+    toggleDropdown(null);
+    const followId = post?.userInfo?.userid;
+    if (!followId) return;
+    try {
+      await dispatch(followUserAsync({ userId: userid, followId })).unwrap();
+      setFollowedUsersing((prev) => prev.filter((id) => id !== followId));
+      Toast.show({ type: "success", text1: `Unfollowed ${post?.userInfo?.name || ""}`.trim() });
+    } catch {
+      Toast.show({ type: "error", text1: "Could not unfollow" });
+    }
+  };
 
   const handleFollow = (followId) => {
     if (followedUsersing.includes(followId)) return;
@@ -262,6 +300,8 @@ const PostSection = ({ post: initialPost, navigation, userid }) => {
     setSavevisible(false);
   };
 
+  if (hidden) return null;
+
   return (
     <View style={{
       marginBottom: 1,
@@ -371,12 +411,39 @@ const PostSection = ({ post: initialPost, navigation, userid }) => {
               elevation: 3, // Android shadow
             }}
           >
-            <Text style={{ fontSize: 14, paddingVertical: 4 }}>Report</Text>
-            <Text style={{ fontSize: 14, paddingVertical: 4 }}>Hide Post</Text>
-            <Text style={{ fontSize: 14, paddingVertical: 4 }}>Unfollow</Text>
+            {/*
+              These were three bare <Text> elements — no touchable, no handler.
+              The menu looked like moderation was on offer and did nothing at
+              all. Every one of them has had a working endpoint for a while.
+            */}
+            <TouchableOpacity style={styles.menuRow} onPress={openReport}>
+              <Ionicons name="flag-outline" size={16} color="#B42318" />
+              <Text style={[styles.menuText, { color: '#B42318' }]}>Report</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.menuRow} onPress={hideThisPost}>
+              <Ionicons name="eye-off-outline" size={16} color="#374151" />
+              <Text style={styles.menuText}>Hide post</Text>
+            </TouchableOpacity>
+
+            {!isOwnPost && isFollowing && (
+              <TouchableOpacity style={styles.menuRow} onPress={unfollowAuthor}>
+                <Ionicons name="person-remove-outline" size={16} color="#374151" />
+                <Text style={styles.menuText}>Unfollow</Text>
+              </TouchableOpacity>
+            )}
           </View>
 
         )}
+
+        <ReportSheet
+          visible={reportOpen}
+          onClose={() => setReportOpen(false)}
+          targetType="post"
+          targetId={post?._id}
+          targetName={post?.userInfo?.name}
+        />
+
         {/* Post Description */}
         <View style={{
           width: '100%', backgroundColor: 'white', borderWidth: 0,
@@ -561,6 +628,16 @@ export default PostSection;
 const styles = StyleSheet.create({
   /* Follow control — one pill, two states. Sized so the row height does not
      jump when it flips between them. */
+  menuRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 9,
+    paddingHorizontal: 6,
+    minWidth: 150,
+  },
+  menuText: { fontSize: 14, color: '#374151' },
+
   followBtn: {
     backgroundColor: '#111827',
     paddingHorizontal: 14,

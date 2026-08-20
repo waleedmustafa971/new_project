@@ -1,6 +1,8 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import HomeScreen from '../screens/HomeScreen';
+import AccountPrivacy from "../screens/social/settings/AccountPrivacy";
+import PeopleListScreen from "../screens/social/settings/PeopleListScreen";
 import DetailsScreen from '../screens/DetailsScreen';
 import HomeSocial from '../screens/social/HomeSocial';
 
@@ -276,6 +278,14 @@ export default function StackNavigator() {
 
       <Stack.Screen name="Privacy" component={Privacy}
         options={{ headerShown: true, headerTitle: 'Privacy' }} />
+
+      {/* Social account privacy, and the two lists it depends on. The existing
+          "Privacy" screen above belongs to the messenger and is a static list;
+          these are the ones wired to /apis/privacy and /apis/safety. */}
+      <Stack.Screen name="AccountPrivacy" component={AccountPrivacy}
+        options={{ headerShown: false }} />
+      <Stack.Screen name="PeopleList" component={PeopleListScreen}
+        options={{ headerShown: false }} />
       <Stack.Screen name="Chats" component={Chats}
         options={{ headerShown: true, headerTitle: 'Chats' }} />
 
