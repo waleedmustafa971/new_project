@@ -3,7 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import multer from 'multer';
-import ffmpeg from 'fluent-ffmpeg';
+import ffmpeg from '../helpers/ffmpeg.js';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import fetch from 'node-fetch';
 //import { uploadDir } from '../config/path.js'; // Assuming you have this configured

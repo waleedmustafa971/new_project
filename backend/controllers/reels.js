@@ -9,7 +9,7 @@ import path from "path";
 import fs from "fs";
 import sharp from "sharp";
 import { uploadMultiple } from "../middleware/multerConfig.js"; // Import multer setup
-import ffmpeg from 'fluent-ffmpeg';
+import ffmpeg from '../helpers/ffmpeg.js';
 import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 

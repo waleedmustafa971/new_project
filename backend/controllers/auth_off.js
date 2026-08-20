@@ -3,7 +3,7 @@ import jwt from "jsonwebtoken";
 import bodyParser from "body-parser";
 import mime from 'mime-types';
 import sharp from 'sharp';
-import ffmpeg from 'fluent-ffmpeg';
+import ffmpeg from '../helpers/ffmpeg.js';
 import User from "../models/users.js"; // import model user
 import Reel from "../models/Reels.js";
 //import Music from '../models/Music.js';

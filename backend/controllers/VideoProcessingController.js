@@ -3,7 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import multer from 'multer';
-import ffmpeg from 'fluent-ffmpeg';
+import ffmpeg from '../helpers/ffmpeg.js';
 //import { exec } from 'child_process';
 import fetch from 'node-fetch';
 import Reel from "../models/Reels.js";
@@ -373,18 +373,25 @@ const convertToHLS = async (inputPath, videoId) => {
     await new Promise((resolve, reject) => {
       ffmpeg(inputPath)
         .output(path.join(hlsDir, "master.m3u8"))
+        /*
+          Each array entry is passed to ffmpeg as one argument — fluent-ffmpeg
+          does not split on whitespace. "-flag value" survives that only while
+          the value itself has no spaces, and this project's path does
+          ("new project"), so the segment filename arrived as one unrecognised
+          option and every HLS conversion failed with exit code 2880417800.
+          Flags and values are separate entries now.
+        */
         .outputOptions([
-          "-preset veryfast",
-          "-g 48",
-          "-sc_threshold 0",
-          "-map 0:v:0",
-          "-map 0:a:0?",
-          "-c:v libx264",
-          "-c:a aac",
-          "-hls_time 6",
-          "-hls_playlist_type vod",
-          "-hls_segment_filename " +
-            path.join(hlsDir, "segment_%03d.ts"),
+          "-preset", "veryfast",
+          "-g", "48",
+          "-sc_threshold", "0",
+          "-map", "0:v:0",
+          "-map", "0:a:0?",
+          "-c:v", "libx264",
+          "-c:a", "aac",
+          "-hls_time", "6",
+          "-hls_playlist_type", "vod",
+          "-hls_segment_filename", path.join(hlsDir, "segment_%03d.ts"),
         ])
         .on("end", resolve)
         .on("error", reject)
