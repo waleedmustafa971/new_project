@@ -1,7 +1,7 @@
 import express from "express";
 import {
     updatePost, getPosts, updateShortpost, getRecentstory,
-    yourContent 
+    yourContent, userWall 
 } from "../controllers/postreel.js";
 
 
@@ -12,6 +12,9 @@ router.get("/lasttenpost", getPosts); //updateShortpost
 router.get("/recentstory", getRecentstory); // filter posttype: posttype, username: loginUserId
 router.post("/poststory", updateShortpost); //
 router.get("/your-content", yourContent); //
+
+/* A single person's posts and shares, filtered to what the viewer may see. */
+router.get("/wall", userWall);
 
 
 

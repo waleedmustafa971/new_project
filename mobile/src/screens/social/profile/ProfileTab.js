@@ -5,16 +5,25 @@ import EducationItem from './EducationItem';
 import ExperienceItem from './ExperienceItem';
 import * as base from '../../../component/global'
 import ViewReels from './Tab/ViewReels';
+import ViewPosts from './Tab/ViewPosts';
 import ViewPhotos from './Tab/ViewPhotos';
 import ViewFollowers from './Tab/ViewFollowers';
 import VIewFollowing from './Tab/VIewFollowing';
 
 const ProfileTab = ({ userid }) => {
-    const [pagestatus, setPagestatus] = useState('About');
+    const [pagestatus, setPagestatus] = useState('Posts');
     console.log("..ProfileTab.userid...." + userid)
 
     // Tabs with labels and icon names
+    /*
+      Posts leads, and is the default.
+
+      A profile that opens on "About" — an empty experience section — while the
+      person's actual posts have no tab at all was the wrong way round. Posts is
+      what a wall is for.
+    */
     const tabs = [
+        { name: 'Posts', icon: 'grid' },
         { name: 'About', icon: 'info' },
         { name: 'Reels', icon: 'film' },
         { name: 'Photos', icon: 'image' },
@@ -121,6 +130,11 @@ const ProfileTab = ({ userid }) => {
         </View>
         <View style={{ width: '100%' }}>
          {
+            pagestatus == "Posts" ?
+            <ViewPosts userid={userid} />
+            : null
+        }
+        {
             pagestatus == "Reels" ?
             <>
             <ViewReels userid={userid}/>

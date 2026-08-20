@@ -81,9 +81,20 @@ const PostSection = ({ post: initialPost, navigation, userid }) => {
     : [];
 
   ///last code
+  /*
+    Three sources, because one alone is not enough.
+
+    followStatus is what the server said when this post was fetched, and it goes
+    stale the moment you follow someone. followedUsersing is local and optimistic,
+    but it dies with the component — and the feed re-renders these cards
+    constantly, so on its own the button snapped back to "Follow" seconds later.
+    The store outlives the card, which is what makes the change stick.
+  */
+  const authorId = String(post?.userInfo?.userid || "");
   const isFollowing =
     post?.followStatus === "follow" ||
-    followedUsersing.includes(post?.userInfo?.userid);
+    followedUsersing.includes(post?.userInfo?.userid) ||
+    (Array.isArray(followedUsers) && followedUsers.includes(authorId));
 
   // Your own post never offers a follow button.
   const isOwnPost = String(post?.userInfo?.userid || "") === String(userid || "");
@@ -131,11 +142,12 @@ const PostSection = ({ post: initialPost, navigation, userid }) => {
     setFollowedUsersing((prev) => [...prev, followId]);
 
     dispatch(followUserAsync({ userId: userid, followId }))
+      .unwrap()
       .catch(() => {
-        // rollback
-        setFollowedUsersing((prev) =>
-          prev.filter((id) => id !== followId)
-        );
+        // Only a real failure rolls back. Without .unwrap() a rejected thunk
+        // resolves here, so genuine failures used to pass silently.
+        setFollowedUsersing((prev) => prev.filter((id) => id !== followId));
+        Toast.show({ type: "error", text1: "Could not follow that account" });
       });
   };
 
@@ -347,9 +359,17 @@ const PostSection = ({ post: initialPost, navigation, userid }) => {
                 <TouchableOpacity onPress={() => {
                   handleProfile(post)
                 }}>
-                  <Text style={{ fontSize: 14, fontWeight: '600' }}>
-                    {post.userInfo?.name}
-                  </Text>
+                  {/* Verified accounts were indistinguishable from everyone
+                      else — the flag was never sent to the feed, and never
+                      drawn if it had been. */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Text style={{ fontSize: 14, fontWeight: '600' }}>
+                      {post.userInfo?.name}
+                    </Text>
+                    {post.userInfo?.verifiedBadge ? (
+                      <Ionicons name="checkmark-circle" size={14} color="#2563EB" />
+                    ) : null}
+                  </View>
                   <Text style={{ fontSize: 12 }}>
                     {getTimeAgo(post?.xtime)}
                   </Text>

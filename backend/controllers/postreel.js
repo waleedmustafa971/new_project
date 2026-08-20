@@ -397,6 +397,10 @@ export const getRecentstory = async (req, res) => {
               bio: user.bio,
               gender: user.gender,
               nationality: user.nationality,
+              // The feed never sent this, so a verified account looked
+              // identical to any other everywhere a post appears.
+              verifiedBadge: !!user.verifiedBadge,
+              accountType: user.accountType,
             }
             : null,
           currentuser: currentuser,
@@ -418,6 +422,122 @@ export const getRecentstory = async (req, res) => {
   }
 };
 
+
+/*
+  Someone's wall: their posts and shares, newest first.
+
+  There was no endpoint for this at all. yourContent is hardcoded to
+  posttype "Reel", the gallery tab reads uploaded images, and the timeline is
+  everyone's posts mixed together — so there was nowhere in the product that
+  answered "show me what this person has posted", including for yourself.
+
+  Visibility is decided the same way the feed decides it, because a wall is just
+  a feed filtered to one author and it must not become a way around privacy: a
+  private account's wall is visible to its followers and nobody else, blocked
+  people see nothing, and per-post audiences still apply. Viewing your own wall
+  skips all of it — you can always see your own posts, including "only me" ones.
+*/
+export const userWall = async (req, res) => {
+  try {
+    const authorId = req.query.userid || req.query.userId;
+    const viewerId = isId(req.query.viewerId) ? String(req.query.viewerId) : null;
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 12, 1), 50);
+
+    if (!isId(authorId)) {
+      return res.status(400).json({ message: "A valid userid is required" });
+    }
+
+    const author = await User.findById(authorId)
+      .select("name image bio verifiedBadge accountType followers closeFriends blockedUsers privacy privacySettings followRequests")
+      .lean();
+    if (!author) return res.status(404).json({ message: "User not found" });
+
+    const isSelf = viewerId && String(viewerId) === String(authorId);
+
+    if (!isSelf) {
+      const rel = await relationship(viewerId, author);
+      if (rel === "blocked") {
+        return res.status(403).json({ message: "This profile is not available" });
+      }
+      if (!(await canView(viewerId, author, "posts", rel))) {
+        /*
+          A private account is not a missing one. Saying so — with the follower
+          counts still visible — is what lets someone decide to send a request,
+          which is the whole point of a private profile rather than a dead end.
+        */
+        return res.status(200).json({
+          success: true,
+          locked: true,
+          reason: "private",
+          message: "This account is private",
+          author: { _id: author._id, name: author.name, image: author.image, verifiedBadge: !!author.verifiedBadge },
+          posts: [],
+          total: 0,
+          hasMore: false,
+        });
+      }
+    }
+
+    // Posts and shares both live in the same collection under posttype "Post".
+    const candidates = await Reel.find({ username: authorId, posttype: "Post" })
+      .populate({
+        path: "sharepost.originalPost",
+        populate: { path: "username", select: "name email image bio verifiedBadge" },
+      })
+      .sort({ xtime: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit * 2)   // room to drop what this viewer may not see
+      .lean();
+
+    const visible = [];
+    for (const post of candidates) {
+      if (isSelf) { visible.push(post); continue; }
+      const verdict = await canViewPost(viewerId, post, { author });
+      if (verdict.allowed) visible.push(post);
+    }
+
+    const posts = visible.slice(0, limit).map((p) => ({
+      _id: p._id,
+      videoTitle: p.videoTitle,
+      videoUrl: p.videoUrl,
+      media: p.media || [],
+      posttype: p.posttype,
+      posttypechild: p.posttypechild,
+      xbackgroundcolor: p.xbackgroundcolor,
+      isShare: !!(p.sharepost && p.sharepost.length),
+      sharepost: p.sharepost || [],
+      likes: p.likes || [],
+      comments: p.comments || [],
+      shares: p.shares || [],
+      audience: p.audience || "everyone",
+      xtime: p.xtime,
+    }));
+
+    const total = await Reel.countDocuments({ username: authorId, posttype: "Post" });
+
+    return res.status(200).json({
+      success: true,
+      locked: false,
+      author: {
+        _id: author._id,
+        name: author.name,
+        image: author.image,
+        bio: author.bio,
+        verifiedBadge: !!author.verifiedBadge,
+        accountType: author.accountType,
+      },
+      page,
+      limit,
+      total,
+      hasMore: (page - 1) * limit + posts.length < total,
+      posts,
+    });
+  } catch (error) {
+    console.error("userWall:", error);
+    return res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
 
 export const yourContent = async (req, res) => {
   try {
@@ -504,6 +624,10 @@ export const yourContent = async (req, res) => {
               bio: user.bio,
               gender: user.gender,
               nationality: user.nationality,
+              // The feed never sent this, so a verified account looked
+              // identical to any other everywhere a post appears.
+              verifiedBadge: !!user.verifiedBadge,
+              accountType: user.accountType,
             }
             : null,
         };
@@ -690,6 +814,10 @@ export const getPosts = async (req, res) => {
               bio: user.bio,
               gender: user.gender,
               nationality: user.nationality,
+              // The feed never sent this, so a verified account looked
+              // identical to any other everywhere a post appears.
+              verifiedBadge: !!user.verifiedBadge,
+              accountType: user.accountType,
             }
             : null,
         };

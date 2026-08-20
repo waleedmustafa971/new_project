@@ -54,9 +54,7 @@ export const followUserAsync = createAsyncThunk("users/followUser", async (userI
 const initialState = {
   users: [],
    singleUser: { user: { address: [] } },
-  //followedUsers: [],
-  //followedUsers: '',
-  followedUsers: {},
+  followedUsers: [],
   loading: false,
   error: null
 };
@@ -80,15 +78,26 @@ const userSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-       .addCase(followUserAsync.fulfilled, (state, action) => {
-        state.followedUsers.add(action.payload.userId);
-       // state.followedUsers.push(action.payload);
-       /*  const alreadyFollowed = state.followedUsers.some(user => user.userId === action.payload.userId);
-  
-        if (!alreadyFollowed) {
-          state.followedUsers.push(action.payload);
-        } */
-      }) 
+      /*
+        Record the follow.
+
+        This called state.followedUsers.add(), but followedUsers is initialised
+        as {} — a plain object, which has no .add. The reducer threw on every
+        successful follow, the dispatch rejected, and the optimistic rollback in
+        the caller's .catch() put the button back to "Follow". The follow itself
+        had already gone through, so the server said "Followed successfully!"
+        while the UI insisted nothing had happened.
+
+        The id comes from meta.arg rather than the payload: it is the argument
+        that was dispatched, so it is there whatever shape the API responds with.
+        An array rather than a Set, because Redux state has to stay serialisable.
+      */
+      .addCase(followUserAsync.fulfilled, (state, action) => {
+        const followId = String(action.meta?.arg?.followId || "");
+        if (followId && !state.followedUsers.includes(followId)) {
+          state.followedUsers.push(followId);
+        }
+      })
     /*   .addCase(followUserAsync.fulfilled, (state, action) => {
         state.followedUsers.add(action.payload.userId);
       }) */

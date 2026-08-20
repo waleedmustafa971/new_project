@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import React, { useState, useEffect } from "react";
+import Ionicons from "react-native-vector-icons/Ionicons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as base from "../../../component/global";
 import { useFocusEffect } from '@react-navigation/native';
@@ -113,7 +114,12 @@ const UserProfile = () => {
             </TouchableOpacity>
 
             <View style={{ marginTop: 20, marginLeft: 10 }}>
-              <Text style={{ fontSize: 16, marginTop: 10 }}>{route.params.name}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 10 }}>
+                <Text style={{ fontSize: 16 }}>{fullname || route.params.name}</Text>
+                {userdata?.verifiedBadge ? (
+                  <Ionicons name="checkmark-circle" size={16} color="#2563EB" />
+                ) : null}
+              </View>
               <Text style={{ fontSize: 12, marginTop: 10 }}>
                 {follower} followers {following} following
               </Text>
