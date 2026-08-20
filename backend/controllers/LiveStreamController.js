@@ -16,8 +16,19 @@ import CoinPurchase from '../models/CoinPurchase.js';
 import { getIO } from "../socket/socket.js";
 // livestream.controller.js
 // Put these in your .env file!
-const APP_ID = "141ea750fc7847129f58316d5c4f6b79";
-const APP_CERTIFICATE = "05b116941e164bdd8dbdd99cd01b3deb";
+/*
+  Agora credentials, from the environment.
+
+  These were the previous owner's App ID and certificate, written straight into
+  this file — the one Agora-using controller that never read the environment, so
+  setting AGORA_APP_ID had no effect here while liveController and callController
+  both picked it up. They are read lazily rather than at module load so import
+  order cannot decide whether dotenv has run yet, and there is no fallback: an
+  unset certificate should fail loudly, not silently sign tokens for somebody
+  else's project.
+*/
+const APP_ID = () => process.env.AGORA_APP_ID || "";
+const APP_CERTIFICATE = () => process.env.AGORA_APP_CERTIFICATE || "";
 import { notifyHostCohostRequest } from "../helpers/liveStreamSocket.js";
 import Stripe from 'stripe';
 const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
@@ -67,8 +78,8 @@ export const createLiveStream = async (req, res) => {
       currentTimestamp + expirationTimeInSeconds;
 
     const token = RtcTokenBuilder.buildTokenWithUid(
-      APP_ID,
-      APP_CERTIFICATE,
+      APP_ID(),
+      APP_CERTIFICATE(),
       channelName,
       uid,
       role,
@@ -137,8 +148,8 @@ export const createLiveStream_off = async (req, res) => {
     const privilegeExpiredTs = currentTimestamp + expirationTimeInSeconds;
 
     const token = RtcTokenBuilder.buildTokenWithUid(
-      APP_ID,
-      APP_CERTIFICATE,
+      APP_ID(),
+      APP_CERTIFICATE(),
       channelName,
       uid,
       role,
@@ -312,8 +323,8 @@ export const getAudienceToken = async (req, res) => {
     const privilegeExpiredTs = Math.floor(Date.now() / 1000) + 3600;
 
     const token = RtcTokenBuilder.buildTokenWithUid(
-      APP_ID,
-      APP_CERTIFICATE,
+      APP_ID(),
+      APP_CERTIFICATE(),
       channelName,
       0,
       RtcRole.SUBSCRIBER, // Audience is a subscriber

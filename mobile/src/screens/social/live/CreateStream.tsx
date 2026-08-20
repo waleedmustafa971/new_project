@@ -21,7 +21,7 @@ import {
   RtcEngine,
 } from 'react-native-agora';
 import * as base from '../../../component/global'; // Assuming this path is correct
-const AGORA_APP_ID = '141ea750fc7847129f58316d5c4f6b79';
+const AGORA_APP_ID = 'd9f79aff2b2341b991fbdf080250a8e0';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import HosterHeader from '../../../component/hostermessenger/HosterHeader'; 
 import HosterMessage from '../../../component/hostermessenger/HosterMessage'; 

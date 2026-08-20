@@ -28,8 +28,13 @@ import { notify } from "../services/notificationService.js";
 const { RtcTokenBuilder, RtcRole } = pkg;
 
 // Same credentials the live-stream controller uses.
-const APP_ID = process.env.AGORA_APP_ID || "141ea750fc7847129f58316d5c4f6b79";
-const APP_CERTIFICATE = process.env.AGORA_APP_CERTIFICATE || "05b116941e164bdd8dbdd99cd01b3deb";
+/*
+  No fallback on purpose. These used to default to the previous owner's App ID
+  and certificate, which meant a missing .env did not fail — it quietly signed
+  tokens against an account we do not control. Empty is the honest default.
+*/
+const APP_ID = process.env.AGORA_APP_ID || "";
+const APP_CERTIFICATE = process.env.AGORA_APP_CERTIFICATE || "";
 
 /* ------------------------------------------------------------------ */
 /* helpers                                                             */

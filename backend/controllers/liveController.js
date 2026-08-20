@@ -34,8 +34,13 @@ const { RtcTokenBuilder, RtcRole } = pkg;
   fallback, matching callController.js — the constants are still literals in
   LiveStreamController.js and moving them wholesale is a separate change.
 */
-const AGORA_APP_ID = process.env.AGORA_APP_ID || "141ea750fc7847129f58316d5c4f6b79";
-const AGORA_APP_CERTIFICATE = process.env.AGORA_APP_CERTIFICATE || "05b116941e164bdd8dbdd99cd01b3deb";
+/*
+  No fallback on purpose. These used to default to the previous owner's App ID
+  and certificate, which meant a missing .env did not fail — it quietly signed
+  tokens against an account we do not control. Empty is the honest default.
+*/
+const AGORA_APP_ID = process.env.AGORA_APP_ID || "";
+const AGORA_APP_CERTIFICATE = process.env.AGORA_APP_CERTIFICATE || "";
 const TOKEN_TTL_SECONDS = 3600;
 
 /*

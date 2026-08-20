@@ -19,7 +19,6 @@ import axios from 'axios';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 //import * as base from '../../../component/global'
 const { height, width } = Dimensions.get('window');
-//const AGORA_APP_ID = "141ea750fc7847129f58316d5c4f6b79";
 import * as base from '../../../component/global'
 import { useNavigation } from '@react-navigation/native';
 
