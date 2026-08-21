@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, FlatList, StyleSheet, TouchableOpacity, ScrollView, Dimensions,
+  View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions,
   TextInput, Button, Alert
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -263,14 +263,27 @@ export default function HomeScreen() {
       </View>
 
       <ScrollView>
+        {/*
+          A wrapped View, not a FlatList.
+
+          A vertical FlatList inside this vertical ScrollView is what raised
+          "VirtualizedLists should never be nested inside plain ScrollViews".
+          The warning is right: the nested list gets no scroll events of its
+          own, so its windowing never works and it renders every row anyway.
+          For nine fixed tiles there was nothing to virtualise in the first
+          place — flexWrap does the same layout with none of the machinery.
+        */}
         <View style={styles.gridCard}>
-          <FlatList
-            data={language === 'ar' ? [...GRID_DATA].reverse() : GRID_DATA}
-            numColumns={numColumns}
-            keyExtractor={(item) => item.key}
-            renderItem={renderItem}
-            contentContainerStyle={styles.grid}
-          />
+          <View
+            style={[
+              styles.grid,
+              { flexDirection: language === 'ar' ? 'row-reverse' : 'row' },
+            ]}
+          >
+            {GRID_DATA.map((item) => (
+              <React.Fragment key={item.key}>{renderItem({ item })}</React.Fragment>
+            ))}
+          </View>
         </View>
 
         <View style={{ height: 180 }}>
@@ -291,13 +304,25 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   gridCard: { paddingVertical: 10, alignItems: 'center' },
-  grid: { paddingHorizontal: 12 },
+  /*
+    Full width, because gridCard centres its children — without this the
+    wrapping row shrinks to its content and the tiles stop lining up.
+
+    The 12 of spacing lives here as a gap rather than on each tile as a
+    marginRight: three tiles plus two gaps is exactly the content width, while
+    three tiles plus three margins overflowed by one margin and pushed the
+    third tile onto its own row.
+  */
+  grid: {
+    paddingHorizontal: 12,
+    flexWrap: 'wrap',
+    width: '100%',
+    gap: 12,
+  },
   iconWrapper: {
     alignItems: 'center',
-    marginBottom: 10,
     borderWidth: 2,
     borderColor: '#f2f2f2',
-    marginRight: 12,
     padding: 7,
     borderRadius: 10,
   },

@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useState } from "react";
 import {
   View,
   Text,
-  FlatList,
   TouchableOpacity,
   Image,
   StyleSheet,
@@ -226,18 +225,26 @@ export default function HomeCategory() {
   );
 
   return (
-    <View style={styles.container}>
-      <FlatList
-        data={categories}
-        keyExtractor={(item) => item._id}
-        renderItem={renderCategory}
-        onEndReached={onEndReached}
-        onEndReachedThreshold={0.4}
-        refreshing={refreshing}
-        onRefresh={onRefresh}
-        contentContainerStyle={{ paddingBottom: 40 }}
-        removeClippedSubviews
-      />
+    /*
+      Rendered directly rather than through a FlatList.
+
+      This component is mounted inside HomeScreen's ScrollView, and a vertical
+      VirtualizedList in a vertical ScrollView is the other half of
+      "VirtualizedLists should never be nested inside plain ScrollViews".
+
+      Nothing is lost by unwrapping it, because none of what the FlatList
+      offered was working here: nested in a ScrollView it receives no scroll
+      events of its own, so windowing never kicked in and it rendered every row
+      regardless, onEndReached never fired, and pull-to-refresh belonged to the
+      outer scroll view. The list is what the screen has already loaded, and
+      the outer ScrollView scrolls it.
+    */
+    <View style={[styles.container, { paddingBottom: 40 }]}>
+      {categories.map((item) => (
+        <React.Fragment key={item._id}>
+          {renderCategory({ item })}
+        </React.Fragment>
+      ))}
     </View>
   );
 }
@@ -246,7 +253,8 @@ export default function HomeCategory() {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    /* No flex:1 — this sits in a ScrollView now, where a flexed child has
+       no bounded height to fill and collapses. It sizes to its rows. */
     backgroundColor: "#fff",
   },
 
