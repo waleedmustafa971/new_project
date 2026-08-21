@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, FlatList, StyleSheet, TouchableOpacity, ScrollView, Dimensions,
-  TextInput, Button
+  TextInput, Button, Alert
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -54,6 +54,18 @@ const GRID_DATA: GridItem[] = [
   { key: 'home_Shopping', value: "Shopping", icon: 'cart-outline', backgroundColor: '#FFD54F' },
   { key: 'home_Food', value: "Food", icon: 'restaurant-outline', backgroundColor: '#E57373' },
 ];
+
+/*
+  Phase one ships the Social module only.
+
+  The other eight tiles open screens whose backends are unbuilt or half-built, so
+  tapping them led to empty lists and dead ends — the app looked broken rather
+  than unfinished. They stay on the board, because the grid is the pitch for what
+  the app will be, but they read as not-yet rather than as doors.
+
+  Turning one on is adding its key here; nothing else in this file is per-module.
+*/
+const ENABLED_MODULES = new Set(['home_Social']);
 
 export default function HomeScreen() {
   const navigation = useNavigation<NavigationProp>();
@@ -120,6 +132,20 @@ export default function HomeScreen() {
 
   /* ---------------- NAVIGATION ---------------- */
   const handleScreen = (key: string) => {
+    /* A locked tile says so rather than navigating into an unfinished module. */
+    if (!ENABLED_MODULES.has(key)) {
+      const name = labels[key] || key.replace('home_', '');
+      /* An Alert rather than a Toast: react-native-toast-message is mounted at
+         the app root but renders nothing from this screen, and a message that
+         silently does not appear is worse than none — the tap would look
+         ignored. */
+      Alert.alert(
+        `${name} is coming soon`,
+        'We are building the app one section at a time. Social is ready to use now.'
+      );
+      return;
+    }
+
     switch (key) {
       case 'home_Social':
         navigation.navigate('HomeSocial');
@@ -152,7 +178,10 @@ export default function HomeScreen() {
   };
 
   /* ---------------- GRID ITEM ---------------- */
-  const renderItem = ({ item }: { item: GridItem }) => (
+  const renderItem = ({ item }: { item: GridItem }) => {
+    const locked = !ENABLED_MODULES.has(item.key);
+
+    return (
     <TouchableOpacity
       style={[
         styles.iconWrapper,
@@ -160,11 +189,36 @@ export default function HomeScreen() {
           width: itemWidth,
           flexDirection: language === 'ar' ? 'row-reverse' : 'column',
         },
+        locked && styles.iconWrapperLocked,
       ]}
       onPress={() => handleScreen(item.key)}
+      /* The tile stays pressable so it can explain itself when tapped.
+         Deliberately NOT accessibilityState={{ disabled }}: React Native
+         forwards that to the native view's enabled flag on Android, which
+         makes it ignore touches outright — the tap did nothing at all and the
+         board felt broken rather than staged. The state is carried in the
+         label instead, which is what a screen reader announces anyway. */
+      accessibilityLabel={
+        locked
+          ? `${labels[item.key] || item.key}, coming soon`
+          : labels[item.key] || item.key
+      }
     >
-      <View style={[styles.iconCircle, { backgroundColor: item.backgroundColor }]}>
+      <View
+        style={[
+          styles.iconCircle,
+          /* A grey circle rather than the brand colour: colour is what makes
+             these tiles scannable, so removing it is what makes one tile
+             obviously live among nine. */
+          { backgroundColor: locked ? '#C9CDD2' : item.backgroundColor },
+        ]}
+      >
         <Ionicons name={item.icon} size={23} color="#fff" />
+        {locked && (
+          <View style={styles.lockBadge}>
+            <Ionicons name="lock-closed" size={9} color="#fff" />
+          </View>
+        )}
       </View>
       {/*   <Text style={[styles.label, { textAlign: language === 'ar' ? 'right' : 'center' }]}>
         {labels[item.key] || item.key}
@@ -172,6 +226,7 @@ export default function HomeScreen() {
       <Text
         style={[
           styles.label,
+          locked && styles.labelLocked,
           {
             textAlign: language === 'ar' ? 'right' : 'center',
             marginRight: language === 'ar' ? 12 : 0, // example dynamic margin
@@ -183,7 +238,8 @@ export default function HomeScreen() {
       </Text>
 
     </TouchableOpacity>
-  );
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -254,6 +310,23 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   label: { fontSize: 11, color: '#333' },
+  /* Dimmed as a group rather than per-element, so the icon, its circle and the
+     label fade together and the tile reads as one inactive object. */
+  iconWrapperLocked: { opacity: 0.45 },
+  labelLocked: { color: '#8A8F98' },
+  lockBadge: {
+    position: 'absolute',
+    right: -2,
+    bottom: -2,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#6B7280',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#fff',
+  },
   /* topBar: {
     justifyContent: 'space-between',
     padding: 10,
