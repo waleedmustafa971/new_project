@@ -58,8 +58,32 @@ const ReelsFeed = ({userid}) => {
     fetchReels();
   }, []);
 
+  /*
+    videoUrl arrives as a plain string, as an array, or as { url, type } from
+    older rows. isVideo used to regex-test the value directly, so an object
+    stringified to "[object Object]", matched nothing, and the tile fell to a
+    branch that renders an empty fragment — a black rectangle with a caption.
+  */
+  const mediaPath = (item) => {
+    const raw = Array.isArray(item?.videoUrl) ? item.videoUrl[0] : item?.videoUrl;
+    if (typeof raw === 'string') return raw;
+    if (raw && typeof raw === 'object') return String(raw.url || raw.uri || '');
+    return '';
+  };
+
+  /*
+    HLS output is stored with a leading slash and older uploads without one, so
+    BASE_URL + '/' + path produced a double slash for every reel posted since
+    the pipeline started working — and those were exactly the black tiles.
+  */
+  const mediaSource = (path) => {
+    if (!path) return null;
+    if (/^(https?:|file:|data:)/.test(path)) return path;
+    return `${base.BASE_URL}/${String(path).replace(/^[/]+/, "")}`;
+  };
+
   const isVideo = (url) => {
-    return /\.(mp4|mov|webm|avi|m3u8)$/i.test(url);
+    return /\.(mp4|mov|webm|avi|m3u8)$/i.test(url || '');
   };
 
   useEffect(() => {
@@ -100,11 +124,11 @@ const ReelsFeed = ({userid}) => {
             overflow: 'hidden',
             position: 'relative',
           }} pointerEvents="none">
-            {item.videoUrl ? (
-              isVideo(item.videoUrl) ? (
+            {mediaPath(item) ? (
+              isVideo(mediaPath(item)) ? (
                 <>
                   <Video
-                    source={{ uri: base.BASE_URL + '/' + item.videoUrl }}
+                    source={{ uri: mediaSource(mediaPath(item)) }}
                     ref={(ref) => {
                       if (ref && item.id) videoRefs.current[item.id] = ref;
                     }}
@@ -116,8 +140,13 @@ const ReelsFeed = ({userid}) => {
                   />
                 </>
               ) : (
-                <>
-                </>
+                /* An image reel used to fall here and render nothing at all,
+                   leaving a bare grey card in the strip. */
+                <Image
+                  source={{ uri: mediaSource(mediaPath(item)) }}
+                  style={{ width: '100%', height: '100%' }}
+                  resizeMode="cover"
+                />
               )
             ) : (
               <View style={{ backgroundColor: '#ccc', flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -138,7 +167,11 @@ const ReelsFeed = ({userid}) => {
               paddingHorizontal: 8,
             }}>
               <Image
-                source={{ uri: item?.userInfo?.image || 'https://via.placeholder.com/150' }}
+                source={
+                  mediaSource(item?.userInfo?.image)
+                    ? { uri: mediaSource(item?.userInfo?.image) }
+                    : require('../../../assets/user.png')
+                }
                 style={{
                   width: 32,
                   height: 32,
