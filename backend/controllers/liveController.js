@@ -608,6 +608,25 @@ export const sendGift = wrap(async (req, res) => {
     LiveStream.findById(id).select("gift_coins").lean(),
   ]);
 
+  /*
+    Tell the room, so the client does not have to.
+
+    The socket handler for "send-gift" charges as well as broadcasting, so a
+    client that spent here and then emitted it for the animation paid twice —
+    one tap, two debits. Broadcasting from the side that took the money means
+    the spend and the animation cannot come apart, and the client needs to emit
+    nothing at all.
+  */
+  const io = req.app.get("io");
+  if (io) {
+    io.to(stream.channelName).emit("gift-received", {
+      gift: { _id: gift._id, name: gift.name, icon: gift.icon, coinCost: unit },
+      sender: { _id: senderId, name: req.user?.name },
+      quantity: qty,
+      totalCoins: host?.coins || 0,
+    });
+  }
+
   ok(res, {
     message: "Gift sent",
     transactionId: tx._id,

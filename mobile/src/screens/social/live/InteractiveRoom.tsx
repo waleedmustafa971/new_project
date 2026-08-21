@@ -26,7 +26,10 @@ import SuccessModal from "./SuccessModal";
 import LiveChatMessage from "../../../component/livechat/LiveChatMessage";
 import LiveChatFooter from "../../../component/livechat/LiveChatFooter";
 import LiveRoomHeader from "./liveroom/LiveRoomHeader";
-import GiftModal from "../../../component/livechat/GiftModal";
+/* The sibling in component/livechat/ reads a legacy /apis/live/get-gifts
+   that returns nothing, takes show/onHide, and charges no coins. This one is
+   the catalogue-backed sheet that actually spends. */
+import GiftModal from "./GiftModal";
 import RechargeModal from "../../../component/livechat/RechargeModal";
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get("window");
@@ -112,6 +115,20 @@ const InteractiveRoom: React.FC<Props> = ({ route, navigation }) => {
     const [viewerCount, setViewerCount] = useState(0);
     const [showGifts, setShowGifts] = useState(false);
     const [sendingGift, setSendingGift] = useState(false);
+    /*
+      One gift per opening of the sheet.
+
+      A single tap on Rose was landing twice — two sends 76ms apart, 20 coins
+      taken for one gift. State could not stop it (it updates asynchronously,
+      so both calls saw sendingGift false) and neither could a ref released
+      when the request finished: the round trip is faster than the gap between
+      the two events, so the second arrived to find the guard already cleared.
+
+      This is money, so the guard is deliberately blunt. It latches on send and
+      is only released when the sheet is opened again or the send fails —
+      whatever is producing the second event, it cannot spend twice.
+    */
+    const giftInFlight = useRef(false);
     const [showbalance, setShowBalance] = useState(false);
     const [isCohost, setIsCohost] = useState(false);
     const [remoteUid, setRemoteUid] = useState<number[]>([]); // Tracks all remote users (Host is UIDs[0])
@@ -464,8 +481,9 @@ const InteractiveRoom: React.FC<Props> = ({ route, navigation }) => {
             Alert.alert("Cannot send that", "This stream is no longer available.");
             return;
         }
-        if (sendingGift) return;
+        if (giftInFlight.current) return;
 
+        giftInFlight.current = true;
         setSendingGift(true);
         try {
             const jsonValue = await AsyncStorage.getItem("userdata");
@@ -477,11 +495,15 @@ const InteractiveRoom: React.FC<Props> = ({ route, navigation }) => {
                 quantity: 1,
             });
 
-            socket.current?.emit("send-gift", {
-                channelName,
-                senderId: userId,
-                giftId: gift._id,
-            });
+            /*
+              Deliberately no socket emit here.
+
+              The server's "send-gift" handler charges as well as broadcasting,
+              so spending over REST and then emitting for the animation took the
+              coins twice — one tap on Rose, two 10-coin debits 76ms apart. The
+              REST endpoint now broadcasts "gift-received" itself, which is the
+              only way the spend and the animation cannot disagree.
+            */
             setShowGifts(false);
         } catch (e: any) {
             const status = e?.response?.status;
@@ -489,6 +511,8 @@ const InteractiveRoom: React.FC<Props> = ({ route, navigation }) => {
 
             /* 402 is the one refusal with an obvious next step, so it offers
                the step instead of just reporting the shortfall. */
+            giftInFlight.current = false;
+
             if (status === 402) {
                 Alert.alert(
                     "Not enough coins",
@@ -529,6 +553,8 @@ const InteractiveRoom: React.FC<Props> = ({ route, navigation }) => {
 
     // --- Hand Gift (Restored) ---
     const handGift = () => {
+        /* Opening the sheet is what re-arms it. */
+        giftInFlight.current = false;
         setShowGifts(true)
     }
 
