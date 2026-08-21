@@ -4,6 +4,7 @@ import StackNavigator from './src/navigation/StackNavigator';
 import Toast from 'react-native-toast-message';
 import { StripeProvider } from '@stripe/stripe-react-native';
 import { navigationRef } from './src/navigation/RootNavigation';
+import IncomingCallListener from './src/screens/calls/IncomingCallListener';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 //import { requestAllPermissions, getLiveLocation } from '../../screens/permission/PermissionManager';
 import { requestAllPermissions, getLiveLocation } from './src/screens/permission/PermissionManager';
@@ -202,6 +203,9 @@ useEffect(() => {
         <NavigationContainer ref={navigationRef}>
           <StripeProvider publishableKey="pk_test_51U6RZqEInLcNzXu3abPcT4NuqcNLIQsLEc7n3LwrzbuE29dJkvyhMvOU6DLAOoeJYxEJIFN7aT30ShIwMrUnTY1r00KcFlsGeM">
             <StackNavigator />
+            {/* Inside the navigator so it can push the call screen, and above
+                every route so a call arrives wherever you are. */}
+            <IncomingCallListener />
           </StripeProvider>
         </NavigationContainer>
       </SafeAreaView>

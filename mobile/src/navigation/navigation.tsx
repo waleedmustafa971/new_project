@@ -157,6 +157,7 @@ export type RootStackParamList = {
     longitude: number},
     DiscountOfferModal: {latitude: number, longitude: number};
     ListofLive: undefined;
+    CallScreen: { callId?: string; channelName?: string; kind?: string; token?: string; uid?: number; appId?: string; peer?: object; incoming?: boolean };
     InteractiveRoom: {channelName: string, hosterinfo: object, userid: string};
    PaymentScreenClassified: undefined;
    SuccessScreen: undefined;

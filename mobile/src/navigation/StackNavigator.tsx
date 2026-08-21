@@ -133,6 +133,7 @@ import ProductReview from '../screens/shopping/order/ProductReview';
 import FoodDashboard from '../screens/food/Dashboard/FoodDashboard';
 import RestaurantScreen from '../screens/food/resturant/ResturantScreen';
 import ListofLive from '../screens/social/live/ListofLive';
+import CallScreen from '../screens/calls/CallScreen';
 import InteractiveRoom from '../screens/social/live/InteractiveRoom';
 import PaymentScreenClassified from '../screens/payment/PaymentScreenClassified';
 import SuccessScreen from '../screens/payment/SuccessScreen';
@@ -823,6 +824,11 @@ export default function StackNavigator() {
         options={{ headerShown: false }} />
       <Stack.Screen name="ListofLive" component={ListofLive}
         options={{ headerShown: false }} />
+
+      {/* A call takes the whole screen and must not be swiped away by accident
+          — leaving one has to go through hanging up. */}
+      <Stack.Screen name="CallScreen" component={CallScreen}
+        options={{ headerShown: false, gestureEnabled: false }} />
       {/* InteractiveRoom */}
       <Stack.Screen name="InteractiveRoom" component={InteractiveRoom}
         options={{ headerShown: false }} />

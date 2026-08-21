@@ -12,6 +12,7 @@ interface ChatHeaderProps {
     partnerLastSeen?: string | null;
     onBackPress: () => void;
     onMorePress: () => void;
+    onCall?: (kind: "audio" | "video") => void;
     // onlineUserIds: object;
 }
 
@@ -22,7 +23,8 @@ const ChatHeaders: React.FC<ChatHeaderProps> = ({
     partnerOnline,
     partnerLastSeen,
     onBackPress,
-    onMorePress
+    onMorePress,
+    onCall
 }) => {
     const navigation = useNavigation();
     const [onlineUserIds, setOnlineUserIds] = useState<string[]>([]);
@@ -129,7 +131,32 @@ const ChatHeaders: React.FC<ChatHeaderProps> = ({
                 </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={onMorePress}>
+            {/* Voice and video sit next to the name, where every messenger
+                puts them, and only on a one-to-one chat: the call backend
+                takes a group id too, but nothing in the app picks members
+                yet, so offering it on a group would open a call that cannot
+                be filled. */}
+            {onCall && type !== "group" && (
+                <>
+                    <TouchableOpacity
+                        onPress={() => onCall("audio")}
+                        hitSlop={8}
+                        accessibilityLabel="Voice call"
+                    >
+                        <Icondot name="call" size={22} color="#007AFF" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        onPress={() => onCall("video")}
+                        hitSlop={8}
+                        style={{ marginLeft: 16 }}
+                        accessibilityLabel="Video call"
+                    >
+                        <Icondot name="videocam" size={24} color="#007AFF" />
+                    </TouchableOpacity>
+                </>
+            )}
+
+            <TouchableOpacity onPress={onMorePress} style={{ marginLeft: 16 }}>
                 <Icondot name="more-vert" size={24} color="#007AFF" />
             </TouchableOpacity>
         </View>

@@ -60,6 +60,7 @@ import ForwardBar from './ForwardBar';
 import ForwardContactModal from './modal/ForwardContactModal';
 import uuid from 'react-native-uuid';
 import { useSocket } from '../context/SocketContext';
+import api from '../../component/api';
 
 interface Message {
   id?: string;
@@ -551,6 +552,55 @@ const ChatDetails = () => {
       console.log("✅ Sync complete");
     } catch (err) {
       console.error("❌ Sync error:", err);
+    }
+  };
+
+  /*
+    Place a call.
+
+    The server does the work that matters: it refuses a call to someone who has
+    blocked you, refuses a second call while one is live, mints the Agora token
+    for this channel, and rings the other side over their socket. The app's
+    part is to ask, then show the screen with what came back — it never invents
+    a channel name or a token of its own.
+  */
+  const startCall = async (kind: "audio" | "video") => {
+    /* This screen carries the two sides as route params: `me` and `partner`.
+       partner is a group id when type is "group", which is why the header only
+       offers calling on a one-to-one chat. */
+    const peerId = userinfo?.partner?._id || partner;
+    if (!peerId || type === "group") {
+      Alert.alert("Cannot call", "This conversation has no one to call.");
+      return;
+    }
+
+    try {
+      const { data } = await api.post("/apis/messaging/calls", {
+        userId: me,
+        to: peerId,
+        kind,
+        conversationId: userinfo?.conversationId || undefined,
+      });
+
+      navigation.navigate("CallScreen", {
+        callId: data?.call?._id,
+        channelName: data?.call?.channelName,
+        kind,
+        token: data?.token,
+        uid: data?.uid,
+        appId: data?.appId,
+        peer: {
+          _id: peerId,
+          name: userinfo?.partner?.name,
+          image: userinfo?.partner?.image,
+        },
+        incoming: false,
+      });
+    } catch (e: any) {
+      Alert.alert(
+        "Could not start the call",
+        e?.response?.data?.message || "Please try again."
+      );
     }
   };
 
@@ -1225,6 +1275,7 @@ const ChatDetails = () => {
           partnerLastSeen={partnerLastSeen}
           onBackPress={() => navigation.goBack()}
           onMorePress={() => Alert.alert("More icon tapped")}
+          onCall={startCall}
         />
         <View style={{
           padding: 10, flexDirection: 'row', justifyContent: 'space-between'
