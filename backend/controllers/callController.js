@@ -148,6 +148,50 @@ const logCallMessage = async (call) => {
 /* 1. Place a call (1:1 and group)                                     */
 /* ------------------------------------------------------------------ */
 
+/*
+  A ring that outlived its window was a missed call; a call still marked
+  ongoing long after anyone could plausibly be on it is a session whose app
+  went away. Both are closed here rather than by a background job, because the
+  only moment it matters is when somebody is being told they are busy.
+
+  ONGOING_MAX_MS is deliberately generous — ending a call somebody is really on
+  would be far worse than leaving a dead one a few hours longer.
+*/
+const ONGOING_MAX_MS = 6 * 60 * 60 * 1000;
+
+export const expireStaleCallsFor = async (userId) => {
+  const now = Date.now();
+  const stale = await CallSession.find({
+    status: { $in: ["ringing", "ongoing"] },
+    "participants.user": oid(userId),
+  }).lean();
+
+  for (const call of stale) {
+    const started = new Date(call.startedAt || call.createdAt || 0).getTime();
+    const touched = new Date(call.updatedAt || call.answeredAt || started).getTime();
+
+    if (call.status === "ringing" && now - started > RING_TIMEOUT_MS) {
+      await CallSession.updateOne(
+        { _id: call._id },
+        {
+          $set: {
+            status: "missed", endedAt: new Date(), endReason: "no answer",
+            "participants.$[r].status": "missed",
+          },
+        },
+        { arrayFilters: [{ "r.status": { $in: ["ringing", "invited"] } }] }
+      );
+      emit(participantIds(call), "callMissed", { callId: call._id });
+    } else if (call.status === "ongoing" && now - touched > ONGOING_MAX_MS) {
+      await CallSession.updateOne(
+        { _id: call._id },
+        { $set: { status: "ended", endedAt: new Date(), endReason: "abandoned" } }
+      );
+      emit(participantIds(call), "callEnded", { callId: call._id, status: "ended" });
+    }
+  }
+};
+
 export const startCall = wrap(async (req, res) => {
   const callerId = actorId(req);
   const { to, groupId, conversationId } = req.body || {};
@@ -190,6 +234,19 @@ export const startCall = wrap(async (req, res) => {
     One live call per person. Without this a second call places the callee in
     two channels at once and the first is never cleaned up.
   */
+  /*
+    Close anything of theirs that is only still open because nobody told us it
+    ended, before deciding they are busy.
+
+    A ring is ended by the caller's app calling /timeout, and an ongoing call by
+    /end — so an app that is killed mid-call leaves its session open forever.
+    The guard below then reads that corpse as a live call and refuses every
+    future call the person tries to place, permanently. Losing the app is not a
+    rare accident, and "You are already on a call" with no way out is a worse
+    failure than the double-call this guard exists to prevent.
+  */
+  await expireStaleCallsFor(callerId);
+
   const busy = await CallSession.findOne({
     status: { $in: ["ringing", "ongoing"] },
     "participants.user": oid(callerId),
