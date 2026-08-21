@@ -338,7 +338,20 @@ app.post("/apis/send-message", async (req, res) => {
     const data = req.body;
     // socket = null because no socket
     //change anything its already called so many where in socket
-    await handleSendMessage(io, null, data);
+    /*
+      handleSendMessage refuses through its callback, which this route did not
+      pass — so a message the privacy rules reject would have been reported to
+      the caller as a success and then silently dropped. The callback turns
+      that into a 403 the app can act on.
+    */
+    let refusal = null;
+    await handleSendMessage(io, null, data, (ack) => {
+      if (ack && ack.success === false) refusal = ack;
+    });
+    if (refusal) {
+      return res.status(403).json({ success: false, message: refusal.error });
+    }
+
     // Notify a recipient who is not connected; a connected one already has it.
     await notifyOfflineMessage(data);
     res.json({ success: true });

@@ -638,6 +638,15 @@ const ChatDetails = () => {
       //  console.log("Socket id:", socket.id);
       if (!ack.success) {
         setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, status: "failed" } : m));
+        /*
+          A refusal is not a delivery failure. The server sets `blocked` when
+          the recipient's privacy settings — or a block — mean this message will
+          never be delivered, and a red "failed" tick invites retrying forever
+          without ever saying why. It is worth interrupting for, once.
+        */
+        if (ack.blocked) {
+          Alert.alert("Message not sent", ack.error || "You can't message this account.");
+        }
         return;
       }
       console.log('five ID : ', msg.id)

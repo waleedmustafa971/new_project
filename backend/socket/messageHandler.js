@@ -10,6 +10,7 @@ import { MessageModel, ConversationModel } from "../models/ConversationModel.js"
 import { GroupChat } from '../models/Groupchat.js'
 import { saveBase64Audio } from "./uploadVoice.js";
 import { applyDisappearing } from "../controllers/chatController.js";
+import { canMessage } from "../helpers/messagePermission.js";
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -122,6 +123,22 @@ const handleSendMessage = async (io, socket = null, data, callback) => {
     // PRIVATE MESSAGE
     // ===============================
     else {
+      /*
+        Ask before writing anything.
+
+        Both the socket path and POST /apis/send-message land here, so this is
+        the one place a direct message can be stopped — and until now neither
+        checked. privacy.messages was settable in the app and enforced nowhere,
+        and a blocked account could still be messaged.
+      */
+      const permission = await canMessage(sender, receiver);
+      if (!permission.allowed) {
+        if (callback) {
+          callback({ success: false, error: permission.reason, blocked: true });
+        }
+        return;
+      }
+
       let convo = await ConversationModel.findOne({
         $or: [
           { sender, receiver },
