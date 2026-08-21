@@ -1,19 +1,26 @@
-import React from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Modal,
   View,
   Text,
+  Image,
   FlatList,
   TouchableOpacity,
+  ActivityIndicator,
   StyleSheet,
 } from "react-native";
+import Ionicons from "react-native-vector-icons/Ionicons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import api from "../../../component/api";
+import * as base from "../../../component/global";
 
 /* ================= TYPES ================= */
 
 export interface Gift {
+  _id: string;
   name: string;
-  emoji: string;
-  coins: number;
+  icon?: string;
+  coinCost: number;
 }
 
 interface GiftModalProps {
@@ -21,83 +28,133 @@ interface GiftModalProps {
   onClose: () => void;
   onSendGift: (gift: Gift) => void;
   onRecharge?: () => void;
+  sending?: boolean;
 }
 
-/* ================= DATA ================= */
+/*
+  The gifts people can actually send.
 
-const gifts: Gift[] = [
-  { name: "Rose", emoji: "🌹", coins: 1 },
-  { name: "Ice Cream Cone", emoji: "🍦", coins: 1 },
-  { name: "Football", emoji: "🏈", coins: 1 },
-  { name: "Mini Speaker", emoji: "🔊", coins: 1 },
-  { name: "Tennis", emoji: "🎾", coins: 1 },
-  { name: "Coffee", emoji: "☕", coins: 1 },
-  { name: "Lightning Bolt", emoji: "⚡", coins: 1 },
-  { name: "Finger Heart", emoji: "🤞", coins: 5 },
-  { name: "Panda", emoji: "🐼", coins: 5 },
-  { name: "Mic", emoji: "🎤", coins: 5 },
-  { name: "Chic", emoji: "👠", coins: 5 },
-  { name: "Lollipop", emoji: "🍭", coins: 10 },
-  { name: "Cake", emoji: "🎂", coins: 20 },
-  { name: "Hand Hearts", emoji: "🫶", coins: 100 },
-  { name: "Flowers", emoji: "💐", coins: 100 },
-  { name: "Confetti", emoji: "🎉", coins: 100 },
-  { name: "Sunglasses", emoji: "😎", coins: 199 },
-  { name: "Crown", emoji: "👑", coins: 199 },
-  { name: "Disco Ball", emoji: "🪩", coins: 1000 },
-  { name: "Shooting Stars", emoji: "🌠", coins: 1580 },
-  { name: "TikTok Universe", emoji: "🌌", coins: 34999 },
-];
+  This list used to be seventeen emoji hardcoded in this file, with prices that
+  existed nowhere else. Sending one emitted a socket event and nothing was ever
+  charged, so "100 coins" was decoration — the wallet never moved and the host
+  was never credited. The catalogue lives on the server, which is also what the
+  spend endpoint prices against, so what is shown here and what is charged
+  cannot drift apart.
 
-/* ================= COMPONENT ================= */
+  Balance is read alongside it so a gift you cannot afford is visibly out of
+  reach before you tap it, rather than after the server refuses.
+*/
 
 const GiftModal: React.FC<GiftModalProps> = ({
   visible,
   onClose,
   onSendGift,
   onRecharge,
+  sending = false,
 }) => {
-  const renderItem = ({ item }: { item: Gift }) => (
-    <TouchableOpacity
-      style={styles.giftItem}
-      onPress={() => onSendGift(item)}
-    >
-      <Text style={styles.emoji}>{item.emoji}</Text>
-      <Text style={styles.name}>{item.name}</Text>
-      <Text style={styles.coins}>{item.coins} coins</Text>
-    </TouchableOpacity>
-  );
+  const [gifts, setGifts] = useState<Gift[]>([]);
+  const [coins, setCoins] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    try {
+      setLoading(true);
+      const raw = await AsyncStorage.getItem("userdata");
+      const userId = raw ? JSON.parse(raw)?._id : null;
+
+      const [cat, wallet] = await Promise.all([
+        api.get("/apis/live/gifts"),
+        userId
+          ? api.get("/apis/monetisation/wallet", { params: { userId } })
+          : Promise.resolve({ data: {} }),
+      ]);
+
+      setGifts(cat.data?.gifts || cat.data?.data || []);
+      setCoins(
+        typeof wallet.data?.coins === "number" ? wallet.data.coins : null
+      );
+    } catch {
+      setGifts([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (visible) load();
+  }, [visible, load]);
+
+  /* The seeded catalogue points at icon files that were never uploaded, so a
+     missing image has to be an expected state rather than a broken tile. */
+  const iconUri = (icon?: string) => {
+    if (!icon) return null;
+    if (/^(https?:|file:|data:)/.test(icon)) return icon;
+    return `${base.BASE_URL}/${String(icon).replace(/^[/]+/, "")}`;
+  };
+
+  const renderItem = ({ item }: { item: Gift }) => {
+    const affordable = coins === null || coins >= item.coinCost;
+    const uri = iconUri(item.icon);
+
+    return (
+      <TouchableOpacity
+        style={[styles.giftItem, !affordable && styles.giftItemLocked]}
+        onPress={() => affordable && !sending && onSendGift(item)}
+        disabled={!affordable || sending}
+        activeOpacity={0.8}
+      >
+        {uri ? (
+          <Image source={{ uri }} style={styles.giftIcon} resizeMode="contain" />
+        ) : (
+          <Ionicons name="gift" size={26} color="#E91E63" />
+        )}
+        <Text style={styles.name} numberOfLines={1}>{item.name}</Text>
+        <Text style={styles.coins}>{item.coinCost} coins</Text>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <Modal visible={visible} animationType="slide" transparent>
-      {/* Overlay */}
       <TouchableOpacity
         activeOpacity={1}
         style={styles.modalOverlay}
         onPress={onClose}
       >
-        {/* Modal Box */}
         <TouchableOpacity activeOpacity={1} style={styles.modalContainer}>
           <View style={styles.modalContent}>
-            <Text style={styles.title}>Select a Gift 🎁</Text>
+            <View style={styles.headerRow}>
+              <Text style={styles.title}>Send a gift</Text>
+              <View style={styles.balancePill}>
+                <Ionicons name="logo-bitcoin" size={13} color="#FFD700" />
+                <Text style={styles.balanceText}>
+                  {coins === null ? "—" : coins}
+                </Text>
+              </View>
+            </View>
 
-            <FlatList
-              data={gifts}
-              keyExtractor={(_, index) => index.toString()}
-              renderItem={renderItem}
-              numColumns={4}
-              contentContainerStyle={styles.grid}
-            />
+            {loading ? (
+              <ActivityIndicator style={{ marginVertical: 30 }} color="#E91E63" />
+            ) : gifts.length === 0 ? (
+              <Text style={styles.empty}>No gifts are available right now.</Text>
+            ) : (
+              <FlatList
+                data={gifts}
+                keyExtractor={(item) => String(item._id)}
+                renderItem={renderItem}
+                numColumns={4}
+                contentContainerStyle={styles.grid}
+              />
+            )}
           </View>
 
-          {/* Footer */}
           {onRecharge && (
             <View style={styles.footer}>
               <TouchableOpacity
                 style={styles.rechargeButton}
                 onPress={onRecharge}
               >
-                <Text style={styles.rechargeButtonText}>Recharge</Text>
+                <Text style={styles.rechargeButtonText}>Get coins</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -146,16 +203,39 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderColor: "#ddd",
   },
-  emoji: {
-    fontSize: 28,
-  },
+  /* A gift you cannot afford stays visible but reads as out of reach, so the
+     reason a tap does nothing is on screen before the tap. */
+  giftItemLocked: { opacity: 0.4 },
+  giftIcon: { width: 28, height: 28 },
   name: {
     marginTop: 4,
-    fontSize: 13,
+    fontSize: 12.5,
   },
   coins: {
-    fontSize: 12,
+    fontSize: 11.5,
     color: "gray",
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 6,
+  },
+  balancePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "#1F2937",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+  },
+  balanceText: { color: "#fff", fontSize: 12.5, fontWeight: "700" },
+  empty: {
+    textAlign: "center",
+    color: "#8A8F98",
+    fontSize: 13,
+    paddingVertical: 30,
   },
   footer: {
     borderTopWidth: 1,

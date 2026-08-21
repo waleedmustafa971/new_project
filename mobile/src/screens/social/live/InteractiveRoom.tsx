@@ -111,6 +111,7 @@ const InteractiveRoom: React.FC<Props> = ({ route, navigation }) => {
     const [activeGift, setActiveGift] = useState(0)
     const [viewerCount, setViewerCount] = useState(0);
     const [showGifts, setShowGifts] = useState(false);
+    const [sendingGift, setSendingGift] = useState(false);
     const [showbalance, setShowBalance] = useState(false);
     const [isCohost, setIsCohost] = useState(false);
     const [remoteUid, setRemoteUid] = useState<number[]>([]); // Tracks all remote users (Host is UIDs[0])
@@ -446,14 +447,69 @@ const InteractiveRoom: React.FC<Props> = ({ route, navigation }) => {
     };
 
     // --- Send Gift (Restored) ---
-    const sendGift = (giftId: string) => {
-        console.log("🎁 Gift selected:", giftId);
-        socket.current?.emit("send-gift", {
-            channelName,
-            senderId: user?._id,
-            giftId,
-        });
-        setShowGifts(false);
+    /*
+      Send a gift, and actually pay for it.
+
+      This used to emit a socket event and nothing else: no coins left the
+      sender, nothing reached the host, and the gift's price was a number in a
+      hardcoded list. The server prices the gift from its own catalogue, debits
+      the wallet in one conditional update that cannot go negative, and credits
+      the host — so the socket broadcast now runs only after the spend has been
+      accepted, and what everyone sees animate is a gift that was really paid
+      for.
+    */
+    const sendGift = async (gift: any) => {
+        const streamId = hosterinfo?._id;
+        if (!streamId) {
+            Alert.alert("Cannot send that", "This stream is no longer available.");
+            return;
+        }
+        if (sendingGift) return;
+
+        setSendingGift(true);
+        try {
+            const jsonValue = await AsyncStorage.getItem("userdata");
+            const userId = jsonValue ? JSON.parse(jsonValue)?._id : user?._id;
+
+            await api.post(`/apis/live/streams/${streamId}/gift`, {
+                userId,
+                giftId: gift._id,
+                quantity: 1,
+            });
+
+            socket.current?.emit("send-gift", {
+                channelName,
+                senderId: userId,
+                giftId: gift._id,
+            });
+            setShowGifts(false);
+        } catch (e: any) {
+            const status = e?.response?.status;
+            const message = e?.response?.data?.message;
+
+            /* 402 is the one refusal with an obvious next step, so it offers
+               the step instead of just reporting the shortfall. */
+            if (status === 402) {
+                Alert.alert(
+                    "Not enough coins",
+                    message || "You do not have enough coins for that gift.",
+                    [
+                        { text: "Not now", style: "cancel" },
+                        {
+                            text: "Get coins",
+                            onPress: () => {
+                                setShowGifts(false);
+                                navigation.navigate("GetCoins");
+                            },
+                        },
+                    ]
+                );
+                return;
+            }
+            Alert.alert("Could not send that gift", message || "Please try again.");
+        } finally {
+            setSendingGift(false);
+        }
     };
 
 
@@ -588,8 +644,19 @@ const InteractiveRoom: React.FC<Props> = ({ route, navigation }) => {
             {/* 6. Modals (Restored) */}
             {
                 showGifts ?
-                <GiftModal show={showGifts} onHide={() => setShowGifts(false)}
-                onSendGift={sendGift} />
+                /* It was given show/onHide, but this component's props are
+                   visible/onClose — so Modal saw visible={undefined} and the
+                   sheet never opened at all. */
+                <GiftModal
+                    visible={showGifts}
+                    onClose={() => setShowGifts(false)}
+                    onSendGift={sendGift}
+                    sending={sendingGift}
+                    onRecharge={() => {
+                        setShowGifts(false);
+                        navigation.navigate("GetCoins");
+                    }}
+                />
                 : null
             }
             {
