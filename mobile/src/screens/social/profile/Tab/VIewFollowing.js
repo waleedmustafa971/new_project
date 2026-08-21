@@ -8,7 +8,6 @@ import {
   TouchableOpacity,
   StatusBar,
   TextInput,
-  ScrollView,
 } from "react-native";
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useDispatch } from "react-redux";
@@ -141,7 +140,14 @@ const VIewFollowing = ({ userid }) => {
           )}
         </View>
       )}
-      <ScrollView>
+      {/* No ScrollView around this list.
+
+          It used to sit in one, which raised "VirtualizedLists should never be
+          nested inside plain ScrollViews" and disabled the pagination below:
+          a nested list receives no scroll events of its own, so onEndReached
+          never fired and the list never grew past its first page. The list is
+          the scroller now, and the search box above it stays put rather than
+          scrolling away. */}
       <FlatList
         data={products}
         keyExtractor={(item) => item._id}
@@ -153,7 +159,6 @@ const VIewFollowing = ({ userid }) => {
           isloading ? <ActivityIndicator size="large" color="#0000ff" /> : null
         }
       />
-      </ScrollView>
     </SafeAreaView>
   );
 };

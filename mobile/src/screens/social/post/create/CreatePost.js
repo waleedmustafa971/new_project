@@ -481,10 +481,16 @@ const playMusicFromChild = (item) => {
               height: 180,
             }}
           >
+            {/* scrollEnabled={false} because the composer's ScrollView is the
+                scroller here — which is also what stops React Native warning
+                that a VirtualizedList is nested inside a plain ScrollView.
+                It is at most four thumbnails, so nothing is lost by rendering
+                them all and letting the page scroll. */}
             <FlatList
               data={selectedMedia.slice(0, 4)}
               keyExtractor={(item, index) => index.toString()}
               numColumns={4}
+              scrollEnabled={false}
               renderItem={(props) =>
                 renderMediaItem(props, selectedMedia, setSelectedMedia)
               }

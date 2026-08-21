@@ -146,19 +146,32 @@ export default function MarketPlace() {
     );
   };
 
+  /*
+    The list is the scroller, with everything above it as its header.
+
+    It used to be a FlatList inside a ScrollView, which raised
+    "VirtualizedLists should never be nested inside plain ScrollViews" and
+    quietly broke the pagination underneath it: a nested list gets no scroll
+    events of its own, so onEndReached never fired and page never advanced
+    past one. ListHeaderComponent keeps the header and categories scrolling
+    with the content, which is what the ScrollView was there for.
+  */
   return (
-    <ScrollView style={styles.container}>
-      <HeaderMarketplace />
-      <CategoriesScreen categories={categories} />
-      <FlatList
-        data={groupdata}
-        showsHorizontalScrollIndicator={false}
-        keyExtractor={(item, index) => index.toString()}
-        renderItem={({ item }) => <GroupItem group={item} />}
-        onEndReached={() => setPage(page + 1)} // pagination
-        onEndReachedThreshold={0.5}
-      />
-    </ScrollView>
+    <FlatList
+      style={styles.container}
+      data={groupdata}
+      keyExtractor={(item, index) => index.toString()}
+      renderItem={({ item }) => <GroupItem group={item} />}
+      ListHeaderComponent={
+        <>
+          <HeaderMarketplace />
+          <CategoriesScreen categories={categories} />
+        </>
+      }
+      onEndReached={() => setPage(page + 1)}
+      onEndReachedThreshold={0.5}
+      showsVerticalScrollIndicator={false}
+    />
   );
 }
 
