@@ -30,7 +30,7 @@ const upload = multer({ storage });
 const handleSendMessage = async (io, socket = null, data, callback) => {
   try {
     const {
-      clientMessageId, text, imageUrl, videoUrl,
+      clientMessageId: clientMessageIdIn, text, imageUrl, videoUrl,
       audioUrl, sender, receiver, groupId, type, 
       messagetype, replyTo, forwardedFrom, isForwarded,
       // Messaging module: typed files, stickers and view-once media travel the
@@ -39,6 +39,28 @@ const handleSendMessage = async (io, socket = null, data, callback) => {
       // Set only by the story viewer's reply box; see ConversationModel.
       storyReply
     } = data;
+
+    /*
+      Every message needs a clientMessageId; not every caller has one to give.
+
+      The field is required and unique on the schema — it is the de-duplication
+      key that lets a client retry a send without posting twice. The app always
+      has one, because it mints a uuid before it queues the message locally. A
+      server-side caller has nothing to de-duplicate and no reason to invent an
+      id, and `POST /apis/send-message` therefore failed validation for anyone
+      who did not know to supply one.
+
+      That failure used to be invisible: the REST route passed no callback, so
+      the refusal was swallowed and the caller was told `success: true` while
+      the message was dropped — and notifyOfflineMessage still wrote the
+      notification, so a recipient was told about a message that did not exist.
+      Passing the callback (a60fe50) surfaced it as a 403 "Message save failed".
+
+      Generating one here is the fix: absent a client key, this send is by
+      definition not a retry of anything.
+    */
+    const clientMessageId = clientMessageIdIn || crypto.randomUUID();
+
      console.log('..sendMessage..new.cccc', JSON.stringify(data))
     // ===============================
     // GROUP MESSAGE
