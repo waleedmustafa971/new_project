@@ -56,6 +56,27 @@ const messageSchema = new mongoose.Schema({
     forwardedFrom: { type: mongoose.Schema.ObjectId, ref: 'users', default: null },
     isForwarded: { type: Boolean, default: false },
 
+    /*
+      A reply sent from the story viewer.
+
+      Story replies are ordinary direct messages -- same delivery, same privacy
+      rules, same thread -- but arriving without any trace of what was being
+      replied to, they read as a stray remark about nothing. `story` is the id
+      so the bubble can open it while it is still live; `mediaUrl` is copied at
+      send time so the thumbnail survives the story expiring, which it will in
+      under a day.
+
+      `default: undefined` keeps the key off every other message rather than
+      writing a null onto all of them.
+    */
+    storyReply: {
+        type: {
+            story: { type: mongoose.Schema.ObjectId, ref: 'Reels' },
+            mediaUrl: { type: String, default: '' },
+        },
+        default: undefined,
+    },
+
     // Structured file sharing. imageUrl/videoUrl/audioUrl above stay for the
     // current screens; anything with a real filename lands here.
     attachments: {

@@ -74,6 +74,7 @@ export const sendNotificationToUser = async (userId, { title, body, data = {} })
    ================================================================ */
 
 import Notification from "../models/Notification.js";
+import { getIO } from "../socket/socket.js";
 import { t, DEFAULT_LANGUAGE, normaliseLanguage } from "../helpers/i18n.js";
 
 // Which preference switch governs which notification type.
@@ -277,6 +278,44 @@ export const notify = async ({
       },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
+
+    /*
+      Deliver it live to anyone connected.
+
+      The record was written and a push was attempted, and that was the whole
+      of delivery — nothing was ever emitted over the socket. So a notification
+      for someone sitting in the app arrived only when they navigated to the
+      notification list and it re-fetched, which is why everything felt
+      delayed: the data was there instantly and nobody was told.
+
+      Push does not cover this case either. It is gated on the `push`
+      preference and on quiet hours, it needs Firebase credentials, and on
+      Android a foreground push is a different path again. The socket is the
+      one channel that is already open, already addressed to this person's
+      room, and free.
+
+      Wrapped because notification delivery must never be the reason an action
+      fails — the same rule the rest of this function follows. getIO() throws
+      when no server is registered, which is the case in scripts and tests.
+    */
+    try {
+      getIO().to(String(recipient)).emit("notification", {
+        _id: record._id,
+        type,
+        read: false,
+        createdAt: record.createdAt,
+        preview: record.preview,
+        reactionType,
+        thumbnail,
+        post: post || null,
+        commentId: commentId || null,
+        group: group || null,
+        actor: { _id: actor, name: actorDoc.name || "", image: actorDoc.image || "" },
+      });
+    } catch (err) {
+      // No socket server in this process, or nobody in the room. Neither is
+      // an error: the record is written and the list will show it.
+    }
 
     /*
       Quiet hours gate the push and nothing else — the record above is already

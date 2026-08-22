@@ -406,13 +406,31 @@ app.get("/apis/get-message", async (req, res) => {
   }
 });
 
+/*
+  Messages this person has deleted for themselves stay deleted.
+
+  A per-user delete writes the caller's id into `message.deletedFor`, and
+  chatController's own history reader already honours it. This endpoint — the
+  one the chat screen actually loads from — did not, so "delete for me" lasted
+  exactly until the next time the thread was opened and the message came
+  straight back.
+
+  Written as a populate `match` rather than a filter afterwards so the rows
+  never leave Mongo. `$ne` on an array field means "no element equals this",
+  which is the test wanted, and it matches documents with no `deletedFor` at
+  all — every message written before the field existed.
+*/
+const visibleTo = (me) => ({
+  path: "messages",
+  match: me ? { deletedFor: { $ne: me } } : {},
+  options: { sort: { createdAt: 1 } },
+});
+
 //getConversion
 app.post("/apis/getChatdetails", async (req, res) => {
   const { me, partner, convoId, type } = req.body;
   console.log(`getMessages... type: ${type}, me: ${me}, partner: ${partner}, convoId: ${convoId}`);
   try {
-    let messages = [];
-
     if (type === "private") {
       const convo = await ConversationModel.findOne({
         type: "private",
@@ -420,31 +438,28 @@ app.post("/apis/getChatdetails", async (req, res) => {
           { sender: me, receiver: partner },
           { sender: partner, receiver: me },
         ],
-      }).populate({
-        path: "messages",
-        options: { sort: { createdAt: 1 } },
-      });
+      }).populate(visibleTo(me));
 
-    //  messages = convo?.messages || []; // its getting error if messages is empty or null
-      return res.json({ messages: convo?.messages });
+      /*
+        `convo.messages` was read without a guard on the group branch, so a
+        group with no conversation row yet threw a TypeError and answered
+        nothing at all — no body, no status. The client saw a hanging request.
+      */
+      return res.json({ messages: convo?.messages || [] });
 
     } else if (type === "group") {
       const convo = await ConversationModel.findOne({
         type: "group",
         group: convoId, // convoId is the group ID (or conversation ID for group)
-      }).populate({
-        path: "messages",
-        options: { sort: { createdAt: 1 } },
-      });
+      }).populate(visibleTo(me));
 
-      messages = convo?.messages || [];
-      return res.json({ messages: convo.messages });
+      return res.json({ messages: convo?.messages || [] });
     }
 
-    // socket.emit("messages", messages);
+    return res.json({ messages: [] });
   } catch (err) {
     console.error("getMessages error:", err);
-    //socket.emit("messages", []); // fallback on error
+    return res.status(500).json({ messages: [] });
   }
 });
 
@@ -575,7 +590,7 @@ app.get("/apis/conversations/:userId", async (req, res) => {
   ask whether a recipient is actually connected. This file still owns adding and
   removing them, which is the only place that knows.
 */
-import onlineUsers, { markOnline, markOffline } from "./helpers/presence.js";
+import { markOnline, markOffline, onlineList } from "./helpers/presence.js";
 io.on("connection", async (socket) => {
   const userId = socket.handshake.query.userId;
   const user = await User.findById(userId).select("-password");
@@ -761,9 +776,23 @@ export const socket = io(SOCKET_URL, {
   /* End Live room */
 
 
-  markOnline(userId);
-  io.emit("onlineUsers", Array.from(onlineUsers));
-  console.log('online user' + Array.from(onlineUsers))
+  markOnline(userId, socket.id);
+  io.emit("onlineUsers", onlineList());
+  console.log('online user' + onlineList())
+
+  /*
+    Answer "who is online right now?" on demand.
+
+    The roster was broadcast on connect and on disconnect and at no other time,
+    so a screen only ever learned it by being mounted at the exact moment
+    somebody else's connection changed. Open a chat while both people are
+    already connected and nothing arrives — the header renders its default and
+    says "Offline" about someone sitting in the app. The client asks on mount
+    and on every reconnect; this replies to that socket alone.
+  */
+  socket.on("getOnlineUsers", () => {
+    socket.emit("onlineUsers", onlineList());
+  });
 
 
 /*   socket.on("getConversations", async (uid) => {
@@ -963,10 +992,7 @@ socket.on("getConversations", async (uid) => {
             { sender: me, receiver: partner },
             { sender: partner, receiver: me },
           ],
-        }).populate({
-          path: "messages",
-          options: { sort: { createdAt: 1 } },
-        });
+        }).populate(visibleTo(me));   // per-user deletes stay deleted here too
 
         messages = convo?.messages || [];
 
@@ -974,10 +1000,7 @@ socket.on("getConversations", async (uid) => {
         const convo = await ConversationModel.findOne({
           type: "group",
           group: convoId, // convoId is the group ID (or conversation ID for group)
-        }).populate({
-          path: "messages",
-          options: { sort: { createdAt: 1 } },
-        });
+        }).populate(visibleTo(me));
 
         messages = convo?.messages || [];
       }
@@ -1055,23 +1078,46 @@ socket.on("getConversations", async (uid) => {
 
 
 
-  socket.on("typing", ({ from, to }) => {
-    // 'from' = sender ID
-    // 'to' = receiver ID
-//    console.log(`${from} is typing to ${to}`);
+  /*
+    Typing indicators.
 
-    // Emit to the receiver only
-    io.to(to).emit("typing", { from });
-  });
+    `to` is a person's id in a one-to-one chat and a group's id in a group one,
+    and only people have a room of their own — everyone joins `socket.join(userId)`
+    on connect, nobody joins a group id. Relaying blind to `io.to(to)` therefore
+    worked for direct messages and silently went nowhere for groups. A group is
+    fanned out to its members' personal rooms, which is how messageHandler
+    already delivers group messages.
 
-  socket.on("stopTyping", ({ from, to }) => {
-   // console.log(`${from} stopped typing to ${to}`);
-    io.to(to).emit("stopTyping", { from });
-  });
+    `from` comes off the handshake, not the payload: it is the one identity this
+    socket has actually proved, and taking it from the body would let any client
+    put "typing…" under somebody else's name.
+
+    The sender is skipped so a group does not show you your own indicator.
+  */
+  const relayTyping = async (event, to) => {
+    if (!to || !userId) return;
+
+    const group = await GroupChat.findById(to).select("members").lean().catch(() => null);
+
+    if (group) {
+      (group.members || []).forEach((member) => {
+        const room = String(member);
+        if (room !== String(userId)) io.to(room).emit(event, { from: userId, groupId: String(to) });
+      });
+      return;
+    }
+
+    io.to(String(to)).emit(event, { from: userId });
+  };
+
+  socket.on("typing", ({ to }) => { relayTyping("typing", to); });
+  socket.on("stopTyping", ({ to }) => { relayTyping("stopTyping", to); });
 
   socket.on("disconnect", async () => {
-    markOffline(userId);
-    io.emit("onlineUsers", Array.from(onlineUsers));
+    // Per-socket, so closing a live stream's socket does not report someone
+    // offline while their chat socket is still open. See helpers/presence.js.
+    markOffline(userId, socket.id);
+    io.emit("onlineUsers", onlineList());
 
     //update live stream when discount its will update also db
     const channelName = socket.channelName;

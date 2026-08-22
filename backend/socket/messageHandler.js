@@ -35,7 +35,9 @@ const handleSendMessage = async (io, socket = null, data, callback) => {
       messagetype, replyTo, forwardedFrom, isForwarded,
       // Messaging module: typed files, stickers and view-once media travel the
       // socket path too, not only the REST one.
-      attachments, sticker, viewOnce
+      attachments, sticker, viewOnce,
+      // Set only by the story viewer's reply box; see ConversationModel.
+      storyReply
     } = data;
      console.log('..sendMessage..new.cccc', JSON.stringify(data))
     // ===============================
@@ -168,7 +170,18 @@ const handleSendMessage = async (io, socket = null, data, callback) => {
         isForwarded: data.isForwarded,
         attachments: Array.isArray(attachments) ? attachments : [],
         sticker: sticker || undefined,
-        viewOnce: !!viewOnce
+        viewOnce: !!viewOnce,
+        /*
+          Only a well-formed story reference is stored. Leaving it undefined
+          keeps the key off the document entirely -- what `default: undefined`
+          on the schema is for -- so every ordinary message is untouched.
+
+          The group branch above deliberately does not carry this: a story
+          reply is always to one person, the one who posted.
+        */
+        storyReply: storyReply?.story
+          ? { story: storyReply.story, mediaUrl: storyReply.mediaUrl || "" }
+          : undefined,
       });
 
       const saved = await msg.save();
