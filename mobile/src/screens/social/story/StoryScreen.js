@@ -161,7 +161,10 @@ const fetchStory = useCallback(async () => {
           */
           onPress={() =>
             item.ring
-              ? navigation.navigate("StoryViewer", { itemdata: item.ring.items })
+              ? navigation.navigate("StoryViewer", {
+                  itemdata: item.ring.items,
+                  author: item.ring.user,
+                })
               : navigation.navigate("CreateStory", { itemdata: [] })
           }
         >
@@ -228,6 +231,7 @@ const fetchStory = useCallback(async () => {
         onPress={() =>
           navigation.navigate("StoryViewer", {
             itemdata: item.items?.length ? item.items : [item],
+            author: item.userInfo,
           })
         }
       >

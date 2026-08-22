@@ -1,160 +1,125 @@
-import React, { useEffect, useRef, useState } from "react";
-import {
-  FlatList,
-  Dimensions,
-} from "react-native";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { FlatList, Dimensions } from "react-native";
 import { useRoute } from "@react-navigation/native";
-import axios from "axios";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as base from "../../../component/global";
 import StoryItem from "./StoryItem";
 import MediaController from "../../../component/story/MediaController";
-//import ReelItem from "../reel/ReelItem";
 
 const { width } = Dimensions.get("window");
 
+/*
+  Show the stories the rail already handed over.
+
+  This used to throw `itemdata` away and re-fetch from
+  /apis/postreel/recentstory, which is the legacy endpoint the rail itself was
+  moved off. That endpoint:
+
+    - looks the author up with `User.findOne({ email: reel.username })`, but
+      `username` holds an ObjectId, so the author was *always* null and every
+      story rendered with no name and no avatar;
+    - filters on nothing but posttype — no expiry, no privacy, no block list —
+      so it served expired stories, and stories from people you do not follow;
+    - identifies the viewer by `AsyncStorage.getItem("username")`, which is the
+      account's email, and then compares it against follower ObjectIds.
+
+  It also meant opening a story cost a network round trip before anything could
+  be drawn, on top of the one the rail had already made. The rings from
+  /apis/feed/stories are filtered, ordered and complete, and they are already in
+  memory by the time this screen mounts — so render those, and open instantly.
+*/
 const StoryViewer = ({ navigation }) => {
   const route = useRoute();
-  const { itemdata } = route.params;
+  const { itemdata, author } = route.params || {};
 
-  const [storydata, setStorydata] = useState([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
   const flatListRef = useRef(null);
-  const cancelSourceRef = useRef(null);
-
-  const [page, setPage] = useState(1);
-  const [totalPage, setTotalPage] = useState(1);
-  const [loading, setLoading] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [removed, setRemoved] = useState([]);
 
-  // --- Fetch Stories ---
-  const fetchNextStory = async (id = null, cancelToken = null) => {
-    if (loading || !hasMore || page > totalPage) return;
-    setLoading(true);
+  /*
+    The author travels beside the items rather than inside them: the feed
+    shapes each story with `username` as a bare id, while the ring carries the
+    name and avatar once. Attaching it here is what lets StoryItem draw a
+    header without another lookup.
+  */
+  const storydata = useMemo(() => {
+    const items = (Array.isArray(itemdata) ? itemdata : [])
+      .filter((item) => !removed.includes(String(item._id)));
+    if (!author) return items;
+    return items.map((item) => ({ ...item, userInfo: item.userInfo || author }));
+  }, [itemdata, author, removed]);
 
-    const user = await AsyncStorage.getItem("username");
-    const posttype = "Story";
-
-    try {
-      const res = await axios.get(
-        `${base.BASE_URL}/apis/postreel/recentstory?page=${page}&limit=2&username=${user}&posttype=${posttype}&reelid=${id}`,
-        { cancelToken }
-      );
-
-      if (res.data?.message === "No story found") {
-        setHasMore(false);
-      } else {
-        setStorydata((prev) => {
-          const existingIds = new Set(prev.map((item) => item._id));
-          const newItems = res.data.reels.filter(
-            (item) => !existingIds.has(item._id)
-          );
-          return [...prev, ...newItems];
-        });
-
-        setPage((prev) => prev + 1);
-        setTotalPage(res.data.totalPages);
-      }
-    } catch (err) {
-      if (axios.isCancel(err)) {
-        console.log("Request cancelled:", err.message);
-      } else {
-        console.error(err);
-      }
-    }
-
-    setLoading(false);
-  };
-
-  // --- Initial Load ---
   useEffect(() => {
-    cancelSourceRef.current = axios.CancelToken.source();
-
-    const fetchInitialStory = async () => {
-      if (itemdata && itemdata[0]?._id) {
-        console.log("Initial load with ID:", itemdata[0]._id);
-        await fetchNextStory(itemdata[0]._id, cancelSourceRef.current.token);
-      }
-    };
-
-    fetchInitialStory();
-
     return () => {
-      console.log("Cleaning up StoryViewer...");
-      cancelSourceRef.current?.cancel?.("Component unmounted");
       MediaController.stopAllMedia(); // Clean up sound/video
     };
   }, []);
 
-  // --- Scroll End Handler ---
-  const handleScrollEnd = async (event) => {
-    const offsetX = event.nativeEvent.contentOffset.x;
-    const newIndex = Math.round(offsetX / width);
-
-    if (newIndex !== currentIndex) {
-     // await MediaController.stopAllMedia(); // stop audio/video
-      setCurrentIndex(newIndex);
-
-      // Preload more stories when near end
-      if (newIndex >= storydata.length - 2) {
-        cancelSourceRef.current?.cancel?.("Request superseded");
-        cancelSourceRef.current = axios.CancelToken.source();
-        fetchNextStory(null, cancelSourceRef.current.token);
-      }
-    }
+  const goTo = (i) => {
+    flatListRef.current?.scrollToIndex({ index: i, animated: true });
+    setActiveIndex(i);
   };
 
-  // --- Manual Skip on Video End ---
-  const handleNextStory = async () => {
-    const nextIndex = currentIndex + 1;
-    if (nextIndex < storydata.length) {
-      flatListRef.current?.scrollToIndex({ index: nextIndex, animated: true });
-      setCurrentIndex(nextIndex);
-     // await MediaController.stopAllMedia();
-    }
+  const handleNextStory = () => {
+    const next = activeIndex + 1;
+    if (next < storydata.length) return goTo(next);
+    // Past the last story there is nothing left to watch, and sitting on a
+    // finished one with no way forward reads as frozen.
+    navigation.goBack();
   };
 
-   const onViewableItemsChanged = useRef(({ viewableItems }) => {
-      if (viewableItems.length > 0) {
-        setActiveIndex(viewableItems[0].index);
-      }
-    });
-  
+  /* A tap on the left goes back a story; on the first one it stays put rather
+     than closing, which is what every story viewer does. */
+  const handlePrevStory = () => {
+    if (activeIndex > 0) goTo(activeIndex - 1);
+  };
 
-  
+  /*
+    Drop a deleted story from the reel without a round trip.
+
+    Deleting the last one leaves nothing to show, so the viewer closes rather
+    than sitting on a blank screen.
+  */
+  const handleDeleted = (id) => {
+    const remaining = storydata.filter((s) => String(s._id) !== String(id));
+    if (!remaining.length) return navigation.goBack();
+    setRemoved((prev) => [...prev, String(id)]);
+    setActiveIndex((i) => Math.min(i, remaining.length - 1));
+  };
+
+  const onViewableItemsChanged = useRef(({ viewableItems }) => {
+    if (viewableItems.length > 0 && viewableItems[0].index != null) {
+      setActiveIndex(viewableItems[0].index);
+    }
+  });
+
   return (
     <FlatList
       ref={flatListRef}
       data={storydata}
-      keyExtractor={(item, index) => item._id || index.toString()}
+      keyExtractor={(item, index) => String(item._id || index)}
       horizontal
       pagingEnabled
       showsHorizontalScrollIndicator={false}
-      onMomentumScrollEnd={handleScrollEnd}
       renderItem={({ item, index }) => (
-     //  renderItem={({ item }) => (
         <StoryItem
-         // key={item._id} // 👈 force full remount on story change
           reel={item}
           isActive={index === activeIndex}
           navigation={navigation}
+          index={index}
+          total={storydata.length}
           onVideoEnd={handleNextStory}
+          onPrev={handlePrevStory}
+          onDeleted={handleDeleted}
           onClose={() => navigation.goBack()}
         />
       )}
-
       onViewableItemsChanged={onViewableItemsChanged.current}
       viewabilityConfig={{ itemVisiblePercentThreshold: 80 }}
-
-
       initialScrollIndex={0}
       getItemLayout={(data, index) => ({
         length: width,
         offset: width * index,
         index,
       })}
-      
     />
   );
 };
