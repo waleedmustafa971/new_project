@@ -277,6 +277,15 @@ export const registerMobile = async (req, res) => {
       // 🔁 resend OTP
       await reEntryotp(mobileno, otpcode);
 
+      /*
+        `refresh: false` is deliberate here, unlike the registration paths.
+
+        This runs before the OTP has been checked, so the number is unproven and
+        the account is unverified. The access token is short and the caller is
+        expected to come back through /verify_mobile, which mints the real pair.
+        Adding a refresh token would stretch a pre-verification session to seven
+        days -- the exact thing the OTP step exists to prevent. Leave it.
+      */
       const session = await issueSession(existingUser, {
         payload: { userId: existingUser._id, mobileno },
         expiresIn: "1h", refresh: false,
@@ -310,6 +319,8 @@ export const registerMobile = async (req, res) => {
     await newUser.save();
     // 📩 Save OTP
     await reEntryotp(mobileno, otpcode);
+    // Pre-verification session, same as the resend branch above: short-lived
+    // and deliberately not refreshable until /verify_mobile has seen the code.
     const session = await issueSession(newUser, {
       payload: { userId: newUser._id, mobileno },
       expiresIn: "1h", refresh: false,
@@ -637,15 +648,31 @@ export const updateDateofbirthbyemail = async (req, res) => {
       if (!user) {
         return res.status(201).json({ message: "Invalid info" });
       }
+      /*
+        A refresh token, not just an access token.
+
+        This branch creates the account, so the session it hands back is the
+        only one the new user has. Minted with `refresh: false` it was an access
+        token alone, good for one hour — and the app's 401 handler logs you out
+        outright when there is no refresh token to spend, so every account
+        registered here was signed out an hour later, mid-session, with no way
+        back but the login screen. `email` was reading `mobileno`, which is the
+        string "null" on this path.
+      */
       const session = await issueSession(user, {
-        payload: { userId: newUser._id, email: newUser.mobileno },
-        expiresIn: "1h", refresh: false,
+        payload: { userId: newUser._id, email: newUser.email },
+        expiresIn: "1h",
       });
       if (session.twoFactorRequired) return twoFactorPending(res, session.challengeToken);
       const token = session.token;
       return res
         .status(201)
-        .json({ message: "User registered successfully", token, usersdata: user });
+        .json({
+          message: "User registered successfully",
+          token,
+          refreshToken: session.refreshToken,
+          usersdata: user,
+        });
 
     }
 
@@ -686,63 +713,86 @@ export const updateInterest = async (req, res) => {
 
 
 
+/*
+  Create an account from name, email and password.
+
+  This threw `ReferenceError: type is not defined` on every single call: the
+  branch below tested `type`, which was never destructured from the body. Past
+  that it would have thrown again -- `newUser` was declared with `const` inside
+  each branch, so the `newUser._id` the session was signed with did not exist in
+  the scope that read it. Nothing reached the response; the endpoint answered
+  500 to everybody, and always had.
+
+  The registration the app actually uses is updateDateofbirthbyemail, which is
+  why this went unnoticed. Repaired rather than deleted because two routes point
+  here and the shape is the one a web or admin client would expect.
+
+  `dateofbirth` is accepted and stored. It is not required: helpers/safety.js
+  reads the date at view time and ageFrom(undefined) is null, so meetsAgeGate
+  refuses -- an account created without a birthdate fails every age-restricted
+  check rather than slipping past one. Taking it here is what lets a caller
+  create a fully usable account in a single step.
+*/
 export const register = async (req, res) => {
   console.log('body....' + JSON.stringify(req.body))
   try {
-    const { name, email, password, mobileno, otpcode } = req.body;
+    const { name, email, password, mobileno, otpcode, dateofbirth } = req.body;
+    // The clients disagree on the field name: `type` here, `regtype` in the
+    // app's sign-up payload. Accept either, and compare without case.
+    const regKind = String(req.body.type || req.body.regtype || "").toLowerCase();
+
     if (!name || !email || !password) {
       return res.status(201).json({ message: "All fields are required" });
     }
-    // console.log("Received Form Data:", req.body); // Debugging
     // Hash password
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // 1️⃣ Check if email already exists
+    // Check if email already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-
       return res.status(201).json({ message: "Email already in use" });
     }
-    // 2️⃣ Create new user and save to database
-    if (type == "Mobile") {
-      const newUser = new User({
-        name,
-        email,
-        password: hashedPassword,
-        mobileno: mobileno,
-        regtype: 'Mobile',
-        otpcode: otpcode,
-        mobileverify: 'Not Verify'
-      });
-      await newUser.save();
-    }
-    else {
-      const newUser = new User({
-        name,
-        email,
-        password: hashedPassword,
-        mobileno: mobileno,
-        regtype: 'Email',
-        otpcode: '0000'
-      });
-      await newUser.save();
-    }
 
+    // Create new user and save to database
+    const isMobile = regKind === "mobile";
+    const newUser = new User({
+      name,
+      email,
+      password: hashedPassword,
+      mobileno: mobileno,
+      dateofbirth: dateofbirth || undefined,
+      regtype: isMobile ? 'Mobile' : 'Email',
+      // A mobile sign-up owes an OTP before the number counts as verified. An
+      // email one has no code to send, and '0000' is the placeholder the rest
+      // of this file already uses for that.
+      otpcode: isMobile ? otpcode : '0000',
+      ...(isMobile ? { mobileverify: 'Not Verify' } : {}),
+    });
+    await newUser.save();
 
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(201).json({ message: "Invalid info" });
     }
+    // Same as updateDateofbirthbyemail above: this is where the account is
+    // created, so it owes a refresh token as well as an access token. Signed
+    // from `user`, the document actually read back, rather than from a
+    // `newUser` that used to be out of scope by this point.
     const session = await issueSession(user, {
-      payload: { userId: newUser._id, email: newUser.email },
-      expiresIn: "1h", refresh: false,
+      payload: { userId: user._id, email: user.email },
+      expiresIn: "1h",
     });
     if (session.twoFactorRequired) return twoFactorPending(res, session.challengeToken);
     const token = session.token;
     return res
       .status(201)
-      .json({ message: "User registered successfully", token, usersdata: user });
+      .json({
+        message: "User registered successfully",
+        token,
+        refreshToken: session.refreshToken,
+        usersdata: user,
+      });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Server Error" });
@@ -1628,15 +1678,26 @@ export const webSignup = async (req, res) => {
     if (!user) {
       return res.status(201).json({ message: "Invalid info" });
     }
+    /*
+      Another account-creation point that handed out an access token and nothing
+      to renew it with, so the session died an hour in with no way back. Same
+      fix as register and updateDateofbirthbyemail. `email` was reading
+      `mobileno` here too.
+    */
     const session = await issueSession(user, {
-      payload: { userId: newUser._id, email: newUser.mobileno },
-      expiresIn: "1h", refresh: false,
+      payload: { userId: user._id, email: user.email },
+      expiresIn: "1h",
     });
     if (session.twoFactorRequired) return twoFactorPending(res, session.challengeToken);
     const token = session.token;
     return res
       .status(201)
-      .json({ message: "User registered successfully", token, usersdata: user });
+      .json({
+        message: "User registered successfully",
+        token,
+        refreshToken: session.refreshToken,
+        usersdata: user,
+      });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Server Error" });

@@ -51,7 +51,6 @@ router.post("/reg", (req, res) => {
 router.post("/login", login)
 router.post("/refresh-token", refreshToken) //webSignup refresh-token verifyToken
 router.get("/verifyToken", authMiddleware, verifyToken) //webSignup refresh-token verifyToken
-router.post("/register", register) //getuser checkEmail
 router.post("/checkEmail", checkEmail) //getuser checkEmail
 //router.get("/getuser", authMiddleware, getuser) //getuser
 router.get("/getuser", getuser) //getuser getProfile
