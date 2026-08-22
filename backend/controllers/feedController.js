@@ -295,7 +295,6 @@ export const storyFeed = wrap(async (req, res) => {
   */
   match.$and = [
     ...(match.$and || []),
-    ...(match.$and || []),
     {
       $or: [
         { expiresAt: { $gt: new Date() } },

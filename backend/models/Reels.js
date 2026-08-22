@@ -287,7 +287,24 @@ const videoSchema = new mongoose.Schema({
     // not yet public. The feed filters on `$ne: "Draft"`, so a scheduled post
     // must be excluded by its own date rather than by this field alone.
     enum: ["Draft", "Publish", "Scheduled"],
-    default: "Draft",
+    /*
+      Published by default, because invisible is the dangerous direction.
+
+      This defaulted to "Draft", and eleven of the twelve places that create a
+      Reel never set the field — the story and image upload paths in reels.js,
+      postreel.js, VideoProcessingController.js and auth.js all just save and
+      answer "uploaded successfully". Every one of them therefore wrote content
+      that baseMatch() filters out of every feed with `$ne: "Draft"`. The story
+      was saved, the app said it was published, and it appeared for nobody:
+      not the poster, not their followers.
+
+      Nothing relied on the old default. The one flow that genuinely means
+      "draft" — postingController's saveDraft — states it outright, and so does
+      every transition in creatorController. A default only decides what an
+      unstated intention means, and for user content that has already been
+      accepted and acknowledged, the honest reading of "unstated" is published.
+    */
+    default: "Publish",
     required: true,
   },
 
