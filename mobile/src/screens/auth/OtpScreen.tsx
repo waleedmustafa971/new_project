@@ -14,6 +14,7 @@ import { useNavigation } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { notifySessionChanged } from "../../component/session";
 import * as base from '../../component/global'
 
 
@@ -104,6 +105,8 @@ const OtpScreen = ({ route }: any) => {
             await AsyncStorage.setItem("userinfo", JSON.stringify(data.usersdata));
             await AsyncStorage.setItem("token", data.token);
             await AsyncStorage.setItem("refreshToken", data.refreshToken);
+            // UserContext reads storage; it has to be told that storage moved.
+            notifySessionChanged();
             // Same reason as the password sign-in: this is a session starting,
             // so the device has to be registered for push.
             registerPushToken();
@@ -117,6 +120,8 @@ const OtpScreen = ({ route }: any) => {
             await AsyncStorage.setItem("userinfo", JSON.stringify(data.usersdata));
             await AsyncStorage.setItem("token", data.token);
             await AsyncStorage.setItem("refreshToken", data.refreshToken);
+            // UserContext reads storage; it has to be told that storage moved.
+            notifySessionChanged();
             // Same reason as the password sign-in: this is a session starting,
             // so the device has to be registered for push.
             registerPushToken();

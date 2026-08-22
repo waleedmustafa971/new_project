@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import DatePicker from 'react-native-date-picker'
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { notifySessionChanged } from '../../component/session';
 import Icon from 'react-native-vector-icons/Ionicons';
 import Toast from 'react-native-toast-message';
 import * as base from '../../component/global'
@@ -152,6 +153,10 @@ const StepFour = ({ navigation }) => {
             }
             registerPushToken();
           }
+          // UserContext reads storage; it has to be told that storage moved.
+          // Fired outside the token guard because `userdata` was written above
+          // either way, and that is what the socket and the chat screens key on.
+          notifySessionChanged();
 
           navigation.navigate("YourInterestScreen");
         } else if (data.message == "All fields are required") {

@@ -1,6 +1,7 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as base from './global';
+import { notifySessionChanged } from './session';
 import { resetToAuth } from '../navigation/RootNavigation';
 import { Alert } from 'react-native';
 
@@ -32,6 +33,10 @@ const endSession = async () => {
   await AsyncStorage.multiRemove([
     'token', 'refreshToken', 'userdata', 'userinfo', 'fcmtoken:registered',
   ]);
+  // This clears storage from outside React, so UserContext would otherwise
+  // keep serving the user it read before -- and keep a socket open for an
+  // account that no longer has a session.
+  notifySessionChanged();
   resetToAuth(); // no-op until the navigator is ready, by design
 };
 

@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { notifySessionChanged } from "../../component/session";
 import * as base from "../../component/global";
 import api from "../../component/api";
 import { registerPushToken, unregisterPushToken } from "../../services/pushToken";
@@ -38,6 +39,9 @@ export const loginUser = createAsyncThunk(
         await AsyncStorage.setItem("userinfo", JSON.stringify(data.usersdata));
         await AsyncStorage.setItem("token", data.token);
         await AsyncStorage.setItem("refreshToken", data.refreshToken);
+        // UserContext reads storage; it has to be told that storage moved.
+        // A thunk cannot use the hook, which is why this is an event.
+        notifySessionChanged();
 
         /*
           Register this device for push now that there is an account to attach it
