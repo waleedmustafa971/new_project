@@ -1,10 +1,11 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
     View, Text, FlatList, Image, StyleSheet, TouchableOpacity,
     ActivityIndicator, RefreshControl,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useSocket } from '../../context/SocketContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../../../component/api';
 import * as base from '../../../component/global';
@@ -70,6 +71,10 @@ const avatarFor = (actor) =>
 
 const NotificationPage = () => {
     const navigation = useNavigation();
+    /* Arrivals pushed over the socket while this screen is open. Without them
+       the list only changed when it was re-opened, which is what made every
+       notification feel late. */
+    const { liveNotifications, clearNotifications } = useSocket();
 
     const [items, setItems] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -107,7 +112,25 @@ const NotificationPage = () => {
 
     // Reload on focus rather than on mount, so coming back from a post shows
     // anything that arrived while it was open.
-    useFocusEffect(useCallback(() => { load(); }, [load]));
+    useFocusEffect(useCallback(() => { load(); clearNotifications(); }, [load]));
+
+    /*
+      Merge live arrivals into the list as they land.
+
+      Prepended rather than triggering a re-fetch: the payload the server emits
+      is already the shape this list renders, and re-fetching on every arrival
+      would hammer the endpoint when several land together. Deduped by id
+      because the server upserts notifications — the same row can be sent again
+      when it is updated rather than created.
+    */
+    useEffect(() => {
+        if (!liveNotifications.length) return;
+        setItems((prev) => {
+            const seen = new Set(prev.map((i) => String(i._id)));
+            const fresh = liveNotifications.filter((n) => !seen.has(String(n._id)));
+            return fresh.length ? [...fresh, ...prev] : prev;
+        });
+    }, [liveNotifications]);
 
     const onRefresh = () => { setRefreshing(true); load(); };
 

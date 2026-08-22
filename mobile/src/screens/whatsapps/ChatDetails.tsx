@@ -60,6 +60,7 @@ import ForwardBar from './ForwardBar';
 import ForwardContactModal from './modal/ForwardContactModal';
 import uuid from 'react-native-uuid';
 import { useSocket } from '../context/SocketContext';
+import { useUser } from '../context/UserContext';
 import api from '../../component/api';
 
 interface Message {
@@ -92,7 +93,31 @@ const ChatDetails = () => {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const route = useRoute<ChatdetailsRouteProp>();
-  const { me, partner, userinfo, type } = route.params; //partner is used for group id or partner id
+  const { me: meParam, partner, userinfo, type } = route.params; //partner is used for group id or partner id
+  const { user } = useUser();
+  /*
+    Fall back to the signed-in user when the route param is missing.
+
+    `me` is handed down from whichever screen opened this one, and those screens
+    fill it from an async storage read -- so a tap that lands before the read
+    resolves arrives here with `me` null. Every outgoing message would then be
+    stored and sent from nobody, and the call endpoint answers "A valid userId
+    is required". The context holds the same id and is already loaded by now.
+  */
+  const me = meParam || user?._id;
+
+  /*
+    Mark this conversation as the one being read.
+
+    SocketContext counts every incoming message for the app-wide badge; without
+    this, sitting inside a chat would still rack up a count for the very
+    messages you are watching arrive. Cleared on the way out so the next message
+    from this person counts again.
+  */
+  useEffect(() => {
+    setActiveChat(partner);
+    return () => setActiveChat(null);
+  }, [partner]);
   console.log('chatdetails group' + '..me..' + me + '---partner...' + partner + '...type...' + type +'--userinfo-'+ JSON.stringify(userinfo))
   //console.log('chatdetails' + '..me..' + me + '---partner...' + partner + '....' + JSON.stringify(userinfo) + '..type....' + type)
   const [messages, setMessages] = useState<any[]>([]);
@@ -100,7 +125,7 @@ const ChatDetails = () => {
   const [text, setText] = useState(""); // 
   const [showSharecontact, setShowSharecontact] = useState(false); // setShowSharecontact
   const [menuVisible, setMenuVisible] = useState(false);
-  const { socket } = useSocket(); //global socket for apps
+  const { socket, setActiveChat } = useSocket(); //global socket for apps
   const flatListRef = useRef(null);
   const navigation = useNavigation();
   const [groupid, setGroupid] = useState(null)
@@ -117,8 +142,14 @@ const ChatDetails = () => {
   const [currentImage, setCurrentImage] = useState(null);
   const minutes = Math.floor(elapsedSecs / 60);
   const seconds = elapsedSecs % 60;
-  const [onlineUserIds, setOnlineUserIds] = useState([])
   const typingTimeout = useRef<NodeJS.Timeout | null>(null);
+  /* Whether we have told the other side we are typing, so a burst of keystrokes
+     sends one event instead of one per character. */
+  const typingSent = useRef(false);
+  /* Clears the partner's indicator if their "stopTyping" never arrives -- a
+     dropped packet or an app killed mid-word would otherwise leave "Typing..."
+     on screen for as long as the chat stays open. */
+  const partnerTypingTimeout = useRef<NodeJS.Timeout | null>(null);
   const [typing, setTyping] = useState(false)
   /* time */
   const [isRunning, setIsRunning] = useState(false);
@@ -376,30 +407,60 @@ const ChatDetails = () => {
       // Update SQLite
       // markMessagesSeenLocally(messageIds);
     });
-    //check online users
-    socket?.on("onlineUsers", (users: any) => {
-      console.log('online users.', users)
-      setOnlineUserIds(users);
-    });
-    //checking typing message
-    const handleTyping = ({ from }: { from: string }) => {
-      if (from === partner) setTyping(true);
+    /*
+      The partner's typing indicator.
+
+      In a one-to-one chat the server addresses the event to the person, so
+      `from` is the partner. In a group it fans out to every member and carries
+      the group id, and `partner` is that group -- so match on either, and show
+      who it is in a group by keeping the sender's id.
+
+      Every indicator is given an expiry. "stopTyping" is one fire-and-forget
+      packet; if it is dropped, or the sender's app dies mid-word, nothing else
+      would ever take the label down.
+    */
+    const showPartnerTyping = () => {
+      setTyping(true);
+      if (partnerTypingTimeout.current) clearTimeout(partnerTypingTimeout.current);
+      partnerTypingTimeout.current = setTimeout(() => setTyping(false), 5000);
     };
-    const handleStopTyping = ({ from }: { from: string }) => {
-      if (from === partner) setTyping(false);
+
+    const hidePartnerTyping = () => {
+      if (partnerTypingTimeout.current) clearTimeout(partnerTypingTimeout.current);
+      partnerTypingTimeout.current = null;
+      setTyping(false);
     };
-    socket?.on("typing", handleTyping);
-    socket?.on("stopTyping", handleStopTyping);
+
+    const isForThisChat = ({ from, groupId }: { from?: string; groupId?: string }) =>
+      (groupId ? String(groupId) === String(partner) : String(from) === String(partner));
+
+    const onPartnerTyping = (payload: { from?: string; groupId?: string }) => {
+      if (isForThisChat(payload)) showPartnerTyping();
+    };
+    const onPartnerStopTyping = (payload: { from?: string; groupId?: string }) => {
+      if (isForThisChat(payload)) hidePartnerTyping();
+    };
+    socket?.on("typing", onPartnerTyping);
+    socket?.on("stopTyping", onPartnerStopTyping);
     //end check typing and stoping
     return () => {
       // clearTimeout(timer);
       socket?.off("messages");
       socket?.off("newMessages");
-      socket?.off("typing");
-      socket?.off("stopTyping");
       socket?.off("messagesSeen");
-      socket?.off("typing", handleTyping);
-      socket?.off("stopTyping", handleStopTyping);
+      socket?.off("typing", onPartnerTyping);
+      socket?.off("stopTyping", onPartnerStopTyping);
+
+      /* Leaving the chat has to take our own indicator down on the other side,
+         and cancel both pending timers -- otherwise a "stopTyping" fires from
+         an unmounted screen, or the partner is left mid-"Typing...". */
+      if (typingSent.current) {
+        socket?.emit("stopTyping", { from: me, to: partner });
+        typingSent.current = false;
+      }
+      if (typingTimeout.current) clearTimeout(typingTimeout.current);
+      if (partnerTypingTimeout.current) clearTimeout(partnerTypingTimeout.current);
+      setTyping(false);
       // socket?.disconnect();
     };
   }, [me, partner]);
@@ -573,6 +634,10 @@ const ChatDetails = () => {
       Alert.alert("Cannot call", "This conversation has no one to call.");
       return;
     }
+    if (!me) {
+      Alert.alert("Cannot call", "You are not signed in on this device.");
+      return;
+    }
 
     try {
       const { data } = await api.post("/apis/messaging/calls", {
@@ -606,6 +671,10 @@ const ChatDetails = () => {
 
   const submit = async () => {
     if (!text.trim()) return;
+    if (!me) {
+      Toast.show({ type: 'error', text1: 'Not signed in', position: 'bottom' });
+      return;
+    }
     const clientMessageId = String(uuid.v4());
     const createdAt = new Date().toISOString();
     console.log('group ID : ', userinfo?.group?._id)
@@ -638,6 +707,15 @@ const ChatDetails = () => {
     setText("");
     setReplyMessage(null);
     setForwardMessage(null);
+
+    /* Sending is the clearest possible "no longer typing". Without this the
+       partner keeps seeing "Typing..." until the 1.5s inactivity timer runs
+       out, which reads as a second message on the way that never comes. */
+    if (typingTimeout.current) clearTimeout(typingTimeout.current);
+    if (typingSent.current) {
+      socket?.emit("stopTyping", { from: me, to: partner });
+      typingSent.current = false;
+    }
 
     // 2️⃣ Online check
     const net = await NetInfo.fetch();
@@ -1079,13 +1157,24 @@ const ChatDetails = () => {
       setShowAudiobutton(true);
       setShowSendbutton(false)
     }
-    // Send typing event immediately
-    socket?.emit("typing", { from: me, to: partner });
-    // Clear previous timeout
+    /*
+      One "typing" per burst, not one per keystroke.
+
+      This fired on every character, so a normal sentence sent thirty socket
+      events that all say the same thing, and the receiver re-rendered on each.
+      The state the other side cares about is binary: announce it when it turns
+      true, and let the inactivity timer take it back down.
+    */
+    if (!typingSent.current) {
+      socket?.emit("typing", { from: me, to: partner });
+      typingSent.current = true;
+    }
+
+    // Each keystroke pushes the "they stopped" moment further out.
     if (typingTimeout.current) clearTimeout(typingTimeout.current);
-    // Send stopTyping after 1.5 seconds of inactivity
     typingTimeout.current = setTimeout(() => {
       socket?.emit("stopTyping", { from: me, to: partner });
+      typingSent.current = false;
     }, 1500);
   };
 
@@ -1251,10 +1340,71 @@ const ChatDetails = () => {
     handleCloseMenu();
   };
 
+  /*
+    Delete a message.
+
+    This was a console.log and a closed menu — the "More" item in the message
+    menu did nothing at all, so there was no way to remove a message from the
+    shipping UI. The only delete that existed anywhere was the developer bar's
+    "Drop Table", which destroyed every conversation on the device.
+
+    Deleting for yourself is the default and the only option offered on someone
+    else's message: it writes your id into the message's `deletedFor` on the
+    server, so it stays gone when the thread is next loaded, and leaves the
+    other person's copy untouched. Deleting for everyone is offered only on
+    your own messages, which is also what the server enforces.
+  */
+  const removeMessage = async (message: any, scope: "me" | "everyone") => {
+    // Drop it from view first: the row should go the moment it is asked for.
+    setMessages(prev => prev.filter(m => m.id !== message.id && m._id !== message._id));
+    if (message.id) await DeleteLocalmess(message.id);
+
+    /*
+      A message still queued locally has no server id yet, so there is nothing
+      to delete server-side — removing the local copy is the whole job.
+    */
+    const serverId = message.mongoId || message._id;
+    if (!serverId) return;
+
+    try {
+      await api.delete(`/apis/messaging/messages/${serverId}`, {
+        data: { userId: me, scope },
+      });
+    } catch (e: any) {
+      Toast.show({
+        type: 'error',
+        text1: 'Could not delete the message',
+        text2: e?.response?.data?.message || 'It may reappear when you reopen the chat.',
+        position: 'bottom',
+      });
+    }
+  };
+
   const handleRemove = (message: any) => {
-    console.log('Remove message:', message.text);
-    // You can trigger delete logic here
     handleCloseMenu();
+    if (!message) return;
+
+    const isMine = String(message.msgByUserId || message.sender) === String(me);
+
+    const options: any[] = [
+      { text: 'Delete for me', style: 'destructive', onPress: () => removeMessage(message, 'me') },
+    ];
+    if (isMine) {
+      options.push({
+        text: 'Delete for everyone',
+        style: 'destructive',
+        onPress: () => removeMessage(message, 'everyone'),
+      });
+    }
+    options.push({ text: 'Cancel', style: 'cancel' });
+
+    Alert.alert(
+      'Delete message',
+      isMine
+        ? 'Remove this message from your device, or from everyone in this chat?'
+        : 'This removes the message for you only. The sender keeps their copy.',
+      options
+    );
   };
 
 
@@ -1277,32 +1427,19 @@ const ChatDetails = () => {
           onMorePress={() => Alert.alert("More icon tapped")}
           onCall={startCall}
         />
-        <View style={{
-          padding: 10, flexDirection: 'row', justifyContent: 'space-between'
-        }}>
-          <TouchableOpacity onPress={ChatHistory}>
-            <Text>Chat History</Text>
-          </TouchableOpacity>
+        {/*
+          The developer bar that used to sit here has been removed.
 
-          {/* deleteHistory */}
+          It was live on every chat, above the messages, and two of its five
+          buttons destroyed data with no confirmation and no undo: "Drop Table"
+          ran DROP TABLE on the local `messages` and `conversations` stores —
+          every conversation on the device, not just this one — and "Delete
+          History" wiped the local history. One mis-tap on a row of unlabelled
+          debug text is indistinguishable from messages vanishing on their own.
 
-          <TouchableOpacity onPress={deleteHistory}>
-            <Text>Delete History</Text>
-          </TouchableOpacity>
-
-
-          <TouchableOpacity onPress={dropTable}>
-            <Text>Drop Table</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity onPress={NewScreen}>
-            <Text>NewScreen</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity onPress={senPending}>
-            <Text>send pending data</Text>
-          </TouchableOpacity>
-        </View>
+          The handlers are kept below and unwired, since they are useful from a
+          debug build; nothing in the shipping UI reaches them.
+        */}
 
 
         {/* Body */}

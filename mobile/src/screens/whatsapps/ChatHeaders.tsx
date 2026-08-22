@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { View, Text, Image, TouchableOpacity } from "react-native";
 import Icondot from "react-native-vector-icons/MaterialIcons"; // your icon library
 import { useSocket } from '../../screens/context/SocketContext';
@@ -27,15 +27,11 @@ const ChatHeaders: React.FC<ChatHeaderProps> = ({
     onCall
 }) => {
     const navigation = useNavigation();
-    const [onlineUserIds, setOnlineUserIds] = useState<string[]>([]);
-    const { socket } = useSocket(); //global socket for apps
-    //console.log('onlineUserIds ChatHeaders......', onlineUserIds)
-    console.log("onlineUserIds:", onlineUserIds);
-    console.log("partnerId:", userinfo?.partner?._id);
-    console.log(
-        "isOnline:",
-        onlineUserIds.includes(String(userinfo?.partner?._id))
-    );
+    /* The roster comes from SocketContext, which holds one subscription for the
+       whole session and asks the server for it on every connect. This screen
+       used to subscribe on mount and wait for a broadcast that only fires when
+       somebody's connection changes — so it usually never arrived. */
+    const { isUserOnline } = useSocket();
 
     const formatLastSeen = (timestamp: string) => {
         if (!timestamp) return "";
@@ -51,26 +47,10 @@ const ChatHeaders: React.FC<ChatHeaderProps> = ({
         return lastSeenDate.toLocaleDateString();
     };
 
-    /*  const getStatusText = () => {
-         if (typing) return "Typing...";
- 
-         const isOnline = onlineUserIds.includes(userinfo?.partner?._id);
- 
-         if (isOnline) return "Online";
- 
-         if (partnerLastSeen) return `Last seen ${formatLastSeen(partnerLastSeen)}`;
- 
-         return "Offline";
-     }; */
-
     const getStatusText = () => {
         if (typing) return "Typing...";
 
-        //  const isOnline = onlineUserIds?.includes(userinfo?.partner?._id);
-        const isOnline = onlineUserIds?.includes(
-            String(userinfo?.partner?._id)
-        );
-        if (isOnline) return "Online";
+        if (isUserOnline(userinfo?.partner?._id)) return "Online";
 
         if (partnerLastSeen) {
             return `Last seen ${formatLastSeen(partnerLastSeen)}`;
@@ -78,22 +58,6 @@ const ChatHeaders: React.FC<ChatHeaderProps> = ({
 
         return "Offline";
     };
-
-    useEffect(() => {
-        if (!socket) return;
-
-        const handleOnlineUsers = (users: string[]) => {
-            console.log("...Header.Socket..users......", users);
-            // store online users
-            setOnlineUserIds(users);
-        };
-
-        socket.on("onlineUsers", handleOnlineUsers);
-
-        return () => {
-            socket.off("onlineUsers", handleOnlineUsers);
-        };
-    }, [socket]);
 
     return (
         <View style={{ flexDirection: "row", alignItems: "center", padding: 10 }}>

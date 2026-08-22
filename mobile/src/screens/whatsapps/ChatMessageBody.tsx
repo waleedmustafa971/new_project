@@ -8,6 +8,16 @@ import ImageViewer from 'react-native-image-zoom-viewer';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import ReactNativeBlobUtil from 'react-native-blob-util';
 import ReplyMessage from './ReplyMessage';
+import * as base from '../../component/global';
+
+/* Story media is stored as a path relative to the API host; an absolute url
+   (or a local file, mid-send) is left alone. */
+const storyThumbUri = (p: string) => {
+  const raw = String(p || '');
+  if (!raw) return undefined;
+  if (/^(https?:|file:|data:)/.test(raw)) return raw;
+  return `${base.BASE_URL}/${raw.replace(/^[/]+/, '')}`;
+};
 
 const { width } = Dimensions.get('window');
 const isTablet = width > 600;
@@ -289,6 +299,31 @@ const ChatMessageBody = React.memo(({ item, isMine, onLongPress, userinfo, me }:
               <View style={styles.replyPreview}>
                 <Text style={styles.replyTitle}>Reply</Text>
                 <ReplyMessage replyTo={item.replyTo} />
+              </View>
+            )}
+
+            {/*
+              Story reply context.
+
+              A reply sent from the story viewer is an ordinary direct message,
+              so without this it arrives as a remark about nothing — the poster
+              sees "nice one" with no idea what it refers to. The thumbnail is
+              the url captured at send time rather than a lookup, because the
+              story is gone within a day and the bubble has to keep making
+              sense afterwards.
+            */}
+            {item?.storyReply?.story && (
+              <View style={styles.storyReplyPreview}>
+                {!!item.storyReply.mediaUrl && (
+                  <Image
+                    source={{ uri: storyThumbUri(item.storyReply.mediaUrl) }}
+                    style={styles.storyReplyThumb}
+                    resizeMode="cover"
+                  />
+                )}
+                <Text style={styles.storyReplyLabel}>
+                  {isMine ? "You replied to their story" : "Replied to your story"}
+                </Text>
               </View>
             )}
 
@@ -602,6 +637,32 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#34C759",
     marginBottom: 2,
+  },
+
+  storyReplyPreview: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderLeftWidth: 3,
+    borderLeftColor: "#A855F7",
+    backgroundColor: "rgba(0,0,0,0.05)",
+    padding: 6,
+    borderRadius: 6,
+    marginBottom: 6,
+  },
+
+  storyReplyThumb: {
+    width: 28,
+    height: 40,
+    borderRadius: 4,
+    marginRight: 8,
+    backgroundColor: "rgba(0,0,0,0.15)",
+  },
+
+  storyReplyLabel: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: "#A855F7",
+    flexShrink: 1,
   },
 });
 

@@ -88,9 +88,13 @@ const MessagePop: React.FC<MessagePopProps> = ({
                                     isForward 
                                     onPress={() => { onForward(selectedMessage); onClose(); }} 
                                 />
+                                {/* Labelled for what it does. It was "More",
+                                    with a dots icon, and it called onRemove —
+                                    so the one destructive action in this menu
+                                    was the one that announced itself least. */}
                                 <MenuOption 
-                                    label="More" 
-                                    icon="dots-horizontal-circle-outline" 
+                                    label="Delete" 
+                                    icon="trash-can-outline" 
                                     onPress={() => { onRemove(selectedMessage); onClose(); }} 
                                     isLast 
                                 />

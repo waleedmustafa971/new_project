@@ -31,6 +31,7 @@ const screenHeight = Dimensions.get('window').height;
 const { height } = Dimensions.get('window');
 import { openDatabase, initDatabase } from '../../utils/dbService';
 import { useSocket } from '../../screens/context/SocketContext';
+import { useUser } from '../../screens/context/UserContext';
 
 interface User {
   _id: string;
@@ -75,15 +76,21 @@ type ChatScreenRouteProp = RouteProp<RootStackParamList, 'ChatScreen'>;
 const ChatScreen = () => {
   const route = useRoute<ChatScreenRouteProp>();
   //const socket = useRef<any>();
-  const { socket } = useSocket(); //global socket for apps
+  /* Presence comes from the provider now: one subscription for the whole
+     session, refreshed by an explicit ask on every connect. Subscribing here
+     only caught a broadcast that fires when somebody's connection changes. */
+  const { socket, isUserOnline } = useSocket(); //global socket for apps
 
   const [newChatUserId, setNewChatUserId] = useState("67dabaea6395831df7dbe782");
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [onlineUserIds, setOnlineUserIds] = useState([])
   const [selectedPartner, setPartner] = useState<string | null>(null);
   //const me = "67f772ab25b7e3f3b5f04783"; //"USER_A_ID"; // replace with actual user ID
   const { userid, userinfo } = route.params;
-  const me = userid;
+  const { user } = useUser();
+  /* Same fallback as ChatDetails: `userid` is a route param filled from an
+     async storage read, so it can arrive null. `me` is passed straight on to
+     ChatDetails, so a null here breaks sending and calling one screen later. */
+  const me = userid || user?._id;
   console.log('conosle.log...chatscreen...', userinfo)
 
   const navigation = useNavigation();
@@ -313,10 +320,6 @@ const ChatScreen = () => {
           });
         }
 
-        socket.on("onlineUsers", (users: any) => {
-          setOnlineUserIds(users);
-        });
-
         socket.on("conversations", (newData: any[]) => {
           if (!Array.isArray(newData)) return;
 
@@ -336,7 +339,6 @@ const ChatScreen = () => {
 
       return () => {
         // cleanup listeners when leaving screen
-        socket.off("onlineUsers");
         socket.off("conversations");
       };
 
@@ -431,7 +433,7 @@ const ChatScreen = () => {
           </View>
           <Text style={styles.storyName}>Add </Text>
         </TouchableOpacity>
-        <StoryList me={userid} userinfo={userinfo} />
+        <StoryList me={me} userinfo={userinfo} />
       </View>
     </View>
   );
@@ -489,7 +491,7 @@ const ChatScreen = () => {
             style={styles.avatar}
           />
           {/* Status Badge */}
-          <View style={[styles.statusContainer, { backgroundColor: onlineUserIds.includes(partner?._id) ? '#4CAF50' : '#B0B0B0' }]}>
+          <View style={[styles.statusContainer, { backgroundColor: isUserOnline(partner?._id) ? '#4CAF50' : '#B0B0B0' }]}>
             <View style={styles.statusDot} />
             {/*   <Text style={styles.statusText}> {onlineUserIds.includes(partner?._id) ? 'Online' : 'Offline'}</Text> */}
           </View>
