@@ -32,6 +32,7 @@ const MyProfile = ({ navigation }) => {
     const [follower, setFollower] = useState(null);
     const [following, setFollowing] = useState(null);
     const [coins, setCoins] = useState(null);
+    const [reelCount, setReelCount] = useState(null);
     const [userdata, setUserdata] = useState(null);
     const [image, setImage] = useState(null);
     const [userinfo, setUserinfo] = useState([])
@@ -127,6 +128,7 @@ const MyProfile = ({ navigation }) => {
             setBio(data.user.bio);
             setFollower(data.user.followersCount);
             setFollowing(data.user.followingCount);
+            setReelCount(data.user.reelsCount);
             setCoins(data.user.coins);
             setImage(data.user.image);
         } catch (error) {
@@ -323,7 +325,7 @@ const MyProfile = ({ navigation }) => {
 
                 <View style={styles.hoursachlangContainer}>
                     <View style={styles.statCard}>
-                        <Text style={styles.statValue}>0</Text>
+                        <Text style={styles.statValue}>{reelCount ?? 0}</Text>
                         <Text style={styles.statLabel}>Reel</Text>
                     </View>
 

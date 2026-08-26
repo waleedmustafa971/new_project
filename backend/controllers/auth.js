@@ -4,6 +4,8 @@ import bodyParser from "body-parser";
 import User from "../models/users.js"; // import model user
 import Otptbl from "../models/OtpModal.js"; 
 import Music from '../models/Music.js';
+import Reels from '../models/Reels.js';
+import { NOT_DELETED } from '../helpers/feed.js';
 import multer from "multer";
 import AWS from 'aws-sdk';
 import crypto from 'crypto';
@@ -1191,6 +1193,17 @@ export const getProfile = async (req, res) => {
     const followersCount = user.followers.length;
     const followingCount = user.following.length;
 
+    /*
+      How many reels this profile actually has.
+
+      The profile screen printed a hardcoded 0 here, because nothing ever sent
+      it a number -- an account with reels and an account with none read the
+      same. Counted with the delete filter, so removing a reel moves it.
+    */
+    const reelsCount = await Reels.countDocuments({
+      username: user._id, posttype: "Reel", ...NOT_DELETED,
+    });
+
     // Send response
     res.json({
       message: "User profile fetched successfully",
@@ -1217,6 +1230,7 @@ export const getProfile = async (req, res) => {
         address: user.address,
         followersCount,
         followingCount,
+        reelsCount,
         coins: user.coins,
         // Social Media module: blue tick + privacy state
         verifiedBadge: !!user.verifiedBadge,
