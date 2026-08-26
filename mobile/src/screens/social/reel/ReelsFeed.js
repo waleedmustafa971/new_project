@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import {
   View,
   FlatList,
@@ -10,7 +10,7 @@ import {
   Pressable
 } from "react-native";
 import axios from "axios";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { Video } from "react-native-video";
 const { height } = Dimensions.get("window");
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -26,7 +26,7 @@ const isTablet = SCREEN_WIDTH >= 768;
 const CARD_WIDTH = isTablet ? 150 : 130;
 const CARD_HEIGHT = isTablet ? 180 : 170;
 
-const ReelsFeed = ({userid}) => {
+const ReelsFeed = ({ userid, refreshKey }) => {
   const [reels, setReels] = useState([]);
   const navigation = useNavigation();
   const [currentVisibleIndex, setCurrentVisibleIndex] = useState(0);
@@ -35,28 +35,50 @@ const ReelsFeed = ({userid}) => {
   const [pausedStates, setPausedStates] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchReels = async () => {
-      try {
-        const res = await api.get("/apis/reel/getReelFeed", {
-          params: {
-            page: 1,
-            limit: 10,
-            userid: userid
-          },
-        });
+  /*
+    Refetched when the viewer arrives, when the screen is returned to, and when
+    the timeline is pulled down -- not only on mount.
 
-     //   console.log("...reels..." + JSON.stringify(res.data.reels));
-        setReels(res.data.reels);
-        setLoading(false);
-      } catch (error) {
-        setLoading(false);
-        console.error("Error fetching reels:", error);
-      }
-    };
+    Three separate bugs met here. The parent reads the signed-in user out of
+    AsyncStorage, so `userid` is null for the first render or two; with an empty
+    dependency array this fetched once against that null and never again, and
+    every reel came back shaped for nobody -- isOwner false, liked false -- which
+    the strip then handed to the reel viewer on tap. And nothing re-ran it at
+    all, so a reel deleted in the viewer was still sitting in the strip when you
+    came back to the timeline, which is what "I deleted one and it is still
+    showing up" meant.
 
-    fetchReels();
-  }, []);
+    `refreshKey` is part of the callback's identity rather than a separate
+    effect, so a pull-to-refresh and a screen focus both go through this one
+    path instead of racing each other for `reels`.
+  */
+  const fetchReels = useCallback(async (signal) => {
+    try {
+      const res = await api.get("/apis/reel/getReelFeed", {
+        params: {
+          page: 1,
+          limit: 10,
+          userid: userid || undefined,
+        },
+      });
+
+      if (signal.cancelled) return;
+      setReels(Array.isArray(res.data?.reels) ? res.data.reels : []);
+    } catch (error) {
+      if (!signal.cancelled) console.log("Error fetching reels:", error?.message);
+    } finally {
+      if (!signal.cancelled) setLoading(false);
+    }
+  }, [userid, refreshKey]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const signal = { cancelled: false };
+      fetchReels(signal);
+      // Blurring mid-request must not write a stale list over a newer one.
+      return () => { signal.cancelled = true; };
+    }, [fetchReels])
+  );
 
   /*
     videoUrl arrives as a plain string, as an array, or as { url, type } from
@@ -264,7 +286,7 @@ const ReelsFeed = ({userid}) => {
         }}>
           <FlatList
             data={reels}
-            keyExtractor={(item) => item._id}
+            keyExtractor={(item, index) => (item?._id ? String(item._id) : `reel-${index}`)}
             renderItem={renderItem}
             horizontal
             // pagingEnabled

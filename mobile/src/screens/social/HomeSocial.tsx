@@ -5,6 +5,7 @@ import {
   StatusBar,
   ScrollView,
   FlatList,
+  RefreshControl,
 } from "react-native";
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -60,6 +61,16 @@ const HomeSocial = () => {
   const [page, setPage] = useState(1);
   const pageRef = useRef(1);
   const fetchingRef = useRef(false);
+  /*
+    Which generation of the list a response belongs to.
+
+    A refresh clears `fetchingRef` so it cannot be blocked by a scroll-fetch
+    still in the air -- but that older request then lands too, and its
+    `[...prev, ...incoming]` would append page four onto the freshly reloaded
+    page one. Every fetch captures this counter and drops its own answer if a
+    refresh has moved on in the meantime.
+  */
+  const generationRef = useRef(0);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [userid, setUserid] = useState(null)
@@ -67,6 +78,14 @@ const HomeSocial = () => {
   const [userName, setUserName] = useState(null)
   const [userImage, setUserImage] = useState(null)
   const [initialLoading, setInitialLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  /*
+    Bumped on every pull. The story row already refetches on focus and the
+    timeline is reloaded directly, so this exists to reach the reels strip,
+    which renders inside ListHeaderComponent and has no other way of being told
+    that the list above it was just thrown away and asked for again.
+  */
+  const [refreshKey, setRefreshKey] = useState(0);
   //end post
 
   useEffect(() => {
@@ -134,6 +153,7 @@ const HomeSocial = () => {
       if (!isInitial && !hasMore) return;
 
       const requestedPage = isInitial ? 1 : pageRef.current;
+      const generation = generationRef.current;
       fetchingRef.current = true;
       setLoading(true);
       if (isInitial) setInitialLoading(true);
@@ -147,6 +167,9 @@ const HomeSocial = () => {
             userid: user?._id,
           },
         });
+
+        // Superseded by a refresh while this was in flight.
+        if (generation !== generationRef.current) return;
 
         if (res.data?.message === "No posts found") {
           setHasMore(false);
@@ -171,13 +194,44 @@ const HomeSocial = () => {
       } catch (error) {
         console.error("Fetch posts error:", error);
       } finally {
-        fetchingRef.current = false;
-        setLoading(false);
-        setInitialLoading(false);
+        // Only the current generation owns these flags; a superseded request
+        // clearing them would let its own staleness through the next check.
+        if (generation === generationRef.current) {
+          fetchingRef.current = false;
+          setLoading(false);
+          setInitialLoading(false);
+        }
       }
     },
     [hasMore, user]
   );
+
+  /*
+    Pull to refresh.
+
+    Reloads rather than merges: `fetchPosts(true)` asks for page 1 and replaces
+    the list, which is the whole point of pulling -- a post deleted, hidden or
+    unfollowed elsewhere has to be able to leave, and appending could never
+    remove anything.
+
+    `hasMore` is reset because a list that had already reached its end would
+    otherwise refuse to page again after the refresh, and `fetchingRef` is
+    cleared so a scroll-triggered fetch still in flight cannot make the pull do
+    nothing at all -- the pull is the newer intent and wins.
+  */
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    setHasMore(true);
+    pageRef.current = 1;
+    generationRef.current += 1;
+    fetchingRef.current = false;
+    setRefreshKey((k) => k + 1);
+    try {
+      await fetchPosts(true);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [fetchPosts]);
 
   return (
     <View style={styles.MainContainer}>
@@ -205,7 +259,7 @@ const HomeSocial = () => {
           ListHeaderComponent={
             <>
               <StoryScreen navigation={navigation} name={userName} image={userImage} />
-              <ReelsFeed userid={userid} />
+              <ReelsFeed userid={userid} refreshKey={refreshKey} />
             </>
           }
           ListFooterComponent={
@@ -218,6 +272,16 @@ const HomeSocial = () => {
           onEndReached={() => fetchPosts(false)}
           onEndReachedThreshold={0.3}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              // Matches the app's accent so the spinner does not read as a
+              // system control dropped onto the feed.
+              colors={["#1877F2"]}
+              tintColor="#1877F2"
+            />
+          }
         />
       </View>
       {/* Backend end-to-end tester. Only rendered while pointed at the local
