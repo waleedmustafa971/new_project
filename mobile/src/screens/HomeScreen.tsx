@@ -11,7 +11,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import MobileModel from './auth/MobileModel';
 import BottomNavBar from './BottomNav';
-import ReelsFeed from './social/reel/ReelsFeed';
 import HomeCategory from './HomeCategory';
 import ModalJobpopup from './job/modal/ModalJobpopup';
 
@@ -284,10 +283,6 @@ export default function HomeScreen() {
               <React.Fragment key={item.key}>{renderItem({ item })}</React.Fragment>
             ))}
           </View>
-        </View>
-
-        <View style={{ height: 180 }}>
-          <ReelsFeed userid={userid} />
         </View>
 
         <HomeCategory />
