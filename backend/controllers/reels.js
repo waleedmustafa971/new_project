@@ -4,6 +4,7 @@ import User from "../models/users.js";
 import Video from '../models/VideoFile.js'; 
 import Savereel from '../models/savereel.js';
 import { relationship, needsFollowApproval } from "../helpers/privacy.js";
+import { NOT_DELETED } from "../helpers/feed.js";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -15,6 +16,9 @@ import { fileURLToPath } from 'url';
 
 import Mux from '@mux/mux-node';
 import { notify } from "../services/notificationService.js";
+import GiftModal from "../models/GiftModal.js";
+import GiftTransaction from "../models/GiftTransaction.js";
+import { recordEarning } from "../helpers/monetisation.js";
 const mux = new Mux({
   tokenId: process.env.MUX_TOKEN_ID,
   tokenSecret: process.env.MUX_TOKEN_SECRET,
@@ -74,6 +78,10 @@ export const removeLike = async (req, res) => {
   try {
     const { username, id } = req.body;
 
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: "Invalid reel id" });
+    }
+
     const reel = await Reel.findById(id);
     if (!reel) {
       return res.status(404).json({ error: "Reel not found" });
@@ -85,7 +93,8 @@ export const removeLike = async (req, res) => {
 
     const totalLikes = reel.likes.length;
 
-    res.json({ message: "Like removed", totalLikes, likes: reel.likes });
+    // `liked` mirrors addlike, so one client branch reads both answers.
+    res.json({ message: "Like removed", totalLikes, liked: false, likes: reel.likes });
   } catch (error) {
     console.error("Server Error:", error);
     res.status(500).json({ error: error.message });
@@ -96,6 +105,10 @@ export const removeLike = async (req, res) => {
 export const isLiked = async (req, res) => {
   try {
     const { username, id } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: "Invalid reel id" });
+    }
 
     const reel = await Reel.findById(id);
     if (!reel) {
@@ -177,6 +190,9 @@ export const addLike = async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(username)) {
       return res.status(400).json({ error: "Invalid userId" });
     }
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: "Invalid reel id" });
+    }
 
     // 2️⃣ Check user exists
     const user = await User.findById(username);
@@ -197,9 +213,23 @@ export const addLike = async (req, res) => {
         like.username.toString() === username
     );
 
+    /*
+      Liking something you already like is not an error.
+
+      This answered 400, and the client had no way to know it was already
+      liked: checkliked was called with a display name while addlike was
+      called with a user id, so the heart rendered empty for a reel the
+      server had on record as liked, and every tap on it failed. The two
+      identities are now the same id on the client, and the outcome the
+      caller asked for -- liked, with this many likes -- is already true
+      here, so it is reported rather than refused.
+    */
     if (alreadyLiked) {
-      console.log('Already liked')
-      return res.status(400).json({ error: "Already liked" });
+      return res.json({
+        message: "Already liked",
+        totalLikes: reel.likes.length,
+        liked: true,
+      });
     }
 
     // 5️⃣ Push valid ObjectId
@@ -209,9 +239,124 @@ export const addLike = async (req, res) => {
     res.json({
       message: "Like added",
       totalLikes: reel.likes.length,
+      liked: true,
     });
   } catch (error) {
     console.error("Like error:", error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+/*
+  Send a gift on a reel.
+
+  The "Give" button in the reel viewer had no handler at all -- it rendered a
+  star, and tapping it did nothing. This is the same transaction live gifting
+  already runs, pointed at a post's author instead of a stream's host, so a
+  gift costs the same, is priced from the same catalogue, and lands in the same
+  earnings ledger wherever it was sent from.
+
+  The debit is a conditional update rather than read-modify-write: matching on
+  `coins: { $gte: cost }` and decrementing in one operation means two taps
+  fired at once cannot both pass a balance check and overdraw the wallet. If it
+  matches nothing the sender could not afford it and nothing has moved.
+*/
+export const giftReel = async (req, res) => {
+  try {
+    const senderId = req.user?.userId || req.user?._id || req.body?.userId;
+    const { reelId, giftId } = req.body || {};
+    const isId = (v) => mongoose.Types.ObjectId.isValid(String(v || ""));
+
+    if (!isId(senderId) || !isId(reelId) || !isId(giftId)) {
+      return res.status(400).json({ error: "Valid userId, reelId and giftId are required" });
+    }
+    const qty = Math.min(Math.max(parseInt(req.body?.quantity, 10) || 1, 1), 99);
+
+    const [reel, gift, sender] = await Promise.all([
+      Reel.findById(reelId).select("username stars").lean(),
+      GiftModal.findById(giftId).lean(),
+      User.findById(senderId).select("name image coins").lean(),
+    ]);
+    if (!reel) return res.status(404).json({ error: "Reel not found" });
+    if (!gift) return res.status(404).json({ error: "Gift not found" });
+    if (!sender) return res.status(404).json({ error: "User not found" });
+    if (String(reel.username) === String(senderId)) {
+      return res.status(400).json({ error: "You cannot gift your own reel" });
+    }
+
+    const unit = Number(gift.coinCost);
+    if (!Number.isFinite(unit) || unit < 0) {
+      return res.status(422).json({ error: "That gift has no valid coin value" });
+    }
+    const cost = unit * qty;
+
+    const debit = await User.updateOne(
+      { _id: senderId, coins: { $gte: cost } },
+      { $inc: { coins: -cost } }
+    );
+    if (debit.matchedCount === 0) {
+      return res.status(402).json({
+        error: `Not enough coins — ${sender.coins || 0} available, ${cost} needed`,
+        coins: sender.coins || 0,
+        needed: cost,
+      });
+    }
+
+    /*
+      Recorded on the reel as well as in the ledger. `stars` is what every reel
+      list already sums for its star count, so a gift that only wrote a ledger
+      row would be charged for and then show nowhere on the post it was sent to.
+    */
+    await Reel.updateOne(
+      { _id: reelId },
+      {
+        $push: {
+          stars: {
+            username: senderId,
+            count: qty,
+            amount: cost,
+            userinfo: { name: sender.name, image: sender.image, giftName: gift.name },
+          },
+        },
+      }
+    );
+
+    const tx = await GiftTransaction.create({
+      sender: senderId,
+      receiver: reel.username,
+      gift: gift._id,
+      coins: cost,
+    });
+
+    const earning = await recordEarning({
+      creator: reel.username, type: "gift", grossCoins: cost,
+      from: senderId, sourceId: tx._id, note: gift.name,
+    });
+
+    await notify({
+      recipient: reel.username, actor: senderId, type: "post_gift", post: reelId,
+      preview: `sent ${qty > 1 ? `${qty}x ` : ""}${gift.name} (${cost} coins)`,
+      thumbnail: gift.icon,
+    });
+
+    const [me, fresh] = await Promise.all([
+      User.findById(senderId).select("coins").lean(),
+      Reel.findById(reelId).select("stars").lean(),
+    ]);
+
+    res.json({
+      message: "Gift sent",
+      transactionId: tx._id,
+      gift: { _id: gift._id, name: gift.name, icon: gift.icon, coinCost: unit },
+      quantity: qty,
+      coinsSpent: cost,
+      senderCoins: me?.coins || 0,
+      creatorEarned: earning?.netCoins ?? cost,
+      platformFee: earning?.feeCoins ?? 0,
+      stars: (fresh?.stars || []).reduce((sum, item) => sum + (item.count || 0), 0),
+    });
+  } catch (error) {
+    console.error("Reel gift error:", error);
     res.status(500).json({ error: error.message });
   }
 };
@@ -533,7 +678,9 @@ export const getUsersReels = async (req, res) => {
     const skip = (page - 1) * limit;
     const loginUserId = req.query.email; //this is login userid
 
-    const reels = await Reel.find({ username: loginUserId })
+    const userFilter = { username: loginUserId, ...NOT_DELETED };
+
+    const reels = await Reel.find(userFilter)
       .sort({ xtime: -1 })
       .skip(skip)
       .limit(limit)
@@ -566,6 +713,21 @@ export const getUsersReels = async (req, res) => {
           );
         }
 
+        /*
+          Who is looking, relative to this reel.
+
+          followStatus only ever said whether the viewer follows the author, so
+          your own reel -- which you do not follow -- came back "not follow" and
+          the viewer offered you a Follow button on your own post, with no way
+          to delete it. `liked` closes the same gap for the heart, which used to
+          be resolved by a second round trip per reel that asked with the wrong
+          identity and always answered false.
+        */
+        const isOwner = !!loginUserId && String(reel.username) === String(loginUserId);
+        const liked = !!loginUserId && reel.likes.some(
+          (like) => String(like.username) === String(loginUserId)
+        );
+
         return {
           _id: reel._id,
           videoUrl: reel.videoUrl,
@@ -580,6 +742,19 @@ export const getUsersReels = async (req, res) => {
           shares: reel.shares.reduce((sum, item) => sum + item.count, 0),
           stars: reel.stars.reduce((sum, item) => sum + item.count, 0),
           followStatus: isFollowing ? "follow" : "not follow",
+          isOwner,
+          liked,
+          /*
+            Who this payload was shaped for.
+
+            isOwner, liked and followStatus are all answers to "for this
+            viewer", and a client that caches or forwards a reel can end up
+            showing one viewer an answer computed for another -- or, as the
+            reel strip did, an answer computed for nobody because the request
+            went out before the session had loaded. Stamping the viewer lets
+            the screen notice that and ask again instead of trusting it.
+          */
+          viewer: loginUserId ? String(loginUserId) : null,
           // Add user info (null-safe access)
           userInfo: user
             ? {
@@ -596,7 +771,10 @@ export const getUsersReels = async (req, res) => {
       })
     );
 
-    const totalReels = await Reel.countDocuments();
+    // Counted over the same filter the page was read with. This was a bare
+    // countDocuments() over the whole collection -- stories, posts and
+    // deleted rows included -- so totalPages never matched the list.
+    const totalReels = await Reel.countDocuments(userFilter);
 
     res.json({
       page,
@@ -620,9 +798,14 @@ export const getReelFeed = async (req, res) => {
     const loginUserId = req.query.userid; //this is login userid
     
 
-    const reels = await Reel.find({
-      posttype: "Reel",
-    })
+    /*
+      A deleted reel is soft-deleted -- the row stays so shares and
+      notifications pointing at it can be cleaned up deliberately. Without this
+      the author deleted a reel and it kept playing in the feed.
+    */
+    const feedFilter = { posttype: "Reel", ...NOT_DELETED };
+
+    const reels = await Reel.find(feedFilter)
       .sort({ xtime: -1 }) // descending order by createdAt
       .skip(skip)
       .limit(limit)
@@ -644,6 +827,21 @@ export const getReelFeed = async (req, res) => {
           );
         }
 
+        /*
+          Who is looking, relative to this reel.
+
+          followStatus only ever said whether the viewer follows the author, so
+          your own reel -- which you do not follow -- came back "not follow" and
+          the viewer offered you a Follow button on your own post, with no way
+          to delete it. `liked` closes the same gap for the heart, which used to
+          be resolved by a second round trip per reel that asked with the wrong
+          identity and always answered false.
+        */
+        const isOwner = !!loginUserId && String(reel.username) === String(loginUserId);
+        const liked = !!loginUserId && reel.likes.some(
+          (like) => String(like.username) === String(loginUserId)
+        );
+
         return {
           _id: reel._id,
           videoUrl: reel.videoUrl,
@@ -660,6 +858,19 @@ export const getReelFeed = async (req, res) => {
           shares: reel.shares.reduce((sum, item) => sum + item.count, 0),
           stars: reel.stars.reduce((sum, item) => sum + item.count, 0),
           followStatus: isFollowing ? "follow" : "not follow",
+          isOwner,
+          liked,
+          /*
+            Who this payload was shaped for.
+
+            isOwner, liked and followStatus are all answers to "for this
+            viewer", and a client that caches or forwards a reel can end up
+            showing one viewer an answer computed for another -- or, as the
+            reel strip did, an answer computed for nobody because the request
+            went out before the session had loaded. Stamping the viewer lets
+            the screen notice that and ask again instead of trusting it.
+          */
+          viewer: loginUserId ? String(loginUserId) : null,
           // Add user info (null-safe access)
           userInfo: user
             ? {
@@ -676,7 +887,10 @@ export const getReelFeed = async (req, res) => {
       })
     );
 
-    const totalReels = await Reel.countDocuments();
+    // Counted over the same filter the page was read with. This was a bare
+    // countDocuments() over the whole collection -- stories, posts and
+    // deleted rows included -- so totalPages never matched the list.
+    const totalReels = await Reel.countDocuments(feedFilter);
 
     res.json({
       page,
@@ -702,10 +916,13 @@ export const getSearchReels = async (req, res) => {
     const title = req.query.search; //this is login userid
     
 
-    const reels = await Reel.find({
+    const searchFilter = {
       posttype: "Reel",
-       videoTitle: { $regex: title, $options: "i" }
-    })
+      ...NOT_DELETED,
+      videoTitle: { $regex: title, $options: "i" },
+    };
+
+    const reels = await Reel.find(searchFilter)
       .sort({ xtime: -1 }) // descending order by createdAt
       .skip(skip)
       .limit(limit)
@@ -727,6 +944,21 @@ export const getSearchReels = async (req, res) => {
           );
         }
 
+        /*
+          Who is looking, relative to this reel.
+
+          followStatus only ever said whether the viewer follows the author, so
+          your own reel -- which you do not follow -- came back "not follow" and
+          the viewer offered you a Follow button on your own post, with no way
+          to delete it. `liked` closes the same gap for the heart, which used to
+          be resolved by a second round trip per reel that asked with the wrong
+          identity and always answered false.
+        */
+        const isOwner = !!loginUserId && String(reel.username) === String(loginUserId);
+        const liked = !!loginUserId && reel.likes.some(
+          (like) => String(like.username) === String(loginUserId)
+        );
+
         return {
           _id: reel._id,
           videoUrl: reel.videoUrl,
@@ -743,6 +975,19 @@ export const getSearchReels = async (req, res) => {
           shares: reel.shares.reduce((sum, item) => sum + item.count, 0),
           stars: reel.stars.reduce((sum, item) => sum + item.count, 0),
           followStatus: isFollowing ? "follow" : "not follow",
+          isOwner,
+          liked,
+          /*
+            Who this payload was shaped for.
+
+            isOwner, liked and followStatus are all answers to "for this
+            viewer", and a client that caches or forwards a reel can end up
+            showing one viewer an answer computed for another -- or, as the
+            reel strip did, an answer computed for nobody because the request
+            went out before the session had loaded. Stamping the viewer lets
+            the screen notice that and ask again instead of trusting it.
+          */
+          viewer: loginUserId ? String(loginUserId) : null,
           // Add user info (null-safe access)
           userInfo: user
             ? {
@@ -759,7 +1004,10 @@ export const getSearchReels = async (req, res) => {
       })
     );
 
-    const totalReels = await Reel.countDocuments();
+    // Counted over the same filter the page was read with. This was a bare
+    // countDocuments() over the whole collection -- stories, posts and
+    // deleted rows included -- so totalPages never matched the list.
+    const totalReels = await Reel.countDocuments(searchFilter);
 
     res.json({
       page,
@@ -780,9 +1028,9 @@ export const getReels = async (req, res) => {
     const skip = (page - 1) * limit;
     const loginUserId = req.query.username; //this is login userid
 
-    const reels = await Reel.find({
-      posttype: "Reel",
-    })
+    const listFilter = { posttype: "Reel", ...NOT_DELETED };
+
+    const reels = await Reel.find(listFilter)
       .sort({ xtime: -1 }) // descending order by createdAt
       .skip(skip)
       .limit(limit)
@@ -807,6 +1055,21 @@ export const getReels = async (req, res) => {
             (followerId) => followerId.toString() === loginUserId
           );
         }
+
+        /*
+          Who is looking, relative to this reel.
+
+          followStatus only ever said whether the viewer follows the author, so
+          your own reel -- which you do not follow -- came back "not follow" and
+          the viewer offered you a Follow button on your own post, with no way
+          to delete it. `liked` closes the same gap for the heart, which used to
+          be resolved by a second round trip per reel that asked with the wrong
+          identity and always answered false.
+        */
+        const isOwner = !!loginUserId && String(reel.username) === String(loginUserId);
+        const liked = !!loginUserId && reel.likes.some(
+          (like) => String(like.username) === String(loginUserId)
+        );
         //add this is for comments
 
         // Add enriched comments with user info
@@ -849,6 +1112,19 @@ export const getReels = async (req, res) => {
           shares: reel.shares.reduce((sum, item) => sum + item.count, 0),
           stars: reel.stars.reduce((sum, item) => sum + item.count, 0),
           followStatus: isFollowing ? "follow" : "not follow",
+          isOwner,
+          liked,
+          /*
+            Who this payload was shaped for.
+
+            isOwner, liked and followStatus are all answers to "for this
+            viewer", and a client that caches or forwards a reel can end up
+            showing one viewer an answer computed for another -- or, as the
+            reel strip did, an answer computed for nobody because the request
+            went out before the session had loaded. Stamping the viewer lets
+            the screen notice that and ask again instead of trusting it.
+          */
+          viewer: loginUserId ? String(loginUserId) : null,
           // Add user info (null-safe access)
           userInfo: user
             ? {
@@ -865,7 +1141,10 @@ export const getReels = async (req, res) => {
       })
     );
 
-    const totalReels = await Reel.countDocuments();
+    // Counted over the same filter the page was read with. This was a bare
+    // countDocuments() over the whole collection -- stories, posts and
+    // deleted rows included -- so totalPages never matched the list.
+    const totalReels = await Reel.countDocuments(listFilter);
 
     res.json({
       page,

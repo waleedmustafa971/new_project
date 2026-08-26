@@ -19,18 +19,44 @@ import Comments from "../post/Comments";
 import ReelShared from "./ReelShared";
 import api from "../../../component/api";
 import SaveModal from "../post/SaveModal";
+import GiftModal from "../live/GiftModal";
 import Toast from "react-native-toast-message";
 
 import LinearGradient from "react-native-linear-gradient";
 
 const screenHeight = Dimensions.get("window").height;
 
-const ReelItem = ({ reel, itemHeight, isActive, onClose, navigation }) => {
+const ReelItem = ({ reel, itemHeight, isActive, onClose, navigation, viewerId, onDeleted }) => {
   const [isShareModalVisible, setIsShareModalVisible] = useState(false);
   const [username, setUsername] = useState(null);
-  const [userid,setUserid] = useState(null)
+  const [userid,setUserid] = useState(viewerId || null)
   const [likes, setLikes] = useState(reel.likes || 0);
-  const [liked, setLiked] = useState(false);
+  /*
+    Seeded from the feed, which now says whether this viewer liked this reel.
+    It used to start false and be corrected by a per-reel round trip that asked
+    with the wrong identity, so the heart was always empty -- and tapping an
+    already-liked reel asked the server to like it again and got a 400 back.
+  */
+  const [liked, setLiked] = useState(!!reel.liked);
+  /*
+    Whether the reel in hand was shaped for the person holding it.
+
+    `liked`, `isOwner` and `followStatus` are all viewer-relative, and this reel
+    may have been fetched by a list that had not resolved the session yet. When
+    the stamp does not match, those three fields answer for someone else and are
+    re-derived rather than displayed.
+  */
+  const payloadViewer = reel?.viewer ? String(reel.viewer) : null;
+  const viewerMatches = !!userid && payloadViewer === String(userid);
+  const [likeBusy, setLikeBusy] = useState(false);
+  const [following, setFollowing] = useState(
+    viewerMatches ? reel.followStatus === "follow" : false
+  );
+  const [followBusy, setFollowBusy] = useState(false);
+  const [menuVisible, setMenuVisible] = useState(false);
+  const [giftVisible, setGiftVisible] = useState(false);
+  const [sendingGift, setSendingGift] = useState(false);
+  const [stars, setStars] = useState(reel.stars || 0);
   const [comments, setComments] = useState(reel.comments || 0);
   const [shares, setShares] = useState(reel.shares || 0);
   const [showComments, setShowComments] = useState(false);
@@ -106,36 +132,226 @@ const ReelItem = ({ reel, itemHeight, isActive, onClose, navigation }) => {
     if (onClose) onClose();
   };
 
-  const handleLike = async (reelId) => {
+  /*
+    Who is watching.
+
+    `userdata._id` is the one identity the reel endpoints accept -- likes,
+    follows, gifts and deletes are all keyed on it. The old code reached for
+    AsyncStorage's "username" in places, which holds a display name, so those
+    calls asked the server about a user that does not exist and were answered
+    accordingly: a like that never registered, a liked state that never showed.
+  */
+  const resolveViewerId = async () => {
+    if (userid) return userid;
     const jsonValue = await AsyncStorage.getItem("userdata");
-    if (jsonValue != null) {
-      const userData = JSON.parse(jsonValue);
-      //  setUserid(userData._id);
-      try {
-        // 1️⃣ Get logged-in username     
-        const endpoint = liked
-          ? "/apis/reel/removeslike"
-          : "/apis/reel/addlike";
-        console.log('reelId.... ', reelId)
-        // 3️⃣ Axios POST request
-        const response = await api.post(endpoint, {
-          username: userData._id,
-          id: reelId,
-        });
+    const id = jsonValue ? JSON.parse(jsonValue)?._id : null;
+    if (id) setUserid(id);
+    return id || null;
+  };
 
-        // 4️⃣ Axios already parses JSON → no response.text()
-        const result = response.data;
-        console.log('....data..... ', response.data)
-        // 5️⃣ Update UI state
-        if (result?.totalLikes !== undefined) {
-          setLikes(result.totalLikes);
-          setLiked((prev) => !prev); // safer toggle
-        }
-      } catch (error) {
-        console.error("Like toggle error:", error);
-      }
+  /*
+    Like / unlike.
+
+    The heart moves first and is put back if the server refuses, because a like
+    that waits for a round trip feels broken on a slow connection. What the
+    server answers wins in the end: both endpoints return the real total and the
+    resulting `liked`, so a state that had drifted is corrected by using the
+    reel rather than by another request.
+  */
+  const handleLike = async (reelId) => {
+    const me = await resolveViewerId();
+    if (!me) return;
+    if (likeBusy) return;
+
+    const wasLiked = liked;
+    const wasLikes = likes;
+
+    setLikeBusy(true);
+    setLiked(!wasLiked);
+    setLikes(Math.max(0, wasLikes + (wasLiked ? -1 : 1)));
+
+    try {
+      const endpoint = wasLiked
+        ? "/apis/reel/removeslike"
+        : "/apis/reel/addlike";
+
+      const response = await api.post(endpoint, {
+        username: me,
+        id: reelId,
+      });
+
+      const result = response.data;
+      if (typeof result?.totalLikes === "number") setLikes(result.totalLikes);
+      if (typeof result?.liked === "boolean") setLiked(result.liked);
+    } catch (error) {
+      setLiked(wasLiked);
+      setLikes(wasLikes);
+      console.log("Like toggle failed:", error?.response?.data || error.message);
+      Toast.show({
+        type: "error",
+        text1: "Couldn't update your like",
+        position: "top",
+        visibilityTime: 2000,
+      });
+    } finally {
+      setLikeBusy(false);
     }
+  };
 
+  /*
+    Is this the viewer's own reel?
+
+    The server answers this now (`isOwner`), because it is the only side that
+    knows who the reel belongs to when the viewer arrived without an id. The
+    local comparison is the fallback for payloads written before that field
+    existed. Getting it wrong is what put a Follow button on your own reel and
+    left you no way to delete it.
+  */
+  const authorId = reel?.userInfo?.userid || reel?.username;
+  const isOwner = userid
+    ? !!authorId && String(authorId) === String(userid)
+    : reel?.isOwner === true;
+
+  const handleFollow = async () => {
+    const me = await resolveViewerId();
+    if (!me || !authorId || followBusy) return;
+    if (String(authorId) === String(me)) return;
+
+    const wasFollowing = following;
+    setFollowBusy(true);
+    setFollowing(!wasFollowing);
+
+    try {
+      const endpoint = wasFollowing ? "/apis/reel/Unfollow" : "/apis/reel/Addfollow";
+      const res = await api.post(endpoint, { userId: me, followId: authorId });
+
+      /*
+        A private account answers "requested", not "following". Showing Following
+        for a request still waiting on approval tells the viewer they are seeing
+        posts they are not.
+      */
+      if (res.data?.status === "following") {
+        setFollowing(true);
+      } else if (res.data?.status === "requested") {
+        setFollowing(false);
+        Toast.show({
+          type: "success",
+          text1: "Follow request sent",
+          position: "top",
+          visibilityTime: 2000,
+        });
+      }
+    } catch (error) {
+      setFollowing(wasFollowing);
+      console.log("Follow failed:", error?.response?.data || error.message);
+      Toast.show({
+        type: "error",
+        text1: error?.response?.data?.message || "Couldn't update follow",
+        position: "top",
+        visibilityTime: 2000,
+      });
+    } finally {
+      setFollowBusy(false);
+    }
+  };
+
+  const handleDelete = () => {
+    setMenuVisible(false);
+    Alert.alert(
+      "Delete reel?",
+      "This removes it from your profile and from everyone's feed.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            const me = await resolveViewerId();
+            if (!me || !reel?._id) return;
+            try {
+              await api.delete(`/apis/posting/posts/${reel._id}`, {
+                params: { userId: me },
+              });
+              Toast.show({
+                type: "success",
+                text1: "Reel deleted",
+                position: "top",
+                visibilityTime: 2000,
+              });
+              if (onDeleted) onDeleted(reel._id);
+              else if (onClose) onClose();
+            } catch (error) {
+              console.log("Delete failed:", error?.response?.data || error.message);
+              Toast.show({
+                type: "error",
+                text1: error?.response?.data?.message || "Couldn't delete this reel",
+                position: "top",
+                visibilityTime: 2500,
+              });
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  /*
+    Send a gift.
+
+    The catalogue and the charge both come from the server, so what the sheet
+    shows and what leaves the wallet cannot disagree -- the same arrangement
+    live gifting already uses. Before this, "Give" had no handler at all.
+  */
+  const handleGive = async () => {
+    const me = await resolveViewerId();
+    if (!me) return;
+    if (isOwner) {
+      Toast.show({
+        type: "info",
+        text1: "You can't gift your own reel",
+        position: "top",
+        visibilityTime: 2000,
+      });
+      return;
+    }
+    setGiftVisible(true);
+  };
+
+  const handleSendGift = async (gift) => {
+    const me = await resolveViewerId();
+    if (!me || !gift?._id || sendingGift) return;
+
+    setSendingGift(true);
+    try {
+      const res = await api.post("/apis/reel/gift", {
+        userId: me,
+        reelId: reel._id,
+        giftId: gift._id,
+        quantity: 1,
+      });
+      if (typeof res.data?.stars === "number") setStars(res.data.stars);
+      setGiftVisible(false);
+      Toast.show({
+        type: "success",
+        text1: `Sent ${gift.name}`,
+        text2: `${res.data?.coinsSpent ?? gift.coinCost} coins — ${res.data?.senderCoins ?? 0} left`,
+        position: "top",
+        visibilityTime: 2500,
+      });
+    } catch (error) {
+      const data = error?.response?.data;
+      console.log("Gift failed:", data || error.message);
+      Toast.show({
+        type: "error",
+        // 402 carries the balance and the price, which is the whole answer to
+        // "why did nothing happen".
+        text1: data?.error || "Couldn't send that gift",
+        position: "top",
+        visibilityTime: 3000,
+      });
+    } finally {
+      setSendingGift(false);
+    }
   };
 
   const handleShare = (reelId) => {
@@ -178,23 +394,47 @@ const ReelItem = ({ reel, itemHeight, isActive, onClose, navigation }) => {
     setShowComments(true);
   };
 
+  /*
+    Only asked when the feed did not already say.
+
+    Every list endpoint now returns `liked` for the viewer, so the common path
+    costs nothing. This stays for reels reaching the viewer from somewhere that
+    does not -- a share link, an older cached payload -- and it asks with the
+    user id, which is what the endpoint compares against.
+  */
   useEffect(() => {
-    const checkIfLiked = async () => {
-      const user = await AsyncStorage.getItem("username");
+    if (viewerMatches && typeof reel.liked === "boolean") return;
+    let cancelled = false;
 
-      const res = await fetch(`${base.BASE_URL}/apis/reel/checkliked`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: user, id: reel._id }),
-      });
-      const result = await res.json();
-      if (result.liked) {
-        setLiked(true);
+    (async () => {
+      try {
+        const me = await resolveViewerId();
+        if (!me || !reel?._id) return;
+        const res = await api.post("/apis/reel/checkliked", {
+          username: me,
+          id: reel._id,
+        });
+        if (!cancelled) setLiked(!!res.data?.liked);
+      } catch (error) {
+        // A reel whose like state cannot be read still plays; leaving the
+        // heart empty is a better failure than taking the viewer down.
+        console.log("checkliked failed:", error?.response?.data || error.message);
       }
-    };
+    })();
 
-    checkIfLiked();
-  }, []);
+    return () => { cancelled = true; };
+  }, [reel?._id, viewerMatches]);
+
+  // The viewer can change route-to-route; keep the id in step with the prop.
+  useEffect(() => {
+    if (viewerId && viewerId !== userid) setUserid(viewerId);
+  }, [viewerId]);
+
+  // Adopt the follow state as soon as the payload is answering for this viewer
+  // -- it may only become trustworthy after the session finishes loading.
+  useEffect(() => {
+    if (viewerMatches) setFollowing(reel.followStatus === "follow");
+  }, [viewerMatches, reel?.followStatus]);
 
 
   const handleSaveConfirm = async (item) => {
@@ -256,12 +496,42 @@ const ReelItem = ({ reel, itemHeight, isActive, onClose, navigation }) => {
         <TouchableOpacity onPress={handleClose}>
           <Ionicons name="close" size={28} color="white" />
         </TouchableOpacity>
-        <Pressable onPress={() => {
-          navigation.navigate("SearchReels")
-        }}>
-          <Feather name="search" size={24} color="white" />
-        </Pressable>
+        <View style={styles.headerRight}>
+          <Pressable onPress={() => {
+            navigation.navigate("SearchReels")
+          }}>
+            <Feather name="search" size={24} color="white" />
+          </Pressable>
+          {/* The author's own controls. Nothing here belongs to anyone else,
+              so the whole affordance is absent rather than disabled. */}
+          {isOwner && (
+            <Pressable
+              onPress={() => setMenuVisible((v) => !v)}
+              style={styles.headerMenuBtn}
+              hitSlop={10}
+            >
+              <Feather name="more-vertical" size={22} color="white" />
+            </Pressable>
+          )}
+        </View>
       </View>
+
+      {isOwner && menuVisible && (
+        <>
+          {/* Tapping anywhere else closes it -- a menu with no way out but its
+              own button is how you end up stuck on a paused reel. */}
+          <Pressable
+            style={styles.menuBackdrop}
+            onPress={() => setMenuVisible(false)}
+          />
+          <View style={styles.ownerMenu}>
+            <TouchableOpacity style={styles.ownerMenuItem} onPress={handleDelete}>
+              <Feather name="trash-2" size={16} color="#E53935" />
+              <Text style={styles.ownerMenuTextDanger}>Delete reel</Text>
+            </TouchableOpacity>
+          </View>
+        </>
+      )}
 
       {/* Media */}
       {isVideo ? (
@@ -294,9 +564,16 @@ const ReelItem = ({ reel, itemHeight, isActive, onClose, navigation }) => {
       <View style={styles.bottomLeft}>
         <View style={styles.userRow}>
           <Text style={styles.userName}>{reel.userInfo?.name}</Text>
-          {reel.followStatus !== "follow" && (
-            <TouchableOpacity style={styles.followBtn}>
-              <Text style={styles.followBtnText}>Follow</Text>
+          {/* Never offered on your own reel: there is nobody to follow. */}
+          {!isOwner && (
+            <TouchableOpacity
+              style={[styles.followBtn, following && styles.followBtnActive]}
+              onPress={handleFollow}
+              disabled={followBusy}
+            >
+              <Text style={styles.followBtnText}>
+                {following ? "Following" : "Follow"}
+              </Text>
             </TouchableOpacity>
           )}
         </View>
@@ -330,9 +607,9 @@ const ReelItem = ({ reel, itemHeight, isActive, onClose, navigation }) => {
           style={styles.userImage}
         />
 
-        <TouchableOpacity style={styles.actionBtn}>
+        <TouchableOpacity style={styles.actionBtn} onPress={handleGive}>
           <Ionicons name="star-outline" size={24} color="white" />
-          <Text style={styles.actionText}>Give</Text>
+          <Text style={styles.actionText}>{stars > 0 ? stars : "Give"}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -364,7 +641,9 @@ const ReelItem = ({ reel, itemHeight, isActive, onClose, navigation }) => {
           }}
           style={styles.actionBtn}>
           <Feather name="bookmark" size={24} color="white" />
-          <Text style={styles.actionText}>{shares}</Text>
+          {/* This read {shares} -- the same number as the button above it,
+              which made saving look like it was counting shares. */}
+          <Text style={styles.actionText}>Save</Text>
         </TouchableOpacity>
       </View>
 
@@ -398,6 +677,15 @@ const ReelItem = ({ reel, itemHeight, isActive, onClose, navigation }) => {
           />
           : ''
       }
+
+      {giftVisible && (
+        <GiftModal
+          visible={giftVisible}
+          sending={sendingGift}
+          onClose={() => setGiftVisible(false)}
+          onSendGift={handleSendGift}
+        />
+      )}
 
       {
 
@@ -481,6 +769,50 @@ const styles = StyleSheet.create({
     marginRight: 10,
     fontSize: 16,
   },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  headerMenuBtn: {
+    marginLeft: 18,
+  },
+  /* Full-screen and below the menu, so a tap outside dismisses it without
+     reaching the video underneath and toggling playback. */
+  menuBackdrop: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 19,
+  },
+  ownerMenu: {
+    position: "absolute",
+    top: 46,
+    right: 16,
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    paddingVertical: 4,
+    minWidth: 160,
+    zIndex: 20,
+    elevation: 6,
+    shadowColor: "#000",
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  ownerMenuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  ownerMenuTextDanger: {
+    color: "#E53935",
+    fontSize: 14,
+    fontWeight: "500",
+    marginLeft: 10,
+  },
   followBtn: {
     backgroundColor: "rgba(255, 255, 255, 0.2)",
     paddingHorizontal: 12,
@@ -489,6 +821,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "white",
     marginTop: 8, marginLeft: 15
+  },
+  // Following is a state you can leave, not a call to action -- it reads
+  // quieter so Follow stays the button that asks to be pressed.
+  followBtnActive: {
+    backgroundColor: "transparent",
+    borderColor: "rgba(255,255,255,0.55)",
   },
   followBtnText: {
     color: "white",

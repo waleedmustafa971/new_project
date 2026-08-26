@@ -83,6 +83,7 @@ const STRINGS = {
     "notif.live_request":    "{actor} wants to join your live",
     "notif.live_invite":     "{actor} invited you onto their live",
     "notif.live_gift":       "{actor} sent you a gift",
+    "notif.post_gift":       "{actor} sent a gift on your reel",
     "notif.subscription":    "{actor} subscribed to you",
     "notif.default":         "You have a new notification",
 
@@ -160,6 +161,7 @@ const STRINGS = {
     "notif.live_request":    "يريد {actor} الانضمام إلى بثك",
     "notif.live_invite":     "دعاك {actor} للانضمام إلى بثه",
     "notif.live_gift":       "أرسل إليك {actor} هدية",
+    "notif.post_gift":       "أرسل {actor} هدية على مقطعك",
     "notif.subscription":    "اشترك {actor} معك",
     "notif.default":         "لديك إشعار جديد",
 

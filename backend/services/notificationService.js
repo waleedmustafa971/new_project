@@ -91,6 +91,7 @@ const PREF_OF = {
   live_request: "live",
   live_invite: "live",
   live_gift: "live",
+  post_gift: "live",
   message: "messages",
   story_view: "storyViews",
   page_post: "pages",
@@ -197,6 +198,8 @@ export const copyFor = (type, actorName, extra = {}, lang = DEFAULT_LANGUAGE) =>
       return { title: actorName, body: extra.preview ? `${actorName} ${extra.preview}` : s("notif.live_invite") };
     case "live_gift":
       return { title: actorName, body: extra.preview ? `${actorName} ${extra.preview}` : s("notif.live_gift") };
+    case "post_gift":
+      return { title: actorName, body: extra.preview ? `${actorName} ${extra.preview}` : s("notif.post_gift") };
     case "subscription":
       return { title: fallback("notif.title.subscription"), body: extra.preview ? `${actorName} ${extra.preview}` : s("notif.subscription") };
 

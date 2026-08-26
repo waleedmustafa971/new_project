@@ -5,7 +5,7 @@ import {
   myFollowers, myFollowering, getUsersReels, getReelFeed, addReplyComments,
   addReplyCommentsLikes, isLiked, removeLike, updateReelpost,
   generateUploadUrl, handleMuxWebhook, sharePostdata, updateNewReelsimageaudio,
-  getSearchReels, addSavepost, getSavetimeline
+  getSearchReels, addSavepost, getSavetimeline, giftReel
 } from "../controllers/reels.js";
 import { upload } from "../middleware/imageHelper.js";
 import authMiddleware from '../middleware/auth.js';
@@ -15,6 +15,8 @@ const router = express.Router();
 
 router.post("/add", addRealls);
 router.post("/addlike", addLike); 
+/* gift coins on a reel — same catalogue and ledger as live gifting */
+router.post("/gift", giftReel);
 router.post("/addSavepost", addSavepost); //time line saved data
 router.get("/get-save-data-timeline/:id", getSavetimeline); //time line saved data
 router.post("/checkliked", isLiked) 
