@@ -9,6 +9,7 @@
 import mongoose from "mongoose";
 import User from "../models/users.js";
 import Reels from "../models/Reels.js";
+import { NOT_DELETED } from "../helpers/feed.js";
 import {
   AREAS, AUDIENCES, effectiveSettings, visibilityFor,
   needsFollowApproval, relationship, applyProfileMask, isId,
@@ -384,6 +385,7 @@ export const myRestrictedPosts = wrap(async (req, res) => {
   const posts = await Reels.find({
     username: oid(userId),
     $or: [{ audience: { $ne: "everyone" } }, { ageRestricted: true }],
+    ...NOT_DELETED,
   }).select("videoTitle audience ageRestricted xtime media").sort({ xtime: -1 }).lean();
 
   ok(res, {

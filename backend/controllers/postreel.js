@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 import bodyParser from "body-parser";
 import User from "../models/users.js"; // import model user
 import Reel from "../models/Reels.js";
+import { NOT_DELETED } from "../helpers/feed.js";
 import { canViewPost } from "../helpers/safety.js";
 import mongoose from "mongoose";
 
@@ -326,7 +327,7 @@ export const getRecentstory = async (req, res) => {
       if (nextReel) reels.push(nextReel);
     } else {
       // Default pagination logic
-      reels = await Reel.find({ posttype })
+      reels = await Reel.find({ posttype, ...NOT_DELETED })
         .sort({ xtime: -1 })
         .skip(skip)
         .limit(limit)
@@ -480,7 +481,7 @@ export const userWall = async (req, res) => {
     }
 
     // Posts and shares both live in the same collection under posttype "Post".
-    const candidates = await Reel.find({ username: authorId, posttype: "Post" })
+    const candidates = await Reel.find({ username: authorId, posttype: "Post", ...NOT_DELETED })
       .populate({
         path: "sharepost.originalPost",
         populate: { path: "username", select: "name email image bio verifiedBadge" },
@@ -514,7 +515,7 @@ export const userWall = async (req, res) => {
       xtime: p.xtime,
     }));
 
-    const total = await Reel.countDocuments({ username: authorId, posttype: "Post" });
+    const total = await Reel.countDocuments({ username: authorId, posttype: "Post", ...NOT_DELETED });
 
     return res.status(200).json({
       success: true,
@@ -546,10 +547,9 @@ export const yourContent = async (req, res) => {
     const skip = (page - 1) * limit;
     const userid = req.query.userid;
 
-    const reels = await Reel.find({
-      posttype: "Reel",
-      username: userid
-    })
+    const yoursFilter = { posttype: "Reel", username: userid, ...NOT_DELETED };
+
+    const reels = await Reel.find(yoursFilter)
       .populate({
         path: "sharepost.originalPost",
         populate: {
@@ -634,7 +634,9 @@ export const yourContent = async (req, res) => {
       })
     );
 
-    const totalReels = await Reel.countDocuments();
+    // Counted over the same filter the page was read with; this was a bare
+    // count of every document in the collection.
+    const totalReels = await Reel.countDocuments(yoursFilter);
 
     res.json({
       page,
@@ -691,7 +693,7 @@ export const getPosts = async (req, res) => {
     const hiddenPostIds = (viewer?.hiddenPosts || []).map(String);
     const followingIds = new Set((viewer?.following || []).map(String));
 
-    const query = { posttype: "Post" };
+    const query = { posttype: "Post", ...NOT_DELETED };
     if (excludedAuthors.length) query.username = { $nin: excludedAuthors };
     if (hiddenPostIds.length) query._id = { $nin: hiddenPostIds };
 
@@ -826,6 +828,7 @@ export const getPosts = async (req, res) => {
 
     const totalReels = await Reel.countDocuments({
       posttype: "Post",
+      ...NOT_DELETED,
     });
 
     res.json({

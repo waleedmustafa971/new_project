@@ -21,6 +21,7 @@ import mongoose from "mongoose";
 
 import User from "../models/users.js";
 import Reels from "../models/Reels.js";
+import { NOT_DELETED } from "../helpers/feed.js";
 import AdCampaign, { campaignIsLive, HOLDING_STATUSES } from "../models/AdCampaign.js";
 import { isId, AUTHOR_FIELDS } from "../helpers/feed.js";
 import { debitCoins, creditCoins } from "../helpers/monetisation.js";
@@ -452,7 +453,7 @@ export const listScheduled = wrap(async (req, res) => {
   if (!isId(userId)) return fail(res, 400, "A valid userId is required");
 
   const rows = await Reels.find({
-    username: oid(userId), status_draft_publish: "Scheduled",
+    username: oid(userId), status_draft_publish: "Scheduled", ...NOT_DELETED,
   }).select("videoTitle media scheduledFor posttype").sort({ scheduledFor: 1 }).lean();
 
   const now = new Date();
@@ -512,9 +513,14 @@ export const publishDue = wrap(async (req, res) => {
 
 export const runDuePublish = async () => {
   const now = new Date();
+  /*
+     Without this the publisher would take a deleted-but-scheduled post, flip it
+     to Publish and announce it -- reviving something its author had removed.
+  */
   const due = await Reels.find({
     status_draft_publish: "Scheduled",
     scheduledFor: { $lte: now, $ne: null },
+    ...NOT_DELETED,
   }).select("_id username scheduledFor videoTitle media posttype").limit(200).lean();
 
   if (!due.length) return { published: 0, posts: [] };

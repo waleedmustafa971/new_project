@@ -21,6 +21,7 @@ import mongoose from "mongoose";
 
 import User from "../models/users.js";
 import Reels from "../models/Reels.js";
+import { NOT_DELETED } from "../helpers/feed.js";
 import StoryStickerResponse from "../models/StoryStickerResponse.js";
 import StoryHighlight from "../models/StoryHighlight.js";
 import { isId, AUTHOR_FIELDS } from "../helpers/feed.js";
@@ -414,7 +415,9 @@ export const highlightDetail = wrap(async (req, res) => {
     .populate("owner", AUTHOR_FIELDS).lean();
   if (!highlight) return fail(res, 404, "Highlight not found");
 
-  const stories = await Reels.find({ _id: { $in: highlight.stories || [] } })
+  // A story deleted after it was added to a highlight must leave the highlight
+  // too -- the highlight holds ids, not copies.
+  const stories = await Reels.find({ _id: { $in: highlight.stories || [] }, ...NOT_DELETED })
     .select("videoUrl videoTitle media music effects posttype xtime audience ageRestricted status username")
     .lean();
 
@@ -630,6 +633,7 @@ export const storiesMentioningMe = wrap(async (req, res) => {
   const rows = await Reels.find({
     mentions: oid(userId),
     posttype: /^stor(y|ies)$/i,
+    ...NOT_DELETED,
     $or: [
       { expiresAt: { $gt: now } },
       { expiresAt: null, xtime: { $gte: new Date(now.getTime() - STORY_TTL_MS) } },

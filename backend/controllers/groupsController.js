@@ -17,6 +17,7 @@
 import Group from "../models/socialmediagroup.js";
 import GroupMember from "../models/GroupMember.js";
 import Reels from "../models/Reels.js";
+import { NOT_DELETED } from "../helpers/feed.js";
 import User from "../models/users.js";
 import {
   RANK, can, outranks, membershipOf, canView, canDiscover,
@@ -1393,6 +1394,7 @@ export const topPosts = wrap(async (req, res) => {
     group: group._id,
     groupStatus: "approved",
     xtime: { $gte: windowStart(days) },
+    ...NOT_DELETED,
   })
     .populate("username", AUTHOR_FIELDS)
     .lean();

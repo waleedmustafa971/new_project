@@ -19,6 +19,21 @@ import { meetsAgeGate } from "./safety.js";
 export const isId = (v) => mongoose.Types.ObjectId.isValid(v);
 const oid = (v) => new mongoose.Types.ObjectId(String(v));
 
+/*
+  The soft-delete tombstone, as a query fragment.
+
+  Deleting a post sets `status: "deleted"` and keeps the row, so anything that
+  lists posts has to say it does not want those. baseMatch() below does; the
+  older hand-rolled queries in reels.js and postreel.js each have to spread
+  this in, and missing it is invisible -- the delete succeeds, the row is
+  marked, and the post carries on appearing wherever the filter was forgotten.
+  One definition so those queries cannot drift apart from baseMatch().
+
+  "hidden" travels with it: a post a moderator has taken down is no more
+  listable than one its author removed.
+*/
+export const NOT_DELETED = Object.freeze({ status: { $nin: ["hidden", "deleted"] } });
+
 export const POSTTYPE = {
   post:  /^post$/i,
   reel:  /^reel$/i,
@@ -238,8 +253,7 @@ export function scoreTrending(doc) {
 */
 export function baseMatch(ctx, { type, includeExpired = false, group = null } = {}) {
   const match = {
-    // "deleted" is the soft-delete tombstone written by the posting controller.
-    status: { $nin: ["hidden", "deleted"] },
+    ...NOT_DELETED,
     /*
       Drafts never appear. Scheduled posts are excluded by their own date
       rather than by this field: a post whose time has come is publishable even

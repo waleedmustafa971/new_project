@@ -11,6 +11,7 @@ import mongoose from "mongoose";
 import User from "../models/users.js";
 import Report from "../models/Report.js";
 import Reels from "../models/Reels.js";
+import { NOT_DELETED } from "../helpers/feed.js";
 import LoginEvent from "../models/LoginEvent.js";
 import { hiddenUserIds, isBlockedEither, isId } from "../helpers/privacy.js";
 import { isRestrictedBy, oid, sameId } from "../helpers/safety.js";
@@ -499,7 +500,7 @@ export const listHiddenPosts = wrap(async (req, res) => {
   const ids = me?.hiddenPosts || [];
   if (!ids.length) return ok(res, { total: 0, posts: [] });
 
-  const posts = await Reels.find({ _id: { $in: ids } })
+  const posts = await Reels.find({ _id: { $in: ids }, ...NOT_DELETED })
     .select("videoTitle media username xtime")
     .populate("username", "name image").lean();
 

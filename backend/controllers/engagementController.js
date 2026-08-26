@@ -25,7 +25,7 @@ import Savereel from "../models/savereel.js";
 import Notification from "../models/Notification.js";
 import { notify, notifyMany } from "../services/notificationService.js";
 import {
-  isId, AUTHOR_FIELDS,
+  isId, AUTHOR_FIELDS, NOT_DELETED,
   extractMentionNames, resolveMentions,
   buildViewerContext, shapeFeedItem,
 } from "../helpers/feed.js";
@@ -652,7 +652,7 @@ export const savedPosts = wrap(async (req, res) => {
   const { skip, limit, page } = paging(req);
   if (!isId(userId)) return fail(res, 400, "A valid userId is required");
 
-  const filter = { "savepost.username": oid(userId) };
+  const filter = { "savepost.username": oid(userId), ...NOT_DELETED };
   const [docs, total] = await Promise.all([
     Reels.find(filter).sort({ xtime: -1 }).skip(skip).limit(limit)
       .populate("username", AUTHOR_FIELDS)
@@ -837,6 +837,7 @@ export const mentionsFeed = wrap(async (req, res) => {
   const filter = {
     $or: [{ mentions: oid(userId) }, { "comments.mentions": oid(userId) }],
     username: { $nin: hidden.map(oid) },
+    ...NOT_DELETED,
   };
 
   const [docs, total] = await Promise.all([
@@ -873,7 +874,10 @@ export const pendingTags = wrap(async (req, res) => {
   const { skip, limit, page } = paging(req);
   if (!isId(userId)) return fail(res, 400, "A valid userId is required");
 
-  const filter = { taggedUsers: { $elemMatch: { user: oid(userId), approved: false } } };
+  const filter = {
+    taggedUsers: { $elemMatch: { user: oid(userId), approved: false } },
+    ...NOT_DELETED,
+  };
   const [docs, total] = await Promise.all([
     Reels.find(filter).sort({ xtime: -1 }).skip(skip).limit(limit)
       .populate("username", AUTHOR_FIELDS)
