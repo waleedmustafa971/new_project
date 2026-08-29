@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useRef, useState } from 'r
 import { io, Socket } from 'socket.io-client';
 import * as base from '../../component/global';
 import { useUser } from './UserContext';
+import { socketAuth, attachAuthRecovery } from '../../component/socketAuth';
 
 interface SocketContextType {
   socket: Socket | null;
@@ -87,10 +88,12 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     console.log('🔌 Connecting to:', base.SOCKET_URL, 'User:', userId);
 
     const socket = io(base.SOCKET_URL, {
+      auth: socketAuth,
       query: { userId },
       transports: ['websocket'],
       forceNew: true
     });
+    attachAuthRecovery(socket);
 
     /*
       The online roster lives here rather than in each screen.

@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import dotenv from "dotenv";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import jwt from "jsonwebtoken";
 import helmet from "helmet";
 import { authLimiter, adminAuthLimiter, apiLimiter } from "./middleware/rateLimit.js";
 import { fileURLToPath } from "url";
@@ -591,8 +592,45 @@ app.get("/apis/conversations/:userId", async (req, res) => {
   removing them, which is the only place that knows.
 */
 import { markOnline, markOffline, onlineList } from "./helpers/presence.js";
+/*
+  The socket handshake proved nothing.
+
+  `userId` arrived as a plain query parameter and everything downstream keyed
+  off it: socket.join(userId) puts you in a personal room, so any client could
+  connect as anybody and receive their direct messages, call invitations and
+  notifications, then emit under their name. relayTyping's comment called the
+  handshake "the one identity this socket has actually proved" -- nothing was
+  proved, it was an unauthenticated string.
+
+  The token is the same one middleware/auth.js verifies for HTTP. It is read
+  from handshake.auth, socket.io's dedicated channel, which keeps it out of the
+  URL and so out of nginx access logs; handshake.query.token is accepted too
+  because some clients cannot set auth. A query userId is honoured only when it
+  matches the token, so an out-of-date client fails closed rather than silently
+  connecting as the wrong person.
+*/
+io.use((socket, next) => {
+  const raw = socket.handshake.auth?.token || socket.handshake.query?.token;
+  const token = typeof raw === "string" ? raw.replace(/^Bearer\s+/i, "") : "";
+  if (!token) return next(new Error("unauthorized: no token"));
+
+  try {
+    const decoded = jwt.verify(token, process.env.SECRET_KEY);
+    if (!decoded?.userId) return next(new Error("unauthorized: token carries no userId"));
+
+    const claimed = socket.handshake.query?.userId;
+    if (claimed && String(claimed) !== String(decoded.userId)) {
+      return next(new Error("unauthorized: identity mismatch"));
+    }
+
+    socket.data.userId = String(decoded.userId);
+    return next();
+  } catch {
+    return next(new Error("unauthorized: invalid or expired token"));
+  }
+});
 io.on("connection", async (socket) => {
-  const userId = socket.handshake.query.userId;
+  const userId = socket.data.userId;   // verified in io.use above, never the query string
   const user = await User.findById(userId).select("-password");
   /* 
   From Front End need call this 

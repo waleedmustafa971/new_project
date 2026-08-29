@@ -309,12 +309,16 @@ const NewReels = ({ navigation }) => {
                 </View>
 
             </View>
-            <View style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                padding: 0,
-            }}>
-                {/*  <GalleryShow />  */}
+            {/*
+                GalleryShow was commented out, so this screen showed a toolbar and
+                nothing else. It is self-contained -- it takes no props, asks for its
+                own photo permission and pages the camera roll itself -- so rendering
+                it is all that was needed. loadMedia() is deliberately still not called
+                on mount: it opens the OS picker via launchImageLibrary, which would
+                pop a system dialog every time the screen opened.
+            */}
+            <View style={{ flex: 1 }}>
+                <GalleryShow />
             </View>
 
 
@@ -324,8 +328,11 @@ const NewReels = ({ navigation }) => {
 
 const styles = StyleSheet.create({
     container: {
-        backgroundColor: "#fffff"
-        //flex: 1,
+        // flex was commented out, so the provider collapsed and every child
+        // below the toolbar had zero height -- which is why the gallery never
+        // appeared even once it was rendered. "#fffff" was five hex digits.
+        flex: 1,
+        backgroundColor: "#ffffff",
         //  paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
     },
     title: { fontSize: 12, color: "#000", marginBottom: 3 },

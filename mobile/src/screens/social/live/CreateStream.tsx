@@ -32,6 +32,7 @@ import io, { Socket } from "socket.io-client";
 import StartJoinChannel from './StartJoinChannel'; 
 import { useNavigation } from '@react-navigation/native'; 
 import CoRequestAcceptModal from './CoRequestAcceptModal';
+import { socketAuth, attachAuthRecovery } from '../../../component/socketAuth';
 
 const localUid = 0; // Standard UID for the local user/host
 
@@ -179,10 +180,12 @@ const CreateStream = () => {
       if (!userIdFinal) return;
 
       socket.current = io(base.SOCKET_URL, {
+        auth: socketAuth,
         transports: ["websocket"],
         query: { userId: userIdFinal },
         autoConnect: true,
       });
+      attachAuthRecovery(socket.current);
 
       socket.current.on("cohost-request", (requester: User) => {
         setCoHostRequests(prev => {

@@ -27,6 +27,7 @@ import LiveChatMessage from "../../../component/livechat/LiveChatMessage";
 import LiveChatFooter from "../../../component/livechat/LiveChatFooter";
 import LiveRoomHeader from "./liveroom/LiveRoomHeader";
 import GiftModal from "../../../component/livechat/GiftModal";
+import { socketAuth, attachAuthRecovery } from '../../../component/socketAuth';
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get("window");
 
@@ -278,10 +279,12 @@ const InteractiveRoom: React.FC<Props> = ({ route, navigation }) => {
             }
 
             socket.current = io(base.SOCKET_URL, {
+                auth: socketAuth,
                 transports: ["websocket"],
                 query: { userId: userIdFinal },
                 autoConnect: false,
             });
+            attachAuthRecovery(socket.current);
 
             socket.current.connect();
 
