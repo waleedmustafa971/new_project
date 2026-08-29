@@ -6,6 +6,7 @@ import Video from 'react-native-video';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import Feather from 'react-native-vector-icons/Feather';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import { BASE_URL } from '../../../component/global';
 
 const { width } = Dimensions.get('window');
 
@@ -21,7 +22,7 @@ const VideoDetails = ({ route, navigation }) => {
             onPress={() => navigation.push('VideoDetails', { video: item })}
         >
             <Image
-                source={{ uri: `http://192.168.0.104:5000${item.bannerImage}` }}
+                source={{ uri: `${BASE_URL}${item.bannerImage}` }}
                 style={styles.relatedThumbnail}
             />
             <View style={{ flex: 1, marginLeft: 8 }}>

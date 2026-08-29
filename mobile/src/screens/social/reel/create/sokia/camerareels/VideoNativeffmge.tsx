@@ -17,6 +17,7 @@ import Sound from 'react-native-sound';
 import api from '../../../../../../component/api';
 import * as base from '../../../../../../component/global';
 import ActiveMusicBadge from '../../../../music/ActiveMusicBadge';
+import { BASE_URL } from '../../../../../../component/global';
 
 Sound.setCategory('Playback');
 const { width, height } = Dimensions.get('window');
@@ -162,7 +163,7 @@ export default function VideoNativeffmge({ videoUri, onBack }: any) {
       console.log(' start time : ', start, ' end time :' + duration) // after this subscrition trimEnd - trimStart duration is not comming right
 
       const cleanFormattedUri = formattedUri.replace(/^file:\/\//, '');
-      const audioUrl = "https://api.dokandarapps.com/uploads/music/1769839852954-audio.mp3";
+      const audioUrl = `${BASE_URL}/uploads/music/1769839852954-audio.mp3`;
       const localAudio = `${RNFS.CachesDirectoryPath}/audio_temp.mp3`;
       // ✅ Download audio if not already downloaded
       const exists = await RNFS.exists(localAudio);
@@ -239,7 +240,7 @@ export default function VideoNativeffmge({ videoUri, onBack }: any) {
       //  console.log(' start time : ', trimStart , ' end time :' + trimEnd) // this comming right
       console.log(' start time : ', start, ' end time :' + duration) // after this subscrition trimEnd - trimStart duration is not comming right
       const cleanFormattedUri = formattedUri.replace(/^file:\/\//, '');
-      const audioUrl = "https://api.dokandarapps.com/uploads/music/1769839852954-audio.mp3";
+      const audioUrl = `${BASE_URL}/uploads/music/1769839852954-audio.mp3`;
       const localAudio = `${RNFS.CachesDirectoryPath}/audio_temp.mp3`;
       // ✅ Download audio if not already downloaded
       const exists = await RNFS.exists(localAudio);

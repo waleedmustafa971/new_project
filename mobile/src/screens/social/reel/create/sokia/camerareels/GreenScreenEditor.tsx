@@ -67,7 +67,7 @@ export default function GreenScreenEditor({
     } as any);
     formData.append('country', "United Arab Emirates");
     try {
-      const response = await fetch('https://api.dokandarapps.com/api/videoprocessing/applygreenscreen', {
+      const response = await fetch(`${base.BASE_URL}/api/videoprocessing/applygreenscreen`, {
         method: 'POST',
         body: formData,
         headers: {
@@ -82,7 +82,7 @@ export default function GreenScreenEditor({
       const result = await response.json();
       console.log('result:', result);
       if (result.success) {
-            onApply('https://api.dokandarapps.com/' + result.videoUrl); // ✅ HTTP URL. base.BASE_URL
+            onApply(base.BASE_URL + '/' + result.videoUrl); // ✅ HTTP URL. base.BASE_URL
             setProcessing(false)
       }
     } catch (error) {

@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
+import { BASE_URL } from "../../../component/global";
 
 // ====================== TYPES ======================
 interface Job {
@@ -56,7 +57,7 @@ const JobDetails: React.FC = () => {
     const fetchJob = async () => {
       try {
         const res = await fetch(
-          `https://api.dokandarapps.com/apis/job/getjoblist?page=1&limit=100&_id=${_id}`
+          `${BASE_URL}/apis/job/getjoblist?page=1&limit=100&_id=${_id}`
         );
         const data = await res.json();
         if (data?.users?.length) {
@@ -74,7 +75,7 @@ const JobDetails: React.FC = () => {
 
   const handleApply = async () => {
     try {
-      const response = await fetch("https://api.dokandarapps.com/apis/job/apply", {
+      const response = await fetch(`${BASE_URL}/apis/job/apply`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ jobId: _id, userId: "USER_ID_HERE" }),
