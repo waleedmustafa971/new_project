@@ -159,7 +159,18 @@ const FinalPostModal = ({
                 console.log("⚠️ Error message:", error.message);
             }
 
-            Alert.alert("Upload Failed", "Something went wrong on the server.");
+            /*
+              Say what went wrong. "Something went wrong on the server" is what
+              the user was told whether the file was too large, the session had
+              expired or the phone was offline -- three different problems, one
+              useless sentence, and nothing to act on.
+            */
+            const reason = error.response
+                ? (error.response.data?.message || `The server refused it (${error.response.status}).`)
+                : error.request
+                    ? "No response from the server. Check your connection and try again."
+                    : error.message || "Something went wrong.";
+            Alert.alert("Could not post", reason);
         }
 
 
@@ -216,7 +227,15 @@ const FinalPostModal = ({
                             fontWeight: '600',   
                         }}
                     >
-                        New Reel Post {imageurl}
+                        {/*
+                          This printed the whole cache path into the heading --
+                          "New Reel Post file:///data/user/0/com.messengeruae/
+                          cache/ReactNative-snapshot-image2565214671837988.png"
+                          -- because {imageurl} was left in the title. It also
+                          said "Reel" while posting a story, which is the one
+                          thing the screen already knows.
+                        */}
+                        {posttype === "Story" ? "New story" : "New reel"}
                     </Text>
 
                     <View style={{ width: 28 }} />
@@ -287,7 +306,7 @@ const FinalPostModal = ({
                     >
                         <Text style={{
                             color: 'black'
-                        }}>Who can see the reel?</Text>
+                        }}>{posttype === "Story" ? "Who can see this story?" : "Who can see this reel?"}</Text>
                        
                         <View>
                             <Text

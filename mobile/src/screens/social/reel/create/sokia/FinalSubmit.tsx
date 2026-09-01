@@ -178,12 +178,23 @@ const FinalSubmit = ({ visible, onSelect, onClose,
             }
 
         } catch (error : any) {
-            console.error("❌ Upload error:", error);
+            // console.log, not console.error: console.error raises a LogBox banner
+            // that sits over the screen until dismissed -- and on this screen it
+            // lands squarely on the submit button, so the failure blocks the
+            // retry. The error is already surfaced to the user below.
+            console.log("Upload error:", error?.message || error);
             if (error.response) {
                 console.log("🔴 Server response:", error.response.data);
             }
             setIsloading(false);
-            Alert.alert("Upload Failed", "Something went wrong.");
+            Alert.alert(
+                "Could not post",
+                error?.response?.data?.message
+                    || (error?.response ? `The server refused it (${error.response.status}).` : null)
+                    || (error?.request ? "No response from the server. Check your connection and try again." : null)
+                    || error?.message
+                    || "Something went wrong."
+            );
         }
 
     }
