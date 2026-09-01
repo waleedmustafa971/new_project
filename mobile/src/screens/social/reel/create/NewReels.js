@@ -1,4 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
+import { FB } from "../../../../theme/social";
+import LinearGradient from "react-native-linear-gradient";
+import Ionicons from "react-native-vector-icons/Ionicons";
 import { HOME_ROUTE } from '../../../../navigation/homeRoute';
 import {
     View,
@@ -179,144 +182,80 @@ const NewReels = ({ navigation }) => {
                     /> : ''
             }
  */}
-            <View style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                padding: 8, // p-2 = 8px
-                backgroundColor: '#ffffff'
-            }}
-            >
+            {/*
+              Facebook's create-reel shape: two big choices, then your camera
+              roll.
+
+              This was a header with a back arrow AND a close X -- both calling
+              goBack() -- over a row of five identical grey circles, so Camera
+              and Music, the two ways to actually make a reel, looked exactly
+              like the three shortcuts beside them.
+            */}
+            <View style={styles.header}>
                 <TouchableOpacity
-                    onPress={() => {
-                        navigation.goBack();
-                    }}
+                    onPress={() => navigation.goBack()}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
-                    <AntDesign name="arrowleft" size={24} color="black" />
+                    <Ionicons name="close" size={26} color={FB.text} />
                 </TouchableOpacity>
-                <Text style={{ fontSize: 16 }}>Create Reel</Text>
+                <Text style={styles.headerTitle}>Create reel</Text>
+                <View style={{ width: 26 }} />
+            </View>
+
+            <View style={styles.choices}>
                 <TouchableOpacity
-                    onPress={() => {
-                        navigation.goBack();
-                    }}
+                    style={styles.choice}
+                    activeOpacity={0.85}
+                    onPress={() => navigation.navigate("TestSokia")}
                 >
-                    <AntDesign name="close" size={24} color="black" />
+                    <LinearGradient
+                        colors={["#F3425F", "#F7B928"]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.choiceFill}
+                    >
+                        <Ionicons name="camera" size={30} color="#fff" />
+                    </LinearGradient>
+                    <Text style={styles.choiceLabel}>Camera</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                    style={styles.choice}
+                    activeOpacity={0.85}
+                    onPress={() => navigation.navigate("NewReelcamera", {
+                        typescreen: 'Reel',
+                        picture: "888.jpg",
+                        imagetype: "image",
+                        musictype: 'yes',
+                        posttype: "Reel"
+                    })}
+                >
+                    <LinearGradient
+                        colors={["#0EA5E9", "#8B5CF6"]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.choiceFill}
+                    >
+                        <Ionicons name="musical-notes" size={30} color="#fff" />
+                    </LinearGradient>
+                    <Text style={styles.choiceLabel}>Music</Text>
                 </TouchableOpacity>
             </View>
-            <View style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                padding: 8, // p-2 = 8px
-                backgroundColor: '#ffffff'
-            }}
 
-            >
-                <View style={{ alignItems: 'center' }}>
-                    <TouchableOpacity
-                        style={{
-                            width: 50,
-                            height: 50,
-                            borderRadius: 50,
-                            backgroundColor: '#f2f2f2',
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                        }}
-                      //  onPress={() => navigation.navigate("CameraReel")}
-                        onPress={() => navigation.navigate("TestSokia")}
-                        
-                        >
-                        <AntDesign name="camerao" size={24} color="black" />
+            <View style={styles.chips}>
+                {[
+                    { icon: "grid-outline", label: "Templates", go: () => navigation.navigate("ListTemplate") },
+                    { icon: "bookmark-outline", label: "Saved", go: () => navigation.navigate("SavedReel", { userId: userid }) },
+                    { icon: "folder-outline", label: "Your content", go: () => navigation.navigate("ShowReels") },
+                ].map((c) => (
+                    <TouchableOpacity key={c.label} style={styles.chip} onPress={c.go} activeOpacity={0.7}>
+                        <Ionicons name={c.icon} size={15} color={FB.textSecondary} />
+                        <Text style={styles.chipText}>{c.label}</Text>
                     </TouchableOpacity>
-                    <Text style={{
-                        marginTop: 1, fontSize: 12,
-                    }}>Camera</Text>
-                </View>
-                <View style={{ alignItems: 'center' }}>
-                    <TouchableOpacity
-                        style={{
-                            width: 50,
-                            height: 50,
-                            borderRadius: 50,
-                            backgroundColor: '#f2f2f2',
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                        }}
-                         onPress={() => navigation.navigate("NewReelcamera", {
-                            typescreen: 'Reel',
-                            picture: "888.jpg",
-                            imagetype: "image",
-                            musictype: 'yes',
-                            posttype: "Reel"
-                        })}
-                    >
-                        <Feather name="music" size={20} color="black" />
-                     
-                    </TouchableOpacity>
-                       <Text style={{ marginTop: 1, fontSize: 12 }}>Music</Text>
-                </View>
-                <View style={{ alignItems: 'center' }}>
-                    <TouchableOpacity
-                        style={{
-                            width: 50,
-                            height: 50,
-                            borderRadius: 50,
-                            backgroundColor: '#f2f2f2',
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                        }}
-                        onPress={() => {
-                            navigation.navigate("ListTemplate");
-                        }}
-                    >
-                        <Feather name="layout" size={24} color="black" />
-                      
-                    </TouchableOpacity>
-                      <Text style={{ marginTop: 1, fontSize: 12 }}>Templates</Text>
-                </View>
-                <View style={{ alignItems: 'center' }}>
-                    <TouchableOpacity
-                        style={{
-                            width: 50,
-                            height: 50,
-                            borderRadius: 50,
-                            backgroundColor: '#f2f2f2',
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                        }}
-                        onPress={() => {
-                            navigation.navigate("SavedReel", {
-                                userId: userid
-                            });
-                        }}
-                    >
-                        <Feather name="bookmark" size={24} color="black" />
-                      
-                    </TouchableOpacity>
-                      <Text style={{ marginTop: 1, fontSize: 12 }}>Saved</Text>
-                </View>
-                <View style={{ alignItems: 'center' }}>
-                    <TouchableOpacity
-                        style={{
-                            width: 50,
-                            height: 50,
-                            borderRadius: 50,
-                            backgroundColor: '#f2f2f2',
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                           
-                        }}
-                        onPress={() => {
-                            //setModalCanvaVisible(true);
-                            navigation.navigate("ShowReels");
-
-                        }}
-                    >
-                        <Feather name="folder" size={24} color="black" />
-                    </TouchableOpacity>
-                    <Text style={{ marginTop: 1, fontSize: 12 }}>Your Content</Text>
-
-                </View>
-
+                ))}
             </View>
+
+            <Text style={styles.sectionLabel}>Recent</Text>
             {/*
                 GalleryShow was commented out, so this screen showed a toolbar and
                 nothing else. It is self-contained -- it takes no props, asks for its
@@ -335,6 +274,43 @@ const NewReels = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
+    header: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: FB.divider,
+    },
+    headerTitle: { ...FB.font.title },
+    choices: { flexDirection: "row", gap: 12, paddingHorizontal: 14, paddingTop: 16 },
+    choice: { flex: 1 },
+    choiceFill: {
+        height: 96,
+        borderRadius: FB.radius.lg,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    choiceLabel: { ...FB.font.name, fontSize: 14, marginTop: 8, textAlign: "center" },
+    chips: { flexDirection: "row", gap: 8, paddingHorizontal: 14, paddingTop: 16 },
+    chip: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        paddingHorizontal: 12,
+        height: 32,
+        borderRadius: FB.radius.pill,
+        backgroundColor: FB.fill,
+    },
+    chipText: { ...FB.font.meta, fontWeight: "600" },
+    sectionLabel: {
+        ...FB.font.name,
+        fontSize: 15,
+        paddingHorizontal: 14,
+        paddingTop: 20,
+        paddingBottom: 10,
+    },
     container: {
         // flex was commented out, so the provider collapsed and every child
         // below the toolbar had zero height -- which is why the gallery never

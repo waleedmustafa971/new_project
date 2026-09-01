@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { FB } from '../../../theme/social';
 import {
     View, Text, TouchableOpacity, FlatList, Image,
     StyleSheet, ActivityIndicator, Alert,
@@ -220,7 +221,7 @@ const GalleryScreen = () => {
                 data={gallery}
                 keyExtractor={(item, index) => index}
                 renderItem={renderItem}
-                numColumns={4}
+                numColumns={3}
                 onEndReached={handleLoadMore}
                 onEndReachedThreshold={0.5}
                 ListFooterComponent={isLoading ? <ActivityIndicator size="large" color="#0000ff" /> : null}
@@ -233,12 +234,17 @@ const GalleryScreen = () => {
                         <TouchableOpacity
                             onPress={addImage}
                             style={{
-                                backgroundColor: '#2196F3',
-                                padding: 15,
-                                borderRadius: 50,
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 6,
+                                backgroundColor: FB.primary,
+                                paddingHorizontal: 18,
+                                height: 40,
+                                borderRadius: FB.radius.md,
                             }}
                         >
-                            <Ionicons name="add" size={30} color="white" />
+                            <Ionicons name="add" size={20} color="white" />
+                            <Text style={{ color: '#fff', fontWeight: '600', fontSize: 15 }}>Add photos</Text>
                         </TouchableOpacity>
                     </View>
                 }
@@ -288,26 +294,31 @@ const GalleryScreen = () => {
 };
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#fff' },
+    container: { flex: 1, backgroundColor: FB.surface },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: 15,
-        borderBottomWidth: 1,
-        borderColor: '#ddd',
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: FB.divider,
     },
     leftIcon: { flex: 1 },
-    title: { flex: 3, textAlign: 'center', fontSize: 16, fontWeight: 'bold' },
+    /* Left-aligned at the app's title size, like every other screen header
+       here. Centred at 16px it was the odd one out. */
+    title: { flex: 3, fontSize: 20, fontWeight: '700', color: FB.text, marginLeft: 16 },
     rightIcon: { flex: 1, alignItems: 'flex-end' },
 
+    /* A 3-column grid on a phone: four columns gave 88px tiles, too small to
+       tell one photo from another. */
     imageContainer: {
-        flex: 1 / 4,
+        flex: 1 / 3,
         aspectRatio: 1,
-        margin: 2,
+        margin: 1.5,
         position: 'relative',
     },
-    image: { width: '100%', height: '100%', borderRadius: 5 },
+    image: { width: '100%', height: '100%', borderRadius: 4, backgroundColor: FB.fill },
     overlay: {
         position: 'absolute',
         bottom: 0,

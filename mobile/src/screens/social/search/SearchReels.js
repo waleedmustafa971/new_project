@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { FB } from '../../../theme/social';
 import {
     View, Text, TextInput, TouchableOpacity,
     FlatList, StyleSheet, ScrollView, Image,
@@ -114,35 +115,48 @@ const SearchReels = () => {
             >
         <View style={styles.container}>
             {/* Header with Search Input */}
+            {/*
+              One way out, not two.
+
+              The header carried a back arrow on the left AND a close X on the
+              right, both calling goBack() -- two controls for one action,
+              squeezing the field between them. The X is gone, the field gets
+              the width back, and the magnifier sits inside it the way every
+              search bar has it.
+            */}
             <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()}>
-                    <Ionicons name="arrow-back" size={24} color="black" />
+                <TouchableOpacity
+                    onPress={() => navigation.goBack()}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                    <Ionicons name="arrow-back" size={24} color={FB.text} />
                 </TouchableOpacity>
 
                 <View style={styles.searchContainer}>
+                    <Ionicons name="search" size={17} color={FB.textSecondary} />
                     <TextInput
                         ref={inputRef}
                         style={styles.searchInput}
-                        placeholder="Search by friends name / Reel / Video / Content "
+                        placeholder="Search people, reels and posts"
                         value={search}
                         onChangeText={handleTyping}
-                        placeholderTextColor="#9CA3AF"   // 👈 Add this
+                        placeholderTextColor={FB.textTertiary}
+                        autoFocus
+                        returnKeyType="search"
                     />
                     {search.length > 0 && (
-                        <TouchableOpacity style={styles.clearIcon}
+                        <TouchableOpacity
+                            style={styles.clearIcon}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                             onPress={() => {
                                 setSearch('');
                                 setCurrentPage(1);
                                 fetchProducts(1, '');
                             }}>
-                            <Ionicons name="close-circle" size={20} color="gray" />
+                            <Ionicons name="close-circle" size={18} color={FB.textSecondary} />
                         </TouchableOpacity>
                     )}
                 </View>
-
-                <TouchableOpacity onPress={() => navigation.goBack()}>                  
-                    <Ionicons name="close" size={24} color="black" />
-                </TouchableOpacity>
             </View>
             <SearchReelsView search={search} products={products} userid={userid}/>
 
@@ -160,27 +174,33 @@ const SearchReels = () => {
 export default SearchReels;
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#fff' },
+    container: { flex: 1, backgroundColor: FB.surface },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
-        padding: 10,
-        borderBottomWidth: 1,
-        borderColor: '#ddd',
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: FB.divider,
     },
+    /* A pill, not a rounded rectangle. Facebook's search field is fully
+       rounded and sits on the standard grey fill. */
     searchContainer: {
         flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
-        marginHorizontal: 10,
-        backgroundColor: '#f0f0f0',
-        borderRadius: 8,
-        paddingHorizontal: 10,
+        gap: 8,
+        marginLeft: 14,
+        backgroundColor: FB.fill,
+        borderRadius: FB.radius.pill,
+        paddingHorizontal: 14,
     },
     searchInput: {
         flex: 1,
         height: 40,
-        color: '#000'
+        fontSize: 15,
+        color: FB.text,
+        padding: 0,
     },
     clearIcon: {
         marginLeft: 5,

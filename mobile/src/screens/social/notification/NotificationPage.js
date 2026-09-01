@@ -9,6 +9,7 @@ import { useSocket } from '../../context/SocketContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../../../component/api';
 import * as base from '../../../component/global';
+import { FB } from '../../../theme/social';
 
 /*
   The notifications screen.
@@ -22,6 +23,38 @@ import * as base from '../../../component/global';
   before sending, so a row can stand for several people: `others` is how many
   beyond the named actor, which is what turns five likes into one line.
 */
+
+/*
+  The little coloured badge on the corner of the avatar.
+
+  A notification list where every row is an anonymous circle makes you read
+  each sentence to find out what happened. Facebook puts the verb on the
+  avatar, so the list is scannable at a glance -- blue thumb, green speech
+  bubble, red heart.
+*/
+const BADGE = {
+    like: { icon: 'thumbs-up', bg: '#1877F2' },
+    comment: { icon: 'chatbubble', bg: '#45BD62' },
+    comment_like: { icon: 'thumbs-up', bg: '#1877F2' },
+    reply: { icon: 'arrow-undo', bg: '#45BD62' },
+    follow: { icon: 'person-add', bg: '#1877F2' },
+    mention: { icon: 'at', bg: '#8B5CF6' },
+    tag: { icon: 'pricetag', bg: '#8B5CF6' },
+    share: { icon: 'arrow-redo', bg: '#1877F2' },
+    story_view: { icon: 'eye', bg: '#F7B928' },
+    subscription: { icon: 'star', bg: '#F7B928' },
+    gift: { icon: 'gift', bg: '#F3425F' },
+    login_alert: { icon: 'shield-checkmark', bg: '#65676B' },
+};
+const badgeFor = (type) => BADGE[type] || { icon: 'notifications', bg: '#65676B' };
+
+/* Thumbnails come back as stored paths, like every other image in this app. */
+const absolute = (path) => {
+    if (!path) return undefined;
+    return /^(https?:|file:|data:)/.test(path)
+        ? path
+        : `${base.BASE_URL}/${String(path).replace(/^\/+/, '')}`;
+};
 
 /* The wording for each type. Anything unknown falls back to a neutral phrase
    rather than rendering an empty sentence. */
@@ -134,13 +167,56 @@ const NotificationPage = () => {
 
     const onRefresh = () => { setRefreshing(true); load(); };
 
+    /*
+      Open what the notification is about.
+
+      Every row was inert -- no onPress anywhere on this screen -- so tapping a
+      notification did nothing at all. A notification exists to take you
+      somewhere; one that does not is just a receipt. A follow goes to the
+      person, everything carrying a post goes to the post, and anything else
+      falls back to the actor's profile.
+    */
+    const openNotification = (item) => {
+        const actor = item.actor || {};
+        const actorId = actor._id || actor.userid;
+
+        if (item.type === 'follow' || item.type === 'subscription') {
+            if (actorId) {
+                navigation.navigate('UserProfile', {
+                    userid: actorId, name: actor.name, image: actor.image,
+                });
+            }
+            return;
+        }
+        if (item.post) {
+            navigation.navigate('ShowReel', { reel: [{ _id: item.post }] });
+            return;
+        }
+        if (actorId) {
+            navigation.navigate('UserProfile', {
+                userid: actorId, name: actor.name, image: actor.image,
+            });
+        }
+    };
+
     const renderItem = ({ item }) => {
         const actor = item.actor || {};
         const others = item.others || 0;
+        const badge = badgeFor(item.type);
 
         return (
-            <View style={[styles.notificationItem, !item.read && styles.unreadItem]}>
-                <Image source={avatarFor(actor)} style={styles.avatar} />
+            <TouchableOpacity
+                style={[styles.notificationItem, !item.read && styles.unreadItem]}
+                onPress={() => openNotification(item)}
+                activeOpacity={0.6}
+            >
+                <View>
+                    <Image source={avatarFor(actor)} style={styles.avatar} />
+                    <View style={[styles.badge, { backgroundColor: badge.bg }]}>
+                        <Ionicons name={badge.icon} size={12} color="#fff" />
+                    </View>
+                </View>
+
                 <View style={styles.textContainer}>
                     <Text style={styles.notificationText}>
                         <Text style={styles.username}>{actor.name || 'Someone'}</Text>
@@ -148,10 +224,21 @@ const NotificationPage = () => {
                         {' '}
                         {describe(item)}
                     </Text>
-                    <Text style={styles.timeText}>{timeAgo(item.createdAt)}</Text>
+                    {/* Unread time reads in the accent colour, which is how the
+                        eye finds the new ones without hunting for dots. */}
+                    <Text style={[styles.timeText, !item.read && styles.timeUnread]}>
+                        {timeAgo(item.createdAt)}
+                    </Text>
                 </View>
-                {!item.read && <View style={styles.unreadDot} />}
-            </View>
+
+                {/* A thumbnail of the post, when the notification is about one.
+                    It was sent by the server all along and never drawn. */}
+                {item.thumbnail ? (
+                    <Image source={{ uri: absolute(item.thumbnail) }} style={styles.thumb} />
+                ) : !item.read ? (
+                    <View style={styles.unreadDot} />
+                ) : null}
+            </TouchableOpacity>
         );
     };
 
@@ -167,8 +254,11 @@ const NotificationPage = () => {
     return (
         <View style={styles.container}>
             <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()}>
-                    <Ionicons name="arrow-back" size={20} color="black" />
+                <TouchableOpacity
+                    onPress={() => navigation.goBack()}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                    <Ionicons name="arrow-back" size={24} color={FB.text} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Notifications</Text>
             </View>
@@ -181,9 +271,8 @@ const NotificationPage = () => {
                     keyExtractor={(item) => String(item._id)}
                     renderItem={renderItem}
                     contentContainerStyle={
-                        items.length ? { padding: 15 } : { flexGrow: 1, justifyContent: 'center' }
+                        items.length ? { paddingVertical: 4 } : { flexGrow: 1, justifyContent: 'center' }
                     }
-                    ItemSeparatorComponent={() => <View style={styles.separator} />}
                     ListEmptyComponent={empty}
                     refreshControl={
                         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -197,39 +286,54 @@ const NotificationPage = () => {
 export default NotificationPage;
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#fff' },
+    container: { flex: 1, backgroundColor: FB.surface },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
-        padding: 15,
-        borderBottomWidth: 1,
-        borderBottomColor: '#eee',
+        gap: 16,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: FB.divider,
     },
-    headerTitle: { fontSize: 12, fontWeight: 'bold', marginLeft: 15 },
+    /* 12px bold is a caption, not a screen title. */
+    headerTitle: { fontSize: 20, fontWeight: '700', color: FB.text },
+
     notificationItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 10,
+        paddingVertical: 12,
+        paddingHorizontal: 16,
     },
-    unreadItem: { backgroundColor: '#f5f9ff' },
+    unreadItem: { backgroundColor: FB.primarySoft },
     avatar: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
-        marginRight: 15,
+        width: 56, height: 56, borderRadius: 28,
+        marginRight: 12,
+        backgroundColor: FB.fill,
+    },
+    badge: {
+        position: 'absolute',
+        bottom: -1, left: 34,
+        width: 24, height: 24, borderRadius: 12,
+        alignItems: 'center', justifyContent: 'center',
+        borderWidth: 2, borderColor: FB.surface,
     },
     textContainer: { flex: 1 },
-    notificationText: { fontSize: 12, color: '#333' },
-    username: { fontWeight: 'bold', color: '#000' },
-    timeText: { color: '#999', fontSize: 12, marginTop: 5 },
+    /* 12px body text on a list you are meant to read. */
+    notificationText: { fontSize: 15, lineHeight: 20, color: FB.text },
+    username: { fontWeight: '700', color: FB.text },
+    timeText: { color: FB.textSecondary, fontSize: 13, marginTop: 3 },
+    timeUnread: { color: FB.primary, fontWeight: '600' },
     unreadDot: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        backgroundColor: '#1d7fe0',
-        marginLeft: 8,
+        width: 12, height: 12, borderRadius: 6,
+        backgroundColor: FB.primary,
+        marginLeft: 10,
     },
-    separator: { height: 1, backgroundColor: '#f0f0f0', marginVertical: 5 },
+    thumb: {
+        width: 52, height: 52, borderRadius: 6,
+        marginLeft: 10,
+        backgroundColor: FB.fill,
+    },
     empty: { alignItems: 'center', justifyContent: 'center', padding: 30 },
-    emptyText: { color: '#999', fontSize: 13, marginTop: 10, textAlign: 'center' },
+    emptyText: { color: FB.textSecondary, fontSize: 15, marginTop: 12, textAlign: 'center' },
 });
