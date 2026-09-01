@@ -374,11 +374,28 @@ const MusicShowPage = () => {
                             soundRef.current = null;
                           });
                         }
-                        takeMusictoparents(item);
-                        console.log('takeMusictoparents...' + item)
-                        Alert.alert(JSON.stringify(item))
-                        navigation.navigate("StartStory")
-                      //  onClose();
+                        /*
+                          Three things were wrong with this one handler.
+
+                          `takeMusictoparents` is not defined anywhere in this
+                          file and this screen takes no props -- it is a
+                          registered route, not a child component -- so the tap
+                          threw ReferenceError before it did anything else.
+                          Behind that sat `Alert.alert(JSON.stringify(item))`,
+                          a raw debug dump shown to the user, and then a
+                          navigation to "StartStory", which is not a registered
+                          route: that file imports ./TextEditor and
+                          ./FinalPostmodal, neither of which exists beside it,
+                          so it cannot be registered without breaking the
+                          bundle. It is abandoned.
+
+                          This screen is a music browser reached from within
+                          Social. Confirming a track stops playback and returns
+                          to whatever opened it, which keeps it inside the
+                          module and is the only honest behaviour available
+                          until a picker actually consumes the choice.
+                        */
+                        navigation.goBack();
                       }}
                     >
                       <Feather name="check" size={20} color="white" />

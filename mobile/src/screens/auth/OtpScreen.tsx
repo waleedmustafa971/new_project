@@ -15,6 +15,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { notifySessionChanged } from "../../component/session";
+import { HOME_RESET } from '../../navigation/homeRoute';
 import * as base from '../../component/global'
 
 
@@ -126,7 +127,12 @@ const OtpScreen = ({ route }: any) => {
             // so the device has to be registered for push.
             registerPushToken();
 
-          navigation.navigate("HomeScreen");
+          /*
+            A finished sign-in resets rather than pushes: pushing leaves the
+            OTP screen underneath, so the hardware back button returns to a
+            code entry the person has already completed.
+          */
+          navigation.reset(HOME_RESET as never);
         }
       }
       else if (data.message === "Invalid OTP") {

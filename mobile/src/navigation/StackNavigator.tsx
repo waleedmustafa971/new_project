@@ -214,6 +214,18 @@ export default function StackNavigator() {
         }}
       />
 
+      {/*
+        The hub — the nine-tile module chooser.
+
+        PARKED, not removed. Phase one ships Social only, so the app opens
+        straight into HomeSocial and nothing routes here any more; see
+        navigation/homeRoute.ts, where flipping HUB_ENABLED to true sends every
+        "home" tap and every finished login back to this screen.
+
+        It stays registered on purpose. Un-registering it would turn any
+        lingering navigate("HomeScreen") into a crash instead of a working
+        screen, and the hub still has to be reachable to be worked on.
+      */}
       <Stack.Screen
         name="HomeScreen"
         component={HomeScreen}

@@ -67,7 +67,10 @@ const StepOne = (props: any) => {
         {/* Close button */}
         <TouchableOpacity
           style={styles.closeButton}
-          onPress={() => props.navigation.navigate('HomeScreen')}
+          /* Dismissing the email form goes back where it was opened from,
+             which is the auth screen. It pointed at the hub — a signed-out
+             person's "close" landed on a home screen. */
+          onPress={() => props.navigation.goBack()}
         >
           <EvilIcons name="close" size={24} color="black" />
         </TouchableOpacity>

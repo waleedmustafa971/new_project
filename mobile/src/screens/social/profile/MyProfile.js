@@ -1,5 +1,5 @@
 import {
-    View, Text, SafeAreaView, StyleSheet, Image, TouchableOpacity, ImageBackground, Alert, ScrollView, ActivityIndicator, Dimensions
+    View, Text, SafeAreaView, StyleSheet, Image, TouchableOpacity, ImageBackground, Alert, ScrollView, ActivityIndicator, Dimensions, Linking
 } from "react-native";
 import React, { useState, useEffect } from "react";
 import Ionicons from "react-native-vector-icons/Ionicons"; // Importing icons from expo vector icons
@@ -81,8 +81,18 @@ const MyProfile = ({ navigation }) => {
             await AsyncStorage.removeItem("userinfo");
             await AsyncStorage.removeItem("token"); //studentid
             await AsyncStorage.removeItem("studentid"); //studentid */
-            //  Alert.alert('Logout Success!');
-            navigation.navigate("HomeScreen");
+            /*
+              Signing out goes to the sign-in screen, not to a home screen.
+              It used to land on the hub, which read storage, found nothing and
+              bounced to AuthScreen — a redirect that only worked because the
+              hub happened to be in the way. With the app opening straight into
+              Social there is nothing in the way any more, and logging out would
+              have dropped a signed-out person onto the timeline.
+
+              Reset, not navigate: the stack behind this belongs to the account
+              that just signed out.
+            */
+            navigation.reset({ index: 0, routes: [{ name: "AuthScreen" }] });
         } catch (error) {
             console.log("AsyncStorage error: " + error.message);
         }
@@ -95,9 +105,9 @@ const MyProfile = ({ navigation }) => {
             const jsonValue = await AsyncStorage.getItem("userdata");
 
             if (storedUsername === null) {
-                // If username is null, show the loader and navigate to HomeScreen
+                // No session: the sign-in screen, for the same reason as above.
                 setLoading(true);
-                navigation.navigate("HomeScreen");
+                navigation.reset({ index: 0, routes: [{ name: "AuthScreen" }] });
             } else {
                 if (jsonValue != null) {
                     const userData = JSON.parse(jsonValue);
@@ -643,9 +653,16 @@ const MyProfile = ({ navigation }) => {
                         </TouchableOpacity>
 
 
+                        {/*
+                          "SettingLang" is not a registered route and no screen
+                          by that name has ever existed, so Privacy Policy was a
+                          row that did nothing. The policy is published and live
+                          at maxsocialapp.com/policy -- the same URL the app
+                          stores are given -- so the row opens that.
+                        */}
                         <TouchableOpacity
                             style={styles.optionContainer}
-                            onPress={() => navigation.navigate("SettingLang")}
+                            onPress={() => Linking.openURL('https://maxsocialapp.com/policy')}
                         >
                             <View style={[styles.leftSection, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                                 <Ionicons name="document-text" size={24} color="#000" style={styles.icon} />

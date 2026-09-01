@@ -15,6 +15,7 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { useDispatch, useSelector } from "react-redux";
 import { loginUser } from "../../store/slice/authSlice";
 import Toast from 'react-native-toast-message';
+import { HOME_RESET } from '../../navigation/homeRoute';
 import { useFocusEffect } from '@react-navigation/native'
 
 
@@ -65,7 +66,8 @@ const StepFive = ({ route }) => {
         .unwrap()
         .then((data) => {
           console.log('data...' + data)
-          navigation.navigate("HomeScreen");
+          // Reset, not navigate: the login form must not stay behind Home.
+          navigation.reset(HOME_RESET);
         })
         .catch((err) => {
           console.log('error......' + err)

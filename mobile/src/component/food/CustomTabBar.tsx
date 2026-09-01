@@ -1,4 +1,5 @@
 import { useNavigation, NavigationProp } from '@react-navigation/native';
+import { HOME_ROUTE } from '../../navigation/homeRoute';
 import React from 'react';
 import {
   View,
@@ -14,6 +15,8 @@ import AnimatedIcon from './AnimatedIcon';
 // 1. Define the screens and their params
 type RootStackParamList = {
   HomeScreen: undefined;
+  // Home resolves to Social while the hub is parked; see navigation/homeRoute.
+  HomeSocial: undefined;
   FoodDashboard: undefined;
   FoodProfile: undefined;
   FoodViewcart: undefined;
@@ -63,7 +66,7 @@ const CustomTabBar = ({ latitude, longitude  } : any) => {
       {/* BOTTOM NAVIGATION BAR */}
       <View style={styles.navBar}>
         <NavItem icon="home" label="home" onPress={() => {
-          navigation.navigate("HomeScreen");
+          navigation.navigate(HOME_ROUTE);
         }} />
         <NavItem icon="silverware-fork-knife" label="Food" onPress={() => {
           navigation.navigate("FoodDashboard");

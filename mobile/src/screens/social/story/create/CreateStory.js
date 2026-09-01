@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
+import { HOME_ROUTE } from '../../../../navigation/homeRoute';
 import {
     View,
     Text,
@@ -146,7 +147,14 @@ const CreateStory = ({ navigation }) => {
     };
 
     const closeReelmodal = async () => {
-        navigation.navigate("Dashboard");
+        /*
+          "Dashboard" is not a registered route -- nothing in the navigator has
+          ever been called that. This runs as the finalSubmit callback, so
+          posting left you sitting on the create screen with an error in the log
+          and no way forward but the back button. Land on the timeline, which is
+          where the thing you just posted appears.
+        */
+        navigation.reset({ index: 0, routes: [{ name: HOME_ROUTE }] });
     };
 
     const requestStoragePermission = async () => {

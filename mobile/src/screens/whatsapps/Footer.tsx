@@ -7,11 +7,14 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSocket } from '../context/SocketContext';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { HOME_ROUTE } from '../../navigation/homeRoute';
 
 type RootStackParamList = {
   ChatScreen: { userid: string, userinfo: object };
   HomeWhatsapp: undefined;
   HomeScreen: undefined;
+  // Home resolves to Social while the hub is parked; see navigation/homeRoute.
+  HomeSocial: undefined;
   Setting: undefined;
   CreateGroup: {userid: string , userinfo: object};
 };
@@ -89,8 +92,12 @@ const Footer = () => {
 
   return (
     <View style={styles.footer}>
+      {/* This footer is reached from inside Social — its top-bar message icon
+          and the Inbox button on the profile both open ChatScreen, which
+          renders this. Home dropped you at the hub from there, which is the
+          escape hatch people kept falling through. */}
       <TouchableOpacity style={styles.footerItem}
-        onPress={() => navigation.navigate("HomeScreen")}>
+        onPress={() => navigation.navigate(HOME_ROUTE)}>
         <Image source={HomeIcon} style={{ width: 25, height: 25 }} />
       </TouchableOpacity>
 

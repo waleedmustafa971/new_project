@@ -6,6 +6,7 @@ import {
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import * as base from '../../component/global'
 import Toast from 'react-native-toast-message';
+import { HOME_RESET } from '../../navigation/homeRoute';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -58,7 +59,7 @@ const YourInterestScreen = () => {
         setLoading(false)
         if (data.message === "interested updated") {
           setLoading(false)
-          navigation.navigate("HomeScreen");
+          navigation.reset(HOME_RESET);
         } else if (data.message == "All fields are required") {
           Toast.show({
             type: 'error',
@@ -105,7 +106,7 @@ const YourInterestScreen = () => {
           <Text style={styles.subtitle}>Get better video recommendations</Text>
         </View>
         <TouchableOpacity style={styles.skipButton} onPress={() => {
-          navigation.navigate("HomeScreen")
+          navigation.reset(HOME_RESET)
         }}>
           <Text style={styles.skipText}>Skip</Text>
           <Icon name="navigate-next" size={20} color="#000" />

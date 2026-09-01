@@ -5,6 +5,7 @@ import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import Feather from 'react-native-vector-icons/Feather';
 import ModalFooter from './ModalFooter';
+import { HOME_ROUTE } from '../../navigation/homeRoute';
 
 const { width } = Dimensions.get("window");
 
@@ -31,9 +32,12 @@ const Footerpage = ({ navigation }: any) => {
 
       {/* FOOTER */}
       <View style={styles.footer}>
+        {/* Home is Social's own timeline, not the module chooser. This sent
+            people out of the module they were using — the one thing a footer
+            Home button should never do. */}
         <TouchableOpacity
           style={styles.footerItem}
-          onPress={() => navigation.navigate("HomeScreen")}
+          onPress={() => navigation.navigate(HOME_ROUTE)}
         >
           <Feather name="home" size={18} color="black" />
         </TouchableOpacity>

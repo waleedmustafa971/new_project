@@ -18,6 +18,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
 import LanguageModal from "./lang/LanguageModal";
 import { requestAllPermissions, getLiveLocation } from '../screens/permission/PermissionManager';
+import { HOME_ROUTE } from '../navigation/homeRoute';
 
 type RootStackParamList = {
     HomeSocial: undefined;
@@ -135,9 +136,15 @@ const loadUserData = async () => {
     setLoading(false);
 
     if (storedUsername) {
+      /*
+        Straight into Social. This used to land on the hub — a grid of nine
+        tiles with eight of them locked — which every returning user then had
+        to tap through to reach the only module that works. HOME_ROUTE keeps
+        the hub one boolean away; see navigation/homeRoute.ts.
+      */
       navigation.reset({
         index: 0,
-        routes: [{ name: 'HomeScreen' }],
+        routes: [{ name: HOME_ROUTE as never }],
       });
     } else {
         LoadLocation();
