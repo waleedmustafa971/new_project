@@ -27,6 +27,8 @@ import PeopleYouMayKnowSection from "./post/PeopleYouMayKnowSection";
 import { useUser } from "../context/UserContext";
 import api from "../../component/api";
 import Toast from "react-native-toast-message";
+import Composer from "../../component/social/Composer";
+import { FB } from "../../theme/social";
 
 type RootStackParamList = {
   HomeSocial: undefined;
@@ -238,6 +240,7 @@ const HomeSocial = () => {
       <TopMenu navigation={navigation} userid={user?._id} userinfo={user} />
       <View style={{ display: 'flex' }}>
         <FlatList
+          style={{ backgroundColor: FB.page }}
           data={renderData}
           extraData={getpost}
           keyExtractor={(item, index) =>
@@ -258,6 +261,17 @@ const HomeSocial = () => {
           }}
           ListHeaderComponent={
             <>
+              {/* Composer first, then stories, then reels -- Facebook's order.
+                  Writing a post had no entry point on this screen at all; it
+                  lived behind the footer's "+" menu and a row in the profile
+                  settings list. */}
+              <Composer
+                avatar={userImage}
+                onCompose={() => navigation.navigate('CreatePost' as never)}
+                onLive={() => navigation.navigate('CreateStream' as never)}
+                onPhoto={() => navigation.navigate('CreatePost' as never)}
+                onFeeling={() => navigation.navigate('CreatePost' as never)}
+              />
               <StoryScreen navigation={navigation} name={userName} image={userImage} />
               <ReelsFeed userid={userid} refreshKey={refreshKey} />
             </>
@@ -305,9 +319,14 @@ const HomeSocial = () => {
 const styles = StyleSheet.create({
   MainContainer: {
     flex: 1,
-    backgroundColor: "#ffffff",
+    /*
+      Grey, not white. The cards are white and the page shows through between
+      them as the separator -- that contrast is what makes a Facebook feed read
+      as a stack of separate posts. On a white page the white cards had to be
+      outlined with hairlines instead, and the whole column ran together.
+    */
+    backgroundColor: FB.page,
     padding: 0
-    //paddingTop: Platform.OS === "android" ? 0 : 0, // ✅ number, not string
   },
   /* Dev-only, so it should sit quietly out of the way rather than compete with
      the feed. It was large and fully opaque, landing on top of whichever post's

@@ -23,9 +23,13 @@ import io, { Socket } from "socket.io-client";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from "../../../component/api";
 import SuccessModal from "./SuccessModal";
-import LiveChatMessage from "../../../component/livechat/LiveChatMessage";
+/* LiveChatMessage is superseded by LiveCommentStream: a panel with its own
+   band of the screen became an overlay rising off the video. The component is
+   left in place for the other live screens that still render it. */
 import LiveChatFooter from "../../../component/livechat/LiveChatFooter";
-import LiveRoomHeader from "./liveroom/LiveRoomHeader";
+import { LiveTopBar, LiveRail, LiveCommentStream } from "../../../component/social/LiveOverlay";
+import { TT } from "../../../theme/social";
+/* LiveRoomHeader is superseded by LiveTopBar. Still rendered by Interactive.tsx. */
 /* The sibling in component/livechat/ reads a legacy /apis/live/get-gifts
    that returns nothing, takes show/onHide, and charges no coins. This one is
    the catalogue-backed sheet that actually spends. */
@@ -110,6 +114,14 @@ const InteractiveRoom: React.FC<Props> = ({ route, navigation }) => {
     const [messages, setMessages] = useState<{ text: string; system?: boolean; sender?: User }[]>([]);
     // const messagesEndRef = useRef<HTMLDivElement | null>(null); // ORIGINAL: Not used in RN
     const [messageInput, setMessageInput] = useState("");
+    /*
+      The rail's heart. Live likes are a mood meter, not a persisted reaction:
+      TikTok counts taps and lets them go. Kept local so a tap is instant, and
+      seeded from nothing because a room you just joined has no history worth
+      showing.
+    */
+    const [liveLikes, setLiveLikes] = useState(0);
+    const [liked, setLiked] = useState(false);
     const [user, setUser] = useState<User | null>(null);
     const scrollViewRef = useRef<ScrollView | null>(null);
     const [activeGift, setActiveGift] = useState(0)
@@ -575,10 +587,12 @@ const InteractiveRoom: React.FC<Props> = ({ route, navigation }) => {
 
     return (
         <View style={styles.container}>
-            {/* --- Debugging Text (Updated to show all UIDs) --- */}
-            <Text style={styles.debugTextOverlay}>
-                Host UID: {hostUid} | All UIDs: {remoteUid.join(', ')} | Is Cohost: {isCohost ? 'YES' : 'NO'}
-            </Text>
+            {/*
+              The Agora UID debug line that used to print here -- "Host UID:
+              12345 | All UIDs: ... | Is Cohost: NO" -- was shipping across the
+              host's face in production. It is gone; the same values are in the
+              console for anyone debugging.
+            */}
 
             {/* 1. BACKGROUND VIDEO (HOST) */}
             <View style={styles.videoContainer}>                
@@ -607,10 +621,17 @@ const InteractiveRoom: React.FC<Props> = ({ route, navigation }) => {
                 )}
             </View>
 
-            {/* 2. HEADER OVERLAY */}
-            <LiveRoomHeader hosterinfo={hosterinfo}
-                onClose={handleCloseStream} activeGift={activeGift}
-                viewerCount={viewerCount} />
+            {/* 2. TOP OVERLAY — host pill, LIVE chip, viewer count, close.
+                 Was a full-width header strip sitting above the video in the
+                 layout flow; it is an overlay on the video now, which is the
+                 whole point of a live screen. */}
+            <LiveTopBar
+                hostName={hosterinfo?.hoster?.name}
+                hostImage={hosterinfo?.hoster?.image}
+                isFollowing={hosterinfo?.hoster?.is_following}
+                viewerCount={viewerCount}
+                onClose={handleCloseStream}
+            />
 
             {/* 3. CO-HOST SLOTS (5 Boxes) */}
             <View style={styles.coHostWrapper}>
@@ -648,15 +669,23 @@ const InteractiveRoom: React.FC<Props> = ({ route, navigation }) => {
                 )}
             </View>
             
-            {/* 4. Chat Area */}
-            <View style={styles.chatArea}>
-                <View style={styles.welcomeMsg}>
-                    <Text style={styles.welcomeText}>
-                        Welcome to live stream!.
-                    </Text>
-                </View>
-                <LiveChatMessage messages={messages} />
-            </View>
+            {/* 4. COMMENT STREAM — rising from the bottom-left over the video,
+                 a short rolling window rather than a chat panel occupying its
+                 own band of the screen. */}
+            <LiveCommentStream messages={messages} />
+
+            {/* 5. ACTION RAIL — the right-hand column. There was no equivalent:
+                 liking, gifting and sharing were spread between a header and a
+                 footer bar, and the only way to send a gift was a button on the
+                 keyboard row. */}
+            <LiveRail
+                likeCount={liveLikes}
+                liked={liked}
+                commentCount={messages?.length || 0}
+                onLike={() => { setLiked(true); setLiveLikes((n) => n + 1); }}
+                onGift={handGift}
+                onComment={() => setShowEmojis(false)}
+            />
 
             {/* 5. Live Chat Footer (Restored) */}
             <LiveChatFooter
@@ -715,7 +744,7 @@ const InteractiveRoom: React.FC<Props> = ({ route, navigation }) => {
 /* ===================== STYLES ===================== */
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: "#000" },
+    container: { flex: 1, backgroundColor: TT.ground },
     videoContainer: { ...StyleSheet.absoluteFillObject },
     fullVideo: { width: "100%", height: "100%" },
     

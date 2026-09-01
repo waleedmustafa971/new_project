@@ -2,7 +2,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import bodyParser from "body-parser";
 import User from "../models/users.js"; // import model user
-import Reel from "../models/Reels.js";
+import Reel, { REACTIONS } from "../models/Reels.js";
 import { NOT_DELETED } from "../helpers/feed.js";
 import { canViewPost } from "../helpers/safety.js";
 import mongoose from "mongoose";
@@ -424,6 +424,33 @@ export const getRecentstory = async (req, res) => {
 };
 
 
+/*
+  The reaction summary a Facebook-style action bar needs.
+
+  The feed has always sent `likes` as a single number, which is all a thumb
+  needs -- but the reaction set (like / love / haha / wow / sad / angry) has
+  existed on the model and behind /apis/engagement since the Engagement build,
+  and a card cannot draw the right lit-up face, or the overlapping cluster of
+  the top three, from a total alone.
+
+  Added alongside `likes`, never in place of it: every existing caller reads
+  that number and none of them know about this field.
+*/
+export const reactionsOf = (likes = [], viewerId) => {
+  const counts = Object.fromEntries(REACTIONS.map((r) => [r, 0]));
+  let myReaction = null;
+  for (const l of likes) {
+    const type = REACTIONS.includes(l?.type) ? l.type : "like";
+    counts[type] += 1;
+    // `username` is a bare id here; it arrives populated only on the
+    // engagement list endpoint.
+    if (viewerId && String(l?.username?._id || l?.username) === String(viewerId)) {
+      myReaction = type;
+    }
+  }
+  return { total: likes.length, counts, myReaction };
+};
+
 /* ---- wall helpers ---- */
 
 const WALL_TYPES = new Set(["posts", "reels", "media", "all"]);
@@ -635,6 +662,7 @@ export const userWall = async (req, res) => {
           Nothing reads the arrays here — the grid only ever wanted totals.
         */
         likes: sumCounts(p.likes),
+        reactions: reactionsOf(p.likes, viewerId),
         dislikes: sumCounts(p.dislikes),
         comments: p.comments?.length ?? 0,
         favorites: sumCounts(p.favorites),
@@ -954,6 +982,13 @@ export const getPosts = async (req, res) => {
           favorites: reel.favorites.reduce((sum, item) => sum + item.count, 0),
           shares: reel.shares.reduce((sum, item) => sum + item.count, 0),
           stars: reel.stars.reduce((sum, item) => sum + item.count, 0),
+          /*
+            The six-way reaction summary the feed card draws: which face is lit
+            for this viewer, and the counts behind the overlapping cluster.
+            Additive -- `likes` above is untouched and is still the plain
+            number every existing caller reads.
+          */
+          reactions: reactionsOf(reel.likes, viewerId),
           followStatus: isFollowing ? "follow" : "not follow",
           userInfo: user
             ? {

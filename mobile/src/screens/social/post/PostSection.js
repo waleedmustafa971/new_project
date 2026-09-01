@@ -26,15 +26,15 @@ import { getUserData } from "../../../store/slice/authSlice";
 import LinearGradient from "react-native-linear-gradient";
 import ShareContentinPost from "./ShareContentinPost";
 import api from "../../../component/api";
-import LoveIcon from "../../../assets/post/love.svg";
-import RedLoveIcon from "../../../assets/post/red_love.svg";
-import CommentIcon from "../../../assets/post/comment.svg";
-import ShareIcon from "../../../assets/post/share.svg";
-import SaveIcon from "../../../assets/post/save.svg";
+/* The five hand-drawn SVG icons went with the strip that used them. The
+   action row is Facebook's now -- a lit-up reaction face or an outline thumb,
+   drawn from the reaction set rather than from bespoke artwork. */
 import Toast from "react-native-toast-message";
 import SaveModal from "./SaveModal";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import ReportSheet from "./ReportSheet";
+import { FB } from "../../../theme/social";
+import ActionBar from "../../../component/social/Reactions";
 
 const PostSection = ({ post: initialPost, navigation, userid }) => {
   // console.log('..get post data...' + post.userInfo.userid)
@@ -61,8 +61,22 @@ const PostSection = ({ post: initialPost, navigation, userid }) => {
   // const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [username, setUsername] = useState(null);
-  const [likes, setLikes] = useState(post.likes || 0);
-  const [liked, setLiked] = useState(false);
+
+  /*
+    The six-way reaction state, seeded from what the feed sent.
+
+    The card used to keep a boolean and a count and drive them through
+    /apis/reel/addlike -- a thumb, and nothing else, in a product whose backend
+    has carried like / love / haha / wow / sad / angry since the Engagement
+    build. ActionBar owns the interaction now; this holds the seed and the
+    latest summary so the counts above the bar stay in step.
+  */
+  const [reactions, setReactions] = useState(
+    post.reactions || { total: post.likes || 0, counts: {}, myReaction: null }
+  );
+  useEffect(() => {
+    if (post.reactions) setReactions(post.reactions);
+  }, [post.reactions]);
   const [sharedata, setSharedata] = useState([]);
   const [shareModal, setShareModal] = useState(false);
   const [followedUsersing, setFollowedUsersing] = useState([]);
@@ -180,55 +194,27 @@ const PostSection = ({ post: initialPost, navigation, userid }) => {
     return t.isAfter(dayjs()) ? "just now" : t.fromNow();
   };
 
+  /*
+    The per-card `checkliked` round trip is gone.
+
+    Every card in the feed fired its own POST to /apis/reel/checkliked on
+    mount -- ten posts, ten requests, on every page -- to learn one boolean the
+    feed could have sent all along. It also asked with AsyncStorage's
+    "username", which holds an email, while the endpoint keys on the user id,
+    so for reel-composer posts it answered false regardless of the truth.
+
+    `reactions.myReaction` arrives with the post now and carries strictly more
+    information: not just whether you reacted but which of the six it was.
+  */
   useEffect(() => {
-    const checkIfLiked = async () => {
-      const user = await AsyncStorage.getItem("username");
-      setUsername(userid);
-      // fetch from your API if user has liked this reel
-      const res = await fetch(`${base.BASE_URL}/apis/reel/checkliked`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: user, id: post._id }),
-      });
-      const result = await res.json();
-      if (result.liked) {
-        setLiked(true);
-      }
-    };
-
-    checkIfLiked();
-  }, []);
+    setUsername(userid);
+  }, [userid]);
 
 
 
-  const handleLike = async (reelId) => {
-    console.log('....like post.....', reelId)
-    setLiked(prev => !prev);
-    setLikes(prev => prev + (liked ? -1 : 1));
-    try {
-      // 1️⃣ Get logged-in username     
-      const endpoint = liked
-        ? "/apis/reel/removeslike"
-        : "/apis/reel/addlike";
-      console.log('reelId.... ', reelId)
-      // 3️⃣ Axios POST request
-      const response = await api.post(endpoint, {
-        username: userid,
-        id: reelId,
-      });
-
-      // 4️⃣ Axios already parses JSON → no response.text()
-      const result = response.data;
-      console.log('....data..... ', response.data)
-      // 5️⃣ Update UI state
-      if (result?.totalLikes !== undefined) {
-        //   setLikes(result.totalLikes);
-        //   setLiked((prev) => !prev); // safer toggle
-      }
-    } catch (error) {
-      console.error("Like toggle error:", error);
-    }
-  };
+  /* handleLike is gone with the button that called it: it posted to
+     /apis/reel/addlike, which knows only "like". Reactions go through
+     /apis/engagement/posts/:id/react inside ActionBar. */
 
   const handleComment = async (post) => {
     const user = await AsyncStorage.getItem("username");
@@ -325,22 +311,16 @@ const PostSection = ({ post: initialPost, navigation, userid }) => {
   if (hidden) return null;
 
   return (
-    <View style={{
-      marginBottom: 1,
-      borderWidth: 1, borderColor: '#f2f2f2',
-      marginBottom: 2,
-      padding: 0 //7
-    }}>
-      <View style={{
-        marginBottom: 2,
-        //padding: 3, backgroundColor: 'white'
-      }}>
-        <View style={{
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: 8, padding: 7
-        }}>
+    /*
+      A Facebook feed card: a white surface on the grey page, full-bleed, with
+      the page itself showing through as the gap between cards. It used to be a
+      white box on a white page ringed with a 1px #f2f2f2 border, which is why
+      the timeline read as one undifferentiated column rather than a stack of
+      separate posts.
+    */
+    <View style={styles.card}>
+      <View>
+        <View style={styles.header}>
           {/* Username and User logo */}
           <View style={{
             flexDirection: 'row',
@@ -356,11 +336,7 @@ const PostSection = ({ post: initialPost, navigation, userid }) => {
                     ? { uri: base.BASE_URL + '/' + post.userInfo.image }
                     : require("../../../assets/user.png")
                 }
-                style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 50, marginRight: 7 // fully rounded avatar
-                }}
+                style={styles.avatar}
               />
               {/*  <Text>{base.BASE_URL + post.userInfo.image}</Text> */}
             </TouchableOpacity>
@@ -373,16 +349,28 @@ const PostSection = ({ post: initialPost, navigation, userid }) => {
                       else — the flag was never sent to the feed, and never
                       drawn if it had been. */}
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    <Text style={{ fontSize: 14, fontWeight: '600' }}>
+                    <Text style={styles.authorName}>
                       {post.userInfo?.name}
                     </Text>
                     {post.userInfo?.verifiedBadge ? (
                       <Ionicons name="checkmark-circle" size={14} color="#2563EB" />
                     ) : null}
                   </View>
-                  <Text style={{ fontSize: 12 }}>
-                    {getTimeAgo(post?.xtime)}
-                  </Text>
+                  {/* Facebook puts the audience beside the timestamp -- it is
+                      the only place you can tell who can see what you posted. */}
+                  <View style={styles.metaRow}>
+                    <Text style={styles.metaText}>{getTimeAgo(post?.xtime)}</Text>
+                    <Text style={styles.metaDot}>·</Text>
+                    <Ionicons
+                      name={
+                        post?.audience === 'onlyMe' ? 'lock-closed'
+                          : post?.audience === 'followers' || post?.audience === 'closeFriends' ? 'people'
+                            : 'earth'
+                      }
+                      size={11}
+                      color={FB.textSecondary}
+                    />
+                  </View>
                 </TouchableOpacity>
               </View>
               {/*
@@ -492,11 +480,15 @@ const PostSection = ({ post: initialPost, navigation, userid }) => {
           >
             <Text
               style={{
-                fontSize: viewfont,
+                // 15px is Facebook's body size. 14 is the single most common
+                // reason a rebuilt feed looks close but not right.
+                fontSize: isWhiteBackground ? (post?.xfontsize ? viewfont : 15) : viewfont,
+                lineHeight: isWhiteBackground ? 20 : undefined,
+                color: FB.text,
                 marginBottom: isWhiteBackground ? 8 : 0,
                 textAlign: isWhiteBackground ? 'left' : 'center',
               }}
-              numberOfLines={expanded ? 0 : 2}
+              numberOfLines={expanded ? 0 : 5}
             >
               {post.videoTitle || ''}
             </Text>
@@ -517,7 +509,7 @@ const PostSection = ({ post: initialPost, navigation, userid }) => {
                     textAlign: isWhiteBackground ? 'left' : 'center',
                   }}
                 >
-                  {expanded ? 'Read less' : 'Read more'}
+                  {expanded ? 'See less' : 'See more'}
                 </Text>
               </TouchableOpacity>
             )}
@@ -541,83 +533,39 @@ const PostSection = ({ post: initialPost, navigation, userid }) => {
           </View>
         )}
 
-        <View
-          style={{
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            marginBottom: 8, marginTop: 5,
-            width: '100%', borderWidth: 0,
-            borderColor: 'red',
-            padding: 7
-          }}
+        {/*
+          Like / Comment / Share, the Facebook way.
+
+          What was here was a 120px-wide strip of three SVG icons with raw
+          counts beside them, plus a save icon floated to the right. It drove a
+          binary like through the legacy endpoint, so the six reactions the
+          backend has always supported were unreachable, and the counts had no
+          summary line -- you could not see who had reacted or with what.
+
+          ActionBar owns the whole interaction: tap to like, hold for the
+          reaction picker, and the summary row above it showing the top three
+          faces and "You and N others". Save keeps its own affordance in the
+          header menu's place, at the end of the row.
+        */}
+        <ActionBar
+          postId={post._id}
+          userId={userid}
+          initialCounts={reactions.counts}
+          initialTotal={reactions.total}
+          initialMine={reactions.myReaction}
+          onChanged={setReactions}
+          onComment={() => handleComment(post)}
+          onShare={() => shareHandle(post)}
+        />
+
+        <TouchableOpacity
+          style={styles.saveRow}
+          onPress={() => handleSavepost(post)}
+          activeOpacity={0.6}
         >
-          <View style={{
-            width: 120, borderWidth: 0, borderColor: '#000',
-            height: 25, display: 'flex', flexDirection: 'row',
-            justifyContent: 'space-between'
-          }}>
-            <TouchableOpacity
-              style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 10 }}
-              onPress={() => handleLike(post._id)}
-            >
-              {liked ? (
-                <>
-                  <Ionicons
-                    name="heart"
-                    size={18}
-                    color="red"
-                  />
-                </>
-              ) : (
-                <LoveIcon width={18} height={18} stroke="gray" fill="none" />
-              )}
-              {likes > 0 && (
-                <Text style={{
-                  fontSize: 14,
-                  color: '#4B5563', marginLeft: 6
-                }}>{likes}</Text>)}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={{ flexDirection: 'row', alignItems: 'center' }}
-              onPress={() => handleComment(post)}
-            >
-
-              <CommentIcon width={18} height={18} />
-              {
-                post.commentsdetails?.length > 0 ?
-                  <Text style={{ fontSize: 14, color: '#4B5563', marginLeft: 4 }}> {post.commentsdetails?.length}</Text>
-                  : null
-              }
-
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={{ flexDirection: 'row', alignItems: 'center' }}
-              onPress={() => {
-                shareHandle(post)
-              }}
-            >
-              <ShareIcon width={18} height={18} />
-              {post.shares > 0 ?
-                <Text style={{ fontSize: 14, color: '#4B5563', marginLeft: 4 }}>{post.shares}</Text>
-                : null
-              }
-
-            </TouchableOpacity>
-
-          </View>
-          <View>
-            <TouchableOpacity
-              style={{ flexDirection: 'row', alignItems: 'center' }}
-              onPress={() => {
-                handleSavepost(post)
-              }}
-            >
-              <SaveIcon />
-            </TouchableOpacity>
-          </View>
-        </View>
+          <Ionicons name="bookmark-outline" size={16} color={FB.textSecondary} />
+          <Text style={styles.saveText}>Save</Text>
+        </TouchableOpacity>
       </View>
       {
         showComments ?
@@ -660,6 +608,43 @@ const PostSection = ({ post: initialPost, navigation, userid }) => {
 export default PostSection;
 
 const styles = StyleSheet.create({
+  /* The card. Full-bleed on a phone: square corners, no side margin, and the
+     grey page showing through underneath as the only separator. */
+  card: {
+    backgroundColor: FB.surface,
+    marginBottom: FB.card.gap,
+    paddingTop: FB.card.padding,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: FB.card.padding,
+    marginBottom: 10,
+  },
+  avatar: {
+    width: FB.avatar.md,
+    height: FB.avatar.md,
+    borderRadius: FB.avatar.md / 2,
+    marginRight: 8,
+    backgroundColor: FB.fill,
+  },
+  authorName: { ...FB.font.name },
+  metaRow: { flexDirection: 'row', alignItems: 'center', marginTop: 1 },
+  metaText: { ...FB.font.meta },
+  metaDot: { ...FB.font.meta, marginHorizontal: 4 },
+
+  saveRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    paddingHorizontal: FB.card.padding,
+    paddingBottom: 10,
+    paddingTop: 2,
+  },
+  saveText: { ...FB.font.meta, fontWeight: '600' },
+
   /* Follow control — one pill, two states. Sized so the row height does not
      jump when it flips between them. */
   menuRow: {
@@ -673,7 +658,7 @@ const styles = StyleSheet.create({
   menuText: { fontSize: 14, color: '#374151' },
 
   followBtn: {
-    backgroundColor: '#111827',
+    backgroundColor: FB.primary,
     paddingHorizontal: 14,
     height: 28,
     borderRadius: 14,

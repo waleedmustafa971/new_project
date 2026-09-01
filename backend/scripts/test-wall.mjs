@@ -300,7 +300,65 @@ try {
   );
 
   /* ================================================================ */
-  section("7. Deleted posts stay off the wall");
+  section("7. Reactions ride along with the post");
+  /* ================================================================ */
+
+  /*
+    The card cannot draw a Facebook action bar from a like count. It needs to
+    know which of the six faces is lit for *this* viewer and what the counts
+    behind the cluster are, and it must get that with the post rather than by
+    asking again per card -- which is what the old per-card `checkliked` round
+    trip did, ten requests per page, for one boolean.
+  */
+  const reactPost = await makePost(U.layla, { _label: "reactions" });
+  const react = (type, as) =>
+    fetch(`${BASE}/engagement/posts/${reactPost}/react`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: as, type }),
+    }).then((res) => res.json());
+
+  await react("love", U.omar);
+  await react("haha", U.yusuf);
+
+  const postOnWall = async (viewer) => {
+    const res = await wall({ userid: U.layla, viewerId: viewer, limit: 50 });
+    return (res.posts || []).find((p) => String(p._id) === reactPost);
+  };
+
+  let seen = await postOnWall(U.omar);
+  check("a wall post carries a reactions object", !!seen?.reactions, JSON.stringify(seen?.reactions));
+  check("counts are per reaction type", seen?.reactions?.counts?.love === 1 && seen?.reactions?.counts?.haha === 1,
+    JSON.stringify(seen?.reactions?.counts));
+  check("total counts every reaction", seen?.reactions?.total === 2, String(seen?.reactions?.total));
+  check(
+    "myReaction is the viewer's own, not just 'someone reacted'",
+    seen?.reactions?.myReaction === "love",
+    String(seen?.reactions?.myReaction)
+  );
+  check("legacy `likes` is still a plain number", typeof seen?.likes === "number", typeof seen?.likes);
+
+  seen = await postOnWall(U.yusuf);
+  check("myReaction follows whoever is looking", seen?.reactions?.myReaction === "haha", String(seen?.reactions?.myReaction));
+
+  seen = await postOnWall(U.layla);
+  check("an author who did not react gets myReaction null", seen?.reactions?.myReaction === null, String(seen?.reactions?.myReaction));
+  check("...but still sees the totals", seen?.reactions?.total === 2);
+
+  const feed = await (await fetch(`${BASE}/postreel/lasttenpost?page=1&limit=30&userid=${U.omar}`)).json();
+  const inFeed = (feed.reels || []).find((r) => String(r._id) === reactPost);
+  check("the timeline sends reactions too", !!inFeed?.reactions, inFeed ? "" : "post not in first page");
+  if (inFeed) {
+    check("timeline myReaction is the viewer's", inFeed.reactions.myReaction === "love", String(inFeed.reactions.myReaction));
+    check("timeline `likes` is untouched", typeof inFeed.likes === "number");
+  }
+
+  /* Stories share the controller and must not have grown a reaction bar. */
+  const storyRes = await fetch(`${BASE}/postreel/recentstory?posttype=Story&username=${U.layla}`);
+  check("stories still answer 200", storyRes.status === 200, String(storyRes.status));
+
+  /* ================================================================ */
+  section("8. Deleted posts stay off the wall");
   /* ================================================================ */
 
   // Counted here rather than reusing dbPosts: section 6 added a fixture post of

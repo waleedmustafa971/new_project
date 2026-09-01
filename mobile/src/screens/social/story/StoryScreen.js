@@ -7,6 +7,8 @@ import * as base from "../../../component/global";
 import AntDesign from "react-native-vector-icons/AntDesign";
 import { Video } from "react-native-video";
 import api from "../../../component/api";
+import LinearGradient from "react-native-linear-gradient";
+import { FB } from "../../../theme/social";
 
 const StorySection = ({ navigation, name, image }) => {
   const [getstory, setGetstory] = useState([]);
@@ -212,13 +214,23 @@ const fetchStory = useCallback(async () => {
                 <AntDesign name="eye" size={11} color="#fff" />
                 <Text style={styles.viewsPillText}>{item.views || 0}</Text>
               </View>
-            ) : (
-              <View style={styles.plusIconContainer}>
-                <AntDesign name="plus" size={18} color="#fff" />
-              </View>
-            )}
+            ) : null}
+
+            {/*
+              Facebook's create card: the photo fills the top, a white footer
+              carries a blue "+" straddling the seam and the label beneath it.
+              The label used to sit outside the tile in grey, which is the
+              Instagram circle-rail pattern, not this one.
+            */}
+            <View style={styles.createFooter}>
+              <Text style={styles.createFooterText} numberOfLines={1}>
+                {item.ring ? "Your story" : "Create story"}
+              </Text>
+            </View>
+            <View style={styles.plusIconContainer}>
+              <AntDesign name="plus" size={16} color="#fff" />
+            </View>
           </View>
-          <Text style={styles.createStoryText} numberOfLines={1}>Your story</Text>
         </TouchableOpacity>
       );
     }
@@ -275,8 +287,21 @@ const fetchStory = useCallback(async () => {
               resizeMode="cover"
             />
           ) : null}
+          {/*
+            The name belongs on the card, in white over a scrim, the way every
+            Facebook story tile does it. Below the card in grey it read as a
+            caption for a thumbnail rather than as part of the tile, and it
+            made the rail a good 18px taller for nothing.
+          */}
+          <LinearGradient
+            colors={["transparent", "rgba(0,0,0,0.65)"]}
+            style={styles.nameScrim}
+            pointerEvents="none"
+          />
+          <Text style={styles.userNameText} numberOfLines={2}>
+            {item.userInfo?.name}
+          </Text>
         </View>
-        <Text style={styles.userNameText} numberOfLines={1}>{item.userInfo?.name}</Text>
       </TouchableOpacity>
     );
   };
@@ -292,7 +317,7 @@ const fetchStory = useCallback(async () => {
   }).current;
 
   return (
-    <View style={{ marginBottom: 16, marginLeft: 8, marginTop: 0 }}>
+    <View style={styles.rail}>
       <FlatList
         horizontal
         data={getstory}
@@ -309,17 +334,23 @@ const fetchStory = useCallback(async () => {
 };
 
 const styles = StyleSheet.create({
+  rail: {
+    backgroundColor: FB.surface,
+    paddingVertical: FB.space.md,
+    paddingLeft: FB.space.md,
+    marginBottom: FB.card.gap,
+  },
   storyItem: {
-    marginRight: 12,
+    marginRight: FB.story.gap,
     alignItems: "center",
   },
   /* One place to change the rail's proportions. 108x148 keeps the 3:4 shape but
      gives back roughly a third of the vertical space the old 130x160 tiles ate
      before the first post was reachable. */
-  storyBoxSize: { width: 108, height: 148 },
+  storyBoxSize: { width: FB.story.width, height: FB.story.height },
   storyBox: {
-    backgroundColor: "#E9EBEE",
-    borderRadius: 14,
+    backgroundColor: FB.fill,
+    borderRadius: FB.story.radius,
     overflow: "hidden",
     justifyContent: "center",
     alignItems: "center",
@@ -329,8 +360,8 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.18)",
   },
   storyBoxUnseen: {
-    borderWidth: 2.5,
-    borderColor: "#2563EB",
+    borderWidth: 3,
+    borderColor: FB.primary,
   },
   viewsPill: {
     position: "absolute",
@@ -355,24 +386,33 @@ const styles = StyleSheet.create({
     height: "100%",
     borderRadius: 16,
   },
+  /* Straddles the seam between photo and footer, which is what makes the
+     create card read as one object rather than two stacked halves. */
   plusIconContainer: {
     position: "absolute",
-    bottom: 10,
-    borderRadius: 9999,
-    width: 32,
-    height: 32,
+    bottom: 26,
+    borderRadius: FB.radius.pill,
+    width: 30,
+    height: 30,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#2563EB",
-    borderWidth: 2,
-    borderColor: "#fff",
+    backgroundColor: FB.primary,
+    borderWidth: 3,
+    borderColor: FB.surface,
   },
-  createStoryText: {
-    fontSize: 11,
-    marginTop: 6,
+  createFooter: {
+    position: "absolute",
+    left: 0, right: 0, bottom: 0,
+    height: 40,
+    backgroundColor: FB.surface,
+    alignItems: "center",
+    justifyContent: "flex-end",
+    paddingBottom: 6,
+  },
+  createFooterText: {
+    fontSize: 12,
     fontWeight: "600",
-    color: "#374151",
-    maxWidth: 108,
+    color: FB.text,
     textAlign: "center",
   },
   /* The author badge sits inset with a white ring, the way every story rail
@@ -392,12 +432,20 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: "#D1D5DB",
   },
+  nameScrim: {
+    position: "absolute",
+    left: 0, right: 0, bottom: 0,
+    height: 62,
+  },
   userNameText: {
-    fontSize: 11,
-    marginTop: 6,
-    color: "#374151",
-    maxWidth: 108,
-    textAlign: "center",
+    position: "absolute",
+    left: 8, right: 8, bottom: 8,
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#fff",
+    textShadowColor: "rgba(0,0,0,0.5)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
 });
 

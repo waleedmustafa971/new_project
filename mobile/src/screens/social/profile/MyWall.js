@@ -23,6 +23,7 @@ import api from "../../../component/api";
 import * as base from "../../../component/global";
 import PostSection from "../post/PostSection";
 import Footerpage from "../Footerpage";
+import { FB } from "../../../theme/social";
 
 /*
   The personal wall.
@@ -309,7 +310,7 @@ const MyWall = () => {
         {/* Cover. There is no cover image on the account yet, so the band is
             drawn rather than left as an empty grey slab. */}
         <LinearGradient
-          colors={["#1877F2", "#4B9BFF", "#8AC1FF"]}
+          colors={[FB.primary, "#4B9BFF", "#8AC1FF"]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.cover}
@@ -333,7 +334,7 @@ const MyWall = () => {
               {name}
             </Text>
             {profile?.verifiedBadge ? (
-              <Ionicons name="checkmark-circle" size={18} color="#2563EB" />
+              <Ionicons name="checkmark-circle" size={18} color={FB.primary} />
             ) : null}
           </View>
 
@@ -418,7 +419,7 @@ const MyWall = () => {
                 <Ionicons
                   name={t.icon}
                   size={16}
-                  color={active ? "#1877F2" : "#6B7280"}
+                  color={active ? FB.primary : FB.textSecondary}
                 />
                 <Text style={[styles.tabText, active && styles.tabTextActive]}>
                   {t.label}
@@ -565,9 +566,9 @@ const MyWall = () => {
         ListEmptyComponent={<Empty />}
         ListFooterComponent={
           loading ? (
-            <ActivityIndicator style={{ marginVertical: 24 }} color="#1877F2" />
+            <ActivityIndicator style={{ marginVertical: 24 }} color={FB.primary} />
           ) : paging ? (
-            <ActivityIndicator style={{ marginVertical: 16 }} color="#1877F2" />
+            <ActivityIndicator style={{ marginVertical: 16 }} color={FB.primary} />
           ) : (
             <View style={{ height: 90 }} />
           )
@@ -579,8 +580,8 @@ const MyWall = () => {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={["#1877F2"]}
-            tintColor="#1877F2"
+            colors={[FB.primary]}
+            tintColor={FB.primary}
           />
         }
       />
@@ -631,7 +632,7 @@ const About = ({ profile }) => {
 export default MyWall;
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#fff" },
+  screen: { flex: 1, backgroundColor: FB.page },
 
   topbar: {
     flexDirection: "row",
@@ -640,20 +641,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: "#EEF0F3",
-    backgroundColor: "#fff",
+    borderBottomColor: FB.hairline,
+    backgroundColor: FB.surface,
   },
   topbarTitle: {
     flex: 1,
     marginHorizontal: 12,
     fontSize: 16,
     fontWeight: "700",
-    color: "#111827",
+    color: FB.text,
   },
 
   cover: { height: 120, width: "100%" },
 
-  identity: { paddingHorizontal: 16, marginTop: -34 },
+  identity: { paddingHorizontal: 16, marginTop: -34, backgroundColor: FB.surface, paddingBottom: 4 },
   avatar: {
     width: 84,
     height: 84,
@@ -663,9 +664,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#E5E7EB",
   },
   nameRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 10 },
-  name: { fontSize: 20, fontWeight: "700", color: "#111827", maxWidth: "85%" },
+  name: { fontSize: 20, fontWeight: "700", color: FB.text, maxWidth: "85%" },
   bio: { marginTop: 4, fontSize: 13, lineHeight: 19, color: "#4B5563" },
-  bioEmpty: { marginTop: 4, fontSize: 13, color: "#1877F2", fontWeight: "600" },
+  bioEmpty: { marginTop: 4, fontSize: 13, color: FB.primary, fontWeight: "600" },
 
   stats: {
     flexDirection: "row",
@@ -673,11 +674,11 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderTopWidth: 1,
     borderBottomWidth: 1,
-    borderColor: "#EEF0F3",
+    borderColor: FB.hairline,
   },
   stat: { flex: 1, alignItems: "center" },
-  statValue: { fontSize: 16, fontWeight: "700", color: "#111827" },
-  statLabel: { fontSize: 12, color: "#6B7280", marginTop: 2 },
+  statValue: { fontSize: 16, fontWeight: "700", color: FB.text },
+  statLabel: { fontSize: 12, color: FB.textSecondary, marginTop: 2 },
 
   actions: { flexDirection: "row", gap: 8, marginTop: 12, alignItems: "center" },
   action: {
@@ -687,10 +688,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     height: 38,
     borderRadius: 8,
-    backgroundColor: "#EEF0F3",
+    backgroundColor: FB.hairline,
   },
-  actionText: { fontSize: 13, fontWeight: "600", color: "#111827" },
-  actionPrimary: { backgroundColor: "#1877F2" },
+  actionText: { fontSize: 13, fontWeight: "600", color: FB.text },
+  actionPrimary: { backgroundColor: FB.primary },
   actionPrimaryText: { fontSize: 13, fontWeight: "600", color: "#fff" },
   actionIcon: {
     width: 38,
@@ -698,14 +699,16 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#EEF0F3",
+    backgroundColor: FB.hairline,
   },
 
   tabs: {
     flexDirection: "row",
-    marginTop: 16,
+    backgroundColor: FB.surface,
+    marginTop: 0,
+    marginBottom: FB.card.gap,
     borderBottomWidth: 1,
-    borderBottomColor: "#EEF0F3",
+    borderBottomColor: FB.hairline,
   },
   tab: {
     flex: 1,
@@ -717,9 +720,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 2,
     borderBottomColor: "transparent",
   },
-  tabActive: { borderBottomColor: "#1877F2" },
-  tabText: { fontSize: 13, fontWeight: "600", color: "#6B7280" },
-  tabTextActive: { color: "#1877F2" },
+  tabActive: { borderBottomColor: FB.primary },
+  tabText: { fontSize: 13, fontWeight: "600", color: FB.textSecondary },
+  tabTextActive: { color: FB.primary },
 
   listContent: { paddingBottom: 20 },
   gridContent: { gap: GAP, paddingHorizontal: GAP, paddingBottom: 20 },
@@ -788,14 +791,14 @@ const styles = StyleSheet.create({
     marginTop: 6,
     fontSize: 13,
     lineHeight: 19,
-    color: "#8A8F98",
+    color: FB.textTertiary,
     textAlign: "center",
   },
 
   about: { paddingHorizontal: 16, paddingTop: 12 },
   aboutRow: { flexDirection: "row", alignItems: "center", paddingVertical: 10 },
-  aboutLabel: { fontSize: 12, color: "#8A8F98" },
-  aboutValue: { fontSize: 14, color: "#111827", fontWeight: "500", marginTop: 1 },
+  aboutLabel: { fontSize: 12, color: FB.textTertiary },
+  aboutValue: { fontSize: 14, color: FB.text, fontWeight: "500", marginTop: 1 },
 
   footer: {
     backgroundColor: "#fff",

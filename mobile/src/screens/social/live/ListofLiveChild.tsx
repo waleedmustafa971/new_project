@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { TT } from "../../../theme/social";
 import api from '../../../component/api';
 import { 
   View, 
@@ -197,7 +198,7 @@ const styles = StyleSheet.create({
   container: { 
     height: height, 
     width: width, 
-    backgroundColor: '#000' 
+    backgroundColor: TT.ground 
   },
   thumbnail: { 
     ...StyleSheet.absoluteFillObject, 
@@ -230,8 +231,10 @@ const styles = StyleSheet.create({
     textShadowOffset: {width: -1, height: 1},
     textShadowRadius: 10
   },
+  /* TikTok's live badge is its hot pink, not a raw #ff0000 — the pure red
+     reads as an error state next to white video. */
   liveBadge: { 
-    backgroundColor: '#ff0000', 
+    backgroundColor: TT.accent, 
     paddingHorizontal: 6, 
     paddingVertical: 1,
     borderRadius: 4,
@@ -250,12 +253,14 @@ const styles = StyleSheet.create({
     marginBottom: 5
   },
   viewers: { 
-    color: '#ddd', 
+    color: TT.textSecondary, 
     fontSize: 14,
     marginBottom: 15
   },
+  /* The one call to action on the card carries the accent, the way Follow
+     does on a TikTok profile. A white pill on white video disappeared. */
   watchBtn: {
-    backgroundColor: '#fff',
+    backgroundColor: TT.accent,
     borderRadius: 30,
     paddingVertical: 12,
     alignItems: 'center',
@@ -267,7 +272,7 @@ const styles = StyleSheet.create({
     shadowRadius: 5,
   },
   watchBtnText: {
-    color: '#000',
+    color: TT.text,
     fontWeight: 'bold',
     fontSize: 16
   },
