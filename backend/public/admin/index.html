@@ -13,10 +13,10 @@
   <div id="auth" class="auth hidden">
     <div class="auth-card">
       <div class="auth-brand">
-        <div class="auth-logo">SA</div>
+        <div class="auth-logo">M</div>
         <div>
-          <h1>Social Media Admin</h1>
-          <p>Super App control panel</p>
+          <h1>Max Social Control</h1>
+          <p>Secure operations workspace</p>
         </div>
       </div>
 
@@ -31,12 +31,20 @@
           <input type="text" id="authName" placeholder="Super Admin" />
         </label>
         <label class="field">
-          <span>Email</span>
-          <input type="email" id="authEmail" placeholder="admin@superapp.com" required autocomplete="username" />
+          <span>Username</span>
+          <input type="text" id="authUsername" placeholder="admin" required autocomplete="username" autocapitalize="none" />
+        </label>
+        <label class="field" id="emailField" hidden>
+          <span>Contact email</span>
+          <input type="email" id="authEmail" placeholder="admin@maxsocialapp.com" autocomplete="email" />
         </label>
         <label class="field">
           <span>Password</span>
           <input type="password" id="authPassword" placeholder="••••••••" required autocomplete="current-password" />
+        </label>
+        <label class="remember">
+          <input type="checkbox" id="rememberMe" />
+          <span>Remember me on this device</span>
         </label>
         <div id="authError" class="auth-error hidden"></div>
         <button type="submit" class="btn btn-primary btn-block" id="authSubmit">Sign in</button>

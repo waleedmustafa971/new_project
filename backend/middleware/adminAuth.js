@@ -14,7 +14,7 @@ export const ADMIN_SECRET =
 
 export const signAdminToken = (admin) =>
   jwt.sign(
-    { adminId: admin._id, email: admin.email, name: admin.name },
+    { adminId: admin._id, username: admin.username, email: admin.email, name: admin.name },
     ADMIN_SECRET,
     { expiresIn: "12h" }
   );

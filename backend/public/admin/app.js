@@ -5,9 +5,10 @@
 
 const API = "/api/adminpanel";
 const TOKEN_KEY = "sa_admin_token";
+const SESSION_TOKEN_KEY = "sa_admin_session_token";
 
 const state = {
-  token: localStorage.getItem(TOKEN_KEY) || null,
+  token: localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(SESSION_TOKEN_KEY) || null,
   admin: null,
   route: "dashboard",
   bootstrapMode: false,
@@ -1670,6 +1671,7 @@ VIEWS.admins = crudView({
   ],
   fields: [
     { key: "name", label: "Full name", placeholder: "Jane Doe" },
+    { key: "username", label: "Username", placeholder: "jane.admin" },
     { key: "email", label: "Email", type: "email", placeholder: "jane@superapp.com" },
     { key: "designation", label: "Designation", placeholder: "Content Moderator" },
     { key: "password", label: "Password (leave blank to keep current)", type: "password" },
@@ -2185,7 +2187,7 @@ function showApp() {
   $("#auth").classList.add("hidden");
   $("#shell").classList.remove("hidden");
   $("#whoName").textContent = state.admin?.name || "Admin";
-  $("#whoEmail").textContent = state.admin?.email || "";
+  $("#whoEmail").textContent = state.admin?.username ? `@${state.admin.username}` : (state.admin?.email || "");
   $("#whoAvatar").textContent = initials(state.admin?.name);
   go(location.hash.replace("#", "") || "dashboard");
 }
@@ -2194,6 +2196,7 @@ function logout() {
   state.token = null;
   state.admin = null;
   localStorage.removeItem(TOKEN_KEY);
+  sessionStorage.removeItem(SESSION_TOKEN_KEY);
   showAuth();
 }
 
@@ -2219,6 +2222,8 @@ async function initAuth() {
   if (state.bootstrapMode) {
     $("#bootstrapNotice").classList.remove("hidden");
     $("#nameField").hidden = false;
+    $("#emailField").hidden = false;
+    $("#authEmail").required = true;
     $("#authSubmit").textContent = "Create admin account";
     $("#authPassword").autocomplete = "new-password";
   }
@@ -2237,15 +2242,18 @@ $("#authForm").onsubmit = async (e) => {
 
   try {
     const body = {
-      email: $("#authEmail").value.trim(),
+      username: $("#authUsername").value.trim(),
       password: $("#authPassword").value,
-      ...(state.bootstrapMode ? { name: $("#authName").value.trim() } : {}),
+      ...(state.bootstrapMode ? { name: $("#authName").value.trim(), email: $("#authEmail").value.trim() } : {}),
     };
     const d = await api(state.bootstrapMode ? "/bootstrap" : "/login", { method: "POST", body });
 
     state.token = d.token;
     state.admin = d.admin;
-    localStorage.setItem(TOKEN_KEY, d.token);
+    const remember = $("#rememberMe").checked;
+    localStorage.removeItem(TOKEN_KEY);
+    sessionStorage.removeItem(SESSION_TOKEN_KEY);
+    (remember ? localStorage : sessionStorage).setItem(remember ? TOKEN_KEY : SESSION_TOKEN_KEY, d.token);
     toast(`Welcome, ${d.admin.name || "Admin"}`, "ok");
     showApp();
   } catch (ex) {

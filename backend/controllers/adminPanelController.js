@@ -73,6 +73,8 @@ const isId = (v) => mongoose.Types.ObjectId.isValid(v);
 const escapeRegex = (s = "") => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const searchRegex = (q) => new RegExp(escapeRegex(String(q).trim()), "i");
+const normalizeAdminUsername = (value = "") => String(value).trim().toLowerCase();
+const validAdminUsername = (value) => /^[a-z0-9][a-z0-9._-]{2,31}$/.test(value);
 
 // Form fields arrive as strings ("true"/"false"), JSON toggles as real booleans.
 const bool = (v, fallback = true) => {
@@ -126,20 +128,27 @@ const POSTTYPE_FILTERS = {
 /* ------------------------------------------------------------------ */
 
 export const login = wrap(async (req, res) => {
-  const { email, password } = req.body || {};
-  if (!email || !password) return fail(res, 400, "Email and password are required");
-
-  const admin = await Admin.findOne({ email: String(email).toLowerCase().trim() });
-  if (!admin) return fail(res, 401, "Invalid email or password");
+  const { username, password } = req.body || {};
+  const loginName = normalizeAdminUsername(username);
+  if (!loginName || !password) return fail(res, 400, "Username and password are required");
+  let admin = await Admin.findOne({ username: loginName });
+  if (!admin) {
+    admin = await Admin.findOne({ email: new RegExp(`^${escapeRegex(loginName)}@`, "i") });
+    if (admin && !admin.username && !(await Admin.exists({ username: loginName, _id: { $ne: admin._id } }))) {
+      admin.username = loginName;
+      await admin.save();
+    }
+  }
+  if (!admin) return fail(res, 401, "Invalid username or password");
   if (admin.status === false) return fail(res, 403, "This admin account is disabled");
 
   const valid = await bcrypt.compare(password, admin.password);
-  if (!valid) return fail(res, 401, "Invalid email or password");
+  if (!valid) return fail(res, 401, "Invalid username or password");
 
   const token = signAdminToken(admin);
   ok(res, {
     token,
-    admin: { _id: admin._id, name: admin.name, email: admin.email, designation: admin.designation },
+    admin: { _id: admin._id, name: admin.name, username: admin.username, email: admin.email, designation: admin.designation },
   });
 });
 
@@ -148,12 +157,15 @@ export const bootstrap = wrap(async (req, res) => {
   const count = await Admin.countDocuments();
   if (count > 0) return fail(res, 403, "An admin already exists. Use the login form.");
 
-  const { name, email, password } = req.body || {};
-  if (!email || !password) return fail(res, 400, "Email and password are required");
+  const { name, username, email, password } = req.body || {};
+  const loginName = normalizeAdminUsername(username);
+  if (!loginName || !email || !password) return fail(res, 400, "Name, username, email and password are required");
+  if (!validAdminUsername(loginName)) return fail(res, 400, "Username must be 3–32 characters and use letters, numbers, dots, underscores or hyphens");
   if (String(password).length < 6) return fail(res, 400, "Password must be at least 6 characters");
 
   const admin = await Admin.create({
     name: name || "Super Admin",
+    username: loginName,
     designation: "Super Admin",
     email: String(email).toLowerCase().trim(),
     password: await bcrypt.hash(String(password), 10),
@@ -163,7 +175,7 @@ export const bootstrap = wrap(async (req, res) => {
 
   ok(res, {
     token: signAdminToken(admin),
-    admin: { _id: admin._id, name: admin.name, email: admin.email },
+    admin: { _id: admin._id, name: admin.name, username: admin.username, email: admin.email },
   });
 });
 
@@ -1388,23 +1400,28 @@ export const listAdmins = wrap(async (req, res) => {
 
 export const saveAdmin = wrap(async (req, res) => {
   const { id } = req.params;
-  const { name, designation, email, password, status } = req.body || {};
+  const { name, username, designation, email, password, status } = req.body || {};
+  const loginName = normalizeAdminUsername(username);
+  if (!validAdminUsername(loginName)) return fail(res, 400, "Username must be 3–32 characters and use letters, numbers, dots, underscores or hyphens");
 
   if (id && isId(id)) {
-    const update = { name, designation, email, status: bool(status) };
+    if (await Admin.findOne({ username: loginName, _id: { $ne: id } })) return fail(res, 409, "That username is already in use");
+    const update = { name, username: loginName, designation, email: String(email).toLowerCase().trim(), status: bool(status) };
     if (password) update.password = await bcrypt.hash(String(password), 10);
     const row = await Admin.findByIdAndUpdate(id, update, { new: true }).select("-password");
     if (!row) return fail(res, 404, "Admin not found");
     return ok(res, { row });
   }
 
-  if (!name || !email || !password) return fail(res, 400, "Name, email and password are required");
+  if (!name || !email || !password) return fail(res, 400, "Name, username, email and password are required");
+  if (await Admin.findOne({ username: loginName })) return fail(res, 409, "That username is already in use");
   if (await Admin.findOne({ email: String(email).toLowerCase().trim() })) {
     return fail(res, 409, "An admin with that email already exists");
   }
 
   const row = await Admin.create({
     name,
+    username: loginName,
     designation,
     email: String(email).toLowerCase().trim(),
     password: await bcrypt.hash(String(password), 10),
