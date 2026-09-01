@@ -589,6 +589,10 @@ export const userWall = async (req, res) => {
             verifiedBadge: !!author.verifiedBadge,
             followersCount: (author.followers || []).length,
             followingCount: (author.following || []).length,
+            /* A locked wall still needs this: following is exactly what the
+               visitor is there to do. */
+            isFollowing: !!viewerId && (author.followers || []).some((f) => String(f) === String(viewerId)),
+            isSelf: false,
           },
           type,
           posts: [],
@@ -701,6 +705,15 @@ export const userWall = async (req, res) => {
         accountType: author.accountType,
         followersCount: (author.followers || []).length,
         followingCount: (author.following || []).length,
+        /*
+          Does the viewer follow this account?
+
+          A profile has to draw Follow or Following the moment it opens, and
+          the only other way to know was to read the follow state off a post --
+          which fails on an account that has not posted anything.
+        */
+        isFollowing: followStatus === "follow",
+        isSelf: !!isSelf,
       },
       type,
       page,
