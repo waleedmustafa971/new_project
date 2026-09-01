@@ -26,6 +26,7 @@ import api from "../../../component/api";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 dayjs.extend(relativeTime);
+import Toast from "react-native-toast-message";
 import { FB } from "../../../theme/social";
 
 /*
@@ -154,23 +155,59 @@ const PostModalComents = ({ data, visible, onClose, username, reelId, onCommentA
     setTimeout(() => inputRef.current?.focus(), 100);
   };
 
+  /*
+    Like a comment.
+
+    Nothing changed on screen when you tapped it -- the handler logged the
+    response and stopped there, so a like that worked and a like that failed
+    looked identical. It also failed: the server answered 404 for every call,
+    because it looked the caller up by email while the app sends a user id.
+
+    Optimistic and reconciled, like every other like in the app: the count
+    moves at once and the server's own answer replaces it.
+  */
   const onReplyLike = async (item) => {
     const commentId = item._id;
-    const userinfo = item.user;
+    if (!commentId || !username) return;
+
+    const bump = (fn) =>
+      setComments((prev) =>
+        prev.map((c) => (String(c._id) === String(commentId) ? fn(c) : c))
+      );
+
+    const liked = (item.likes || []).some(
+      (l) => String(l.username?._id || l.username) === String(username)
+    );
+
+    bump((c) => ({
+      ...c,
+      likes: liked
+        ? (c.likes || []).filter((l) => String(l.username?._id || l.username) !== String(username))
+        : [...(c.likes || []), { username }],
+    }));
 
     try {
-      const response = await axios.post(`${base.BASE_URL}/apis/reel/addcommentsylike`, {
+      const { data } = await api.post("/apis/reel/addcommentsylike", {
         reelId,
         commentId,
         username,
-        userinfo,
       });
-
-      if (response.data.success) {
-        console.log("Reply liked:", response.data.result);
+      if (typeof data?.count === "number") {
+        bump((c) => ({
+          ...c,
+          // Keep the array's length honest against the server's count without
+          // pretending to know who the other likers are.
+          likes: data.liked
+            ? [...(c.likes || []).filter((l) => String(l.username?._id || l.username) !== String(username)), { username }]
+            : (c.likes || []).filter((l) => String(l.username?._id || l.username) !== String(username)),
+        }));
       }
-    } catch (error) {
-      console.error("Reply like error:", error.message);
+    } catch (e) {
+      bump((c) => ({ ...c, likes: item.likes || [] }));
+      Toast.show({
+        type: "error",
+        text1: e?.response?.data?.error || "Could not like that comment",
+      });
     }
   };
 
@@ -236,8 +273,18 @@ const PostModalComents = ({ data, visible, onClose, username, reelId, onCommentA
                       with labels beneath them, taking three times the room. */}
                   <View style={styles.metaRow}>
                     <Text style={styles.metaTime}>{timeAgo(item.timestamp)}</Text>
+                    {/* Lit when it is yours, so the tap has a visible result. */}
                     <TouchableOpacity onPress={() => onReplyLike(item)}>
-                      <Text style={styles.metaAction}>Like</Text>
+                      <Text
+                        style={[
+                          styles.metaAction,
+                          (item.likes || []).some(
+                            (l) => String(l.username?._id || l.username) === String(username)
+                          ) && styles.metaActionOn,
+                        ]}
+                      >
+                        Like
+                      </Text>
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => replyHandler(item)}>
                       <Text style={styles.metaAction}>Reply</Text>
@@ -385,6 +432,7 @@ const styles = StyleSheet.create({
   metaRow: { flexDirection: "row", alignItems: "center", gap: 14, marginTop: 5, marginLeft: 12 },
   metaTime: { fontSize: 12, color: FB.textTertiary },
   metaAction: { fontSize: 12, fontWeight: "700", color: FB.textSecondary },
+  metaActionOn: { color: FB.primary },
   likePill: {
     flexDirection: "row", alignItems: "center",
     paddingHorizontal: 6, height: 20, borderRadius: 10,

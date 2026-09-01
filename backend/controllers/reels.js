@@ -398,25 +398,73 @@ export const addFavourite = async (req, res) => {
   }
 };
 
+/*
+  Who is acting on a comment.
+
+  `username` in these bodies is the caller, and the app sends a user id -- the
+  same id every other endpoint keys on. These two looked it up by *email*, so
+  every request answered 404 "User not found": replying to a comment and
+  liking a reply were both dead, while top-level comments worked because
+  addComments (below) looks up by _id.
+
+  Older rows really do carry an email there, so both are tried.
+*/
+const resolveActor = async (username) => {
+  const key = String(username || "");
+  if (!key) return null;
+  return mongoose.Types.ObjectId.isValid(key)
+    ? await User.findById(key).select("_id name email image").lean()
+    : await User.findOne({ email: key }).select("_id name email image").lean();
+};
+
 export const addReplyCommentsLikes = async (req, res) => {
   const { reelId, commentId, username } = req.body;
-  //get User info from User Modal
-  const user = await User.findOne({ email: username }).select("_id name email image"); // ✅
+
+  const user = await resolveActor(username);
   if (!user) {
     return res.status(404).json({ error: "User not found" });
   }
-  //const useri = JSON.stringify(user);
+
   try {
-    const result = await Reel.updateOne(
+    const reel = await Reel.findOne(
       { _id: reelId, "comments._id": commentId },
-      {
-        $push: {
-          "comments.$.likes": { username, userinfo: user }
-        }
-      }
+      { "comments.$": 1 }
+    ).lean();
+    if (!reel || !reel.comments?.length) {
+      return res.status(404).json({ error: "Comment not found" });
+    }
+
+    const likes = reel.comments[0].likes || [];
+    const mine = likes.some(
+      (l) => String(l.username?._id || l.username) === String(user._id)
     );
 
-    res.status(200).json({ success: true, result });
+    /*
+      A toggle, not an ever-growing list.
+
+      This used to $push unconditionally, so tapping Like twice recorded the
+      same person twice and there was no way to take it back -- the count only
+      ever went up. Tapping a lit-up button means "undo", everywhere.
+    */
+    if (mine) {
+      await Reel.updateOne(
+        { _id: reelId, "comments._id": commentId },
+        { $pull: { "comments.$.likes": { username: user._id } } }
+      );
+    } else {
+      await Reel.updateOne(
+        { _id: reelId, "comments._id": commentId },
+        { $push: { "comments.$.likes": { username: user._id, userinfo: user } } }
+      );
+    }
+
+    const fresh = await Reel.findOne(
+      { _id: reelId, "comments._id": commentId },
+      { "comments.$": 1 }
+    ).lean();
+    const count = (fresh?.comments?.[0]?.likes || []).length;
+
+    res.status(200).json({ success: true, liked: !mine, count });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -424,8 +472,8 @@ export const addReplyCommentsLikes = async (req, res) => {
 
 export const addReplyComments = async (req, res) => {
   const { reelId, commentId, username, message, userinfo } = req.body;
-  //get User info from User Modal
-  const user = await User.findOne({ email: username }).select("_id name email image"); // ✅
+
+  const user = await resolveActor(username);
   if (!user) {
     return res.status(404).json({ error: "User not found" });
   }
