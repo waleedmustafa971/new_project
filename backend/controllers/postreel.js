@@ -560,11 +560,32 @@ export const userWall = async (req, res) => {
     }
 
     const author = await User.findById(authorId)
-      .select("name email image bio verifiedBadge accountType followers following closeFriends blockedUsers privacy privacySettings followRequests gender nationality")
+      .select("name email image bio verifiedBadge accountType accountStatus followers following closeFriends blockedUsers privacy privacySettings followRequests gender nationality")
       .lean();
     if (!author) return res.status(404).json({ message: "User not found" });
 
     const isSelf = viewerId && String(viewerId) === String(authorId);
+
+    /*
+      Suspended and deleted accounts.
+
+      The wall checked that the user existed and nothing else, so a banned
+      account's posts were served exactly like anyone's -- the ban stopped them
+      signing in and did nothing about what they had already published. The
+      author still sees their own wall while suspended; that is deliberate, so
+      the account is not simply erased from under them.
+    */
+    if (!isSelf && (author.accountStatus === "banned" || author.accountStatus === "deleted")) {
+      return res.status(403).json({
+        success: false,
+        locked: true,
+        reason: author.accountStatus === "banned" ? "suspended" : "deleted",
+        message: "This profile is not available",
+        posts: [],
+        total: 0,
+        hasMore: false,
+      });
+    }
 
     if (!isSelf) {
       const rel = await relationship(viewerId, author);
@@ -593,6 +614,13 @@ export const userWall = async (req, res) => {
                visitor is there to do. */
             isFollowing: !!viewerId && (author.followers || []).some((f) => String(f) === String(viewerId)),
             isSelf: false,
+            /* A private wall is exactly where the request button belongs. */
+            viewerState: !!viewerId && (author.followRequests || []).some((r) => String(r) === String(viewerId))
+              ? "requested"
+              : (author.followers || []).some((f) => String(f) === String(viewerId))
+                ? "following"
+                : "none",
+            isPrivate: true,
           },
           type,
           posts: [],
@@ -641,6 +669,20 @@ export const userWall = async (req, res) => {
       viewerId && (author.followers || []).some((f) => String(f) === String(viewerId))
         ? "follow"
         : "not follow";
+
+    /*
+      One word for what the viewer is to this account, so the button has a
+      state to draw the moment the wall opens. "requested" is the one that
+      matters: a private account turns a follow into a request, and without
+      this the button offered to send a second one.
+    */
+    const viewerState = isSelf
+      ? "self"
+      : followStatus === "follow"
+        ? "following"
+        : viewerId && (author.followRequests || []).some((r) => String(r) === String(viewerId))
+          ? "requested"
+          : "none";
 
     const posts = await Promise.all(
       visible.slice(0, limit).map(async (p) => ({
@@ -714,6 +756,8 @@ export const userWall = async (req, res) => {
         */
         isFollowing: followStatus === "follow",
         isSelf: !!isSelf,
+        viewerState,
+        isPrivate: false,
       },
       type,
       page,

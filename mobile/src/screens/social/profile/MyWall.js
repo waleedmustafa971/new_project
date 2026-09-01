@@ -116,6 +116,14 @@ const MyWall = () => {
   const [author, setAuthor] = useState(null);
   const [following, setFollowing] = useState(false);
   const [followBusy, setFollowBusy] = useState(false);
+  /*
+    What the viewer is to this account: "none" | "requested" | "following" |
+    "self". A private account turns a follow into a request that has to be
+    approved, so a single boolean cannot describe the button.
+  */
+  const [viewerState, setViewerState] = useState("none");
+  /* "private" | "suspended" | "deleted" | "blocked" -- why the wall is shut. */
+  const [lockReason, setLockReason] = useState(null);
   const dispatch = useDispatch();
 
   const [loading, setLoading] = useState(true);
@@ -175,9 +183,11 @@ const MyWall = () => {
         if (generation !== generationRef.current) return;
 
         setLocked(!!data?.locked);
+        setLockReason(data?.locked ? (data.reason || "private") : null);
         if (data?.author) {
           setAuthor(data.author);
           setFollowing(!!data.author.isFollowing);
+          setViewerState(data.author.viewerState || (data.author.isFollowing ? "following" : "none"));
         }
         setCounts(data?.counts || { posts: 0, reels: 0, media: 0 });
         setTotal(data?.total || 0);
@@ -196,8 +206,28 @@ const MyWall = () => {
         });
         pageRef.current = requested + 1;
       } catch (e) {
-        if (generation === generationRef.current && initial) setItems([]);
-        console.log("wall:", e?.response?.data || e.message);
+        /*
+          403 is the server telling us this wall is shut -- blocked either way,
+          or a suspended account. It is an answer, not a failure, and it has to
+          reach the screen: the catch used to swallow it and leave an empty
+          grid, which reads as "they have posted nothing".
+        */
+        const status = e?.response?.status;
+        const body = e?.response?.data;
+        if (generation === generationRef.current) {
+          if (status === 403) {
+            setLocked(true);
+            setLockReason(body?.reason || "blocked");
+            setItems([]);
+          } else if (status === 404) {
+            setLocked(true);
+            setLockReason("deleted");
+            setItems([]);
+          } else if (initial) {
+            setItems([]);
+          }
+        }
+        console.log("wall:", body || e.message);
       } finally {
         if (generation === generationRef.current) {
           fetchingRef.current = false;
@@ -319,6 +349,13 @@ const MyWall = () => {
     setFollowing(!before);
     setFollowBusy(true);
     try {
+      if (viewerState === "requested") {
+        /* A pending request is withdrawn, not re-sent. */
+        await api.post("/apis/profile/unfollow", { userId: viewerId, targetId: authorId });
+        setViewerState("none");
+        setFollowing(false);
+        return;
+      }
       if (before) {
         /*
           Unfollowing needs its own endpoint.
@@ -330,11 +367,35 @@ const MyWall = () => {
         */
         await api.post("/apis/profile/unfollow", { userId: viewerId, targetId: authorId });
       } else {
-        await dispatch(followUserAsync({ userId: viewerId, followId: authorId })).unwrap();
+        /*
+          /apis/profile/follow, not the legacy /apis/reel/Addfollow.
+
+          The legacy one adds a follower unconditionally: it does not know
+          about private accounts, so following a private account bypassed
+          approval entirely, and it does not refuse a blocked or suspended
+          account either. This one answers "requested" for a private account
+          and 403 for the rest, which is exactly what the button needs.
+        */
+        const { data } = await api.post("/apis/profile/follow", {
+          userId: viewerId,
+          targetId: authorId,
+        });
+        const state = data?.status === "requested" ? "requested"
+          : data?.status === "following" ? "following"
+            : "none";
+        setViewerState(state);
+        setFollowing(state === "following");
+        if (state === "requested") {
+          Toast.show({ type: "success", text1: "Follow request sent" });
+        }
       }
     } catch (e) {
       setFollowing(before);
-      Toast.show({ type: "error", text1: before ? "Could not unfollow" : "Could not follow" });
+      Toast.show({
+        type: "error",
+        text1: e?.response?.data?.message
+          || (before ? "Could not unfollow" : "Could not follow"),
+      });
     } finally {
       setFollowBusy(false);
     }
@@ -456,26 +517,44 @@ const MyWall = () => {
               id it is handed and uses it.
             */
             <View style={styles.actions}>
+              {/*
+                Three states, not two. A private account turns a follow into a
+                request somebody has to approve, so "Follow" would be a lie and
+                tapping it again would send a second one.
+              */}
               <TouchableOpacity
-                style={[styles.action, following ? styles.actionFollowing : styles.actionPrimary]}
+                style={[
+                  styles.action,
+                  viewerState === "none" ? styles.actionPrimary : styles.actionFollowing,
+                ]}
                 onPress={toggleFollow}
                 activeOpacity={0.85}
                 disabled={followBusy}
               >
                 <Ionicons
-                  name={following ? "checkmark" : "person-add"}
+                  name={
+                    viewerState === "following" ? "checkmark"
+                      : viewerState === "requested" ? "time-outline"
+                        : "person-add"
+                  }
                   size={16}
-                  color={following ? FB.text : "#fff"}
+                  color={viewerState === "none" ? "#fff" : FB.text}
                 />
-                <Text style={following ? styles.actionText : styles.actionPrimaryText}>
-                  {following ? "Following" : "Follow"}
+                <Text style={viewerState === "none" ? styles.actionPrimaryText : styles.actionText}>
+                  {viewerState === "following" ? "Following"
+                    : viewerState === "requested" ? "Requested"
+                      : "Follow"}
                 </Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.action} onPress={openMessage} activeOpacity={0.85}>
-                <Ionicons name="chatbubble-outline" size={15} color={FB.text} />
-                <Text style={styles.actionText}>Message</Text>
-              </TouchableOpacity>
+              {/* Messaging a private account you cannot see is a dead end, so
+                  it is only offered once you are through the door. */}
+              {(!locked || viewerState === "following") && (
+                <TouchableOpacity style={styles.action} onPress={openMessage} activeOpacity={0.85}>
+                  <Ionicons name="chatbubble-outline" size={15} color={FB.text} />
+                  <Text style={styles.actionText}>Message</Text>
+                </TouchableOpacity>
+              )}
             </View>
           ) : (
             <View style={styles.actions}>
@@ -538,16 +617,77 @@ const MyWall = () => {
   const Empty = () => {
     if (loading || tab === "about") return null;
     if (locked) {
+      /*
+        Why the wall is shut decides what to say, and what to offer.
+
+        A private account is not a missing one: the visitor should see who it
+        is, that it is private, and the one action that changes that -- sending
+        a request. A blocked or suspended account gets no such invitation,
+        because there is nothing they can do about it and hinting otherwise
+        would be worse than silence.
+      */
+      const shut = {
+        private: {
+          icon: "lock-closed",
+          title: "This profile is private",
+          body: "Send them a follow request to see their posts, photos and reels.",
+        },
+        suspended: {
+          icon: "alert-circle-outline",
+          title: "This profile is not available",
+          body: "This account has been suspended.",
+        },
+        deleted: {
+          icon: "person-remove-outline",
+          title: "This profile is not available",
+          body: "This account no longer exists.",
+        },
+        blocked: {
+          icon: "ban-outline",
+          title: "This profile is not available",
+          body: "You can't view this account.",
+        },
+      }[lockReason || "private"];
+
       return (
         <View style={styles.state}>
-          <Ionicons name="lock-closed-outline" size={40} color="#C7CBD1" />
-          <Text style={styles.stateTitle}>This account is private</Text>
-          <Text style={styles.stateHint}>
-            Follow this account to see what they post.
-          </Text>
+          <View style={styles.lockCircle}>
+            <Ionicons name={shut.icon} size={30} color={FB.textSecondary} />
+          </View>
+          <Text style={styles.stateTitle}>{shut.title}</Text>
+          <Text style={styles.stateHint}>{shut.body}</Text>
+
+          {lockReason === "private" && viewerState !== "following" && (
+            <TouchableOpacity
+              style={[
+                styles.action,
+                viewerState === "requested" ? styles.actionFollowing : styles.actionPrimary,
+                { marginTop: 18 },
+              ]}
+              onPress={toggleFollow}
+              disabled={followBusy}
+              activeOpacity={0.85}
+            >
+              <Ionicons
+                name={viewerState === "requested" ? "time-outline" : "person-add"}
+                size={16}
+                color={viewerState === "requested" ? FB.text : "#fff"}
+              />
+              <Text style={viewerState === "requested" ? styles.actionText : styles.actionPrimaryText}>
+                {viewerState === "requested" ? "Request sent" : "Send follow request"}
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {viewerState === "requested" && lockReason === "private" && (
+            <Text style={styles.stateFoot}>
+              They'll be able to approve it from their notifications.
+            </Text>
+          )}
         </View>
       );
     }
+
     const copy = {
       posts: isMine
         ? ["Your wall is empty", "Anything you post appears here, newest first."]
@@ -903,7 +1043,16 @@ const styles = StyleSheet.create({
     paddingVertical: 48,
     paddingHorizontal: 40,
   },
-  stateTitle: { marginTop: 12, fontSize: 15, fontWeight: "600", color: "#3C4048" },
+  lockCircle: {
+    width: 64, height: 64, borderRadius: 32,
+    alignItems: "center", justifyContent: "center",
+    backgroundColor: FB.fill,
+  },
+  stateTitle: { marginTop: 12, fontSize: 17, fontWeight: "700", color: FB.text },
+  stateFoot: {
+    marginTop: 12, fontSize: 12, color: FB.textTertiary,
+    textAlign: "center", lineHeight: 17,
+  },
   stateHint: {
     marginTop: 6,
     fontSize: 13,
