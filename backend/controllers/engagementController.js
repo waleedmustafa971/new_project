@@ -388,6 +388,17 @@ export const listComments = wrap(async (req, res) => {
     roots.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
   }
 
+  /*
+    Replies are one level deep, on purpose.
+
+    addComment flattens: `rootId = parent.parentId || parent._id`, so
+    answering a reply puts your comment in the same thread and records who you
+    answered in `replyTo`. That is Facebook's model, and it is why a thread
+    cannot run away into a staircase of indents.
+
+    I briefly built this recursively before reading the writer -- pointless,
+    because the depth it handled can never occur.
+  */
   const items = roots.slice(skip, skip + limit).map((c) => {
     const threaded = (byParent.get(String(c._id)) || [])
       .filter((r) => !r.deleted)

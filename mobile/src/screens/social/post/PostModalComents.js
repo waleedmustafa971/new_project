@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useCallback, useEffect, useState, useRef } from "react";
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   FlatList,
   TouchableOpacity,
   StyleSheet,
+  Alert,
   Keyboard,
   Platform,
   ActivityIndicator,
@@ -20,7 +21,8 @@ import FontAwesome from "react-native-vector-icons/FontAwesome";
 import Feather from "react-native-vector-icons/Feather";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import EvilIcons from "react-native-vector-icons/EvilIcons";
-import axios from "axios";
+/* axios is gone with the legacy endpoints; everything here goes through the
+   shared api client, which carries the session token and refreshes it. */
 import * as base from "../../../component/global";
 import api from "../../../component/api";
 import dayjs from "dayjs";
@@ -49,166 +51,261 @@ const timeAgo = (t) => {
 };
 
 const PostModalComents = ({ data, visible, onClose, username, reelId, onCommentAdded }) => {
+  /*
+    The whole sheet moved onto /apis/engagement.
+
+    The legacy pair it used before -- /apis/reel/addcomments and
+    /apis/reel/addreply -- store replies in a flat comment.reply[] array that
+    carries no id a client can act on. That is why you could reply to a
+    comment but never to a reply: there was nowhere to hang it and nothing to
+    address. The engagement module has had real threading the whole time,
+    replies being comments with parentId set, so a reply to a reply is just
+    another comment pointed one level deeper.
+
+    It also brings what the old endpoints never sent: whether *you* liked a
+    comment, whether it is yours, how many replies it has, and the legacy
+    reply[] rows surfaced read-only alongside the new ones so nothing already
+    written disappears.
+  */
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState("");
   const [loading, setLoading] = useState(false);
-  const [replytext, setReplytext] = useState(null);
-  /* The post itself is no longer re-drawn in here, so the sheet does not need
-     to hold a copy of it -- only its comments. */
+  const [fetching, setFetching] = useState(false);
+  /* What the composer is aimed at: null for a new top-level comment, or the
+     comment being answered. Replying to a reply targets that reply. */
+  const [replyTo, setReplyTo] = useState(null);
+  /* Which threads are expanded. Replies are collapsed behind "View N replies"
+     so a long argument cannot bury the rest of the conversation. */
+  const [openThreads, setOpenThreads] = useState({});
   const inputRef = useRef(null);
 
-  /*
-    Seed the thread when the sheet opens, and only then.
+  const load = useCallback(async () => {
+    if (!reelId) return;
+    setFetching(true);
+    try {
+      const { data: res } = await api.get(`/apis/engagement/posts/${reelId}/comments`, {
+        params: { userId: username, limit: 50, replies: 10 },
+      });
+      setComments(res?.comments || []);
+    } catch (e) {
+      console.log("comments:", e?.response?.data || e.message);
+    } finally {
+      setFetching(false);
+    }
+  }, [reelId, username]);
 
-    This used to key on `data`, whose identity changes every time the card
-    above re-renders -- and the card re-renders as soon as a comment is added,
-    because that is what updates its count. So the freshly posted comment was
-    written into state and then immediately overwritten by the feed's copy of
-    the post, which had been fetched before it existed. The comment reached the
-    server and vanished from the screen, which reads exactly like a failure.
-  */
+  /* Seed once per opening. Keying this on the `data` prop is what used to
+     wipe a freshly posted comment: the card above re-renders when its count
+     changes, which changed the prop identity, which re-ran the effect with
+     the feed's older copy of the post. */
   useEffect(() => {
-    if (visible) setComments(data?.commentsdetails || []);
-  }, [visible]);
+    if (visible) {
+      setReplyTo(null);
+      setOpenThreads({});
+      load();
+    }
+  }, [visible, load]);
 
   const addComment = async () => {
-    if (!newComment.trim()) return;
+    const message = newComment.trim();
+    if (!message || !username) return;
     setLoading(true);
-    if (replytext) {
-      // Adding a reply
-      const commentId = replytext._id;
-      const message = newComment;
-      const userinfo = replytext.user;
-      console.log(`${base.BASE_URL}/apis/reel/addreply`)
-      try {
-        const response = await axios.post(`${base.BASE_URL}/apis/reel/addreply`, {
-          reelId,
-          commentId,
-          username,
-          message,
-          userinfo,
-        });
-
-        if (response.data.success) {
-          const addedReply = response.data.result;
-          // Update local comments
-          setComments((prev) =>
-            prev.map((c) =>
-              c._id === commentId
-                ? { ...c, reply: [...(c.reply || []), addedReply] }
-                : c
-            )
-          );
-          // Notify parent
-          if (onCommentAdded) onCommentAdded(addedReply);
-          setNewComment("");
-          setReplytext(null);
-          Keyboard.dismiss();
-        }
-      } catch (error) {
-        console.error("Add reply error:", error.message);
-      }
-    } else {
-      // Adding a top-level comment
-      try {
-        const result = await api.post("/apis/reel/addcomments", {
-          username,
-          id: reelId,
-          message: newComment,
-        });
-
-        console.log("...first time add comments... ", result.data);
-
-        /*
-          /addcomments answers with the post's whole comment list, already
-          enriched with each author. Taking it wholesale is both simpler and
-          more correct than diffing it against what the sheet happens to hold:
-          the merge here dropped anything whose _id it thought it had seen,
-          and it was reconciling against state the effect above had just
-          overwritten.
-        */
-        const serverComments = result.data.comments || [];
-        setComments((prev) => {
-          if (onCommentAdded) {
-            const known = new Set(prev.map((c) => String(c._id)));
-            serverComments
-              .filter((c) => !known.has(String(c._id)))
-              .forEach((c) => onCommentAdded(c));
-          }
-          return serverComments;
-        });
-
-        setNewComment("");
-        Keyboard.dismiss();
-      } catch (error) {
-        console.error("Add comment error:", error.message);
-      }
-
+    try {
+      const { data: res } = await api.post(`/apis/engagement/posts/${reelId}/comments`, {
+        userId: username,
+        message,
+        /* One field is the whole of threading. A reply to a reply points at
+           that reply; the server resolves the root for display. */
+        ...(replyTo ? { parentId: replyTo._id } : {}),
+      });
+      setNewComment("");
+      setReplyTo(null);
+      Keyboard.dismiss();
+      if (replyTo) setOpenThreads((o) => ({ ...o, [String(replyTo.parentId || replyTo._id)]: true }));
+      await load();
+      if (onCommentAdded && res?.comment) onCommentAdded(res.comment);
+    } catch (e) {
+      Toast.show({
+        type: "error",
+        text1: e?.response?.data?.message || "Could not post that comment",
+      });
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
-  const replyHandler = (item) => {
-    setReplytext(item);
-    setNewComment(`@${item.user.name} `);
+  /*
+    Like a comment or a reply.
+
+    Optimistic and reconciled. It used to log the response and stop, so a like
+    that worked and a like that failed looked identical -- and it always
+    failed, because the legacy endpoint looked the caller up by email while
+    the app sends a user id.
+  */
+  const toggleCommentLike = async (item) => {
+    if (!username || item?.legacy) return;
+    const id = String(item._id);
+
+    const apply = (fn) => {
+      const walk = (list) => list.map((c) => {
+        if (String(c._id) === id) return fn(c);
+        if (c.replies?.length) return { ...c, replies: walk(c.replies) };
+        return c;
+      });
+      setComments((prev) => walk(prev));
+    };
+
+    const wasLiked = !!item.isLiked;
+    apply((c) => ({ ...c, isLiked: !wasLiked, likes: Math.max((c.likes || 0) + (wasLiked ? -1 : 1), 0) }));
+
+    try {
+      const { data: res } = await api.post(
+        `/apis/engagement/posts/${reelId}/comments/${id}/like`,
+        { userId: username }
+      );
+      if (typeof res?.likes === "number") {
+        apply((c) => ({ ...c, likes: res.likes, isLiked: !!res.liked }));
+      }
+    } catch (e) {
+      apply((c) => ({ ...c, isLiked: wasLiked, likes: item.likes || 0 }));
+      Toast.show({
+        type: "error",
+        text1: e?.response?.data?.message || "Could not like that comment",
+      });
+    }
+  };
+
+  const startReply = (item) => {
+    setReplyTo(item);
     setTimeout(() => inputRef.current?.focus(), 100);
   };
 
+  const deleteComment = (item) => {
+    if (!item?.isMine) return;
+    Alert.alert("Delete comment?", "This can't be undone.", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await api.delete(`/apis/engagement/posts/${reelId}/comments/${item._id}`, {
+              params: { userId: username },
+            });
+            await load();
+          } catch (e) {
+            Toast.show({ type: "error", text1: e?.response?.data?.message || "Could not delete that" });
+          }
+        },
+      },
+    ]);
+  };
+
   /*
-    Like a comment.
+    One row, drawn recursively.
 
-    Nothing changed on screen when you tapped it -- the handler logged the
-    response and stopped there, so a like that worked and a like that failed
-    looked identical. It also failed: the server answered 404 for every call,
-    because it looked the caller up by email while the app sends a user id.
-
-    Optimistic and reconciled, like every other like in the app: the count
-    moves at once and the server's own answer replaces it.
+    A reply is a comment with a parent, so the same component renders both and
+    a reply to a reply needs no new code -- only a deeper indent. The old sheet
+    had a hardcoded second level (comment, then comment.reply[]) which is
+    exactly why the conversation stopped there.
   */
-  const onReplyLike = async (item) => {
-    const commentId = item._id;
-    if (!commentId || !username) return;
+  const CommentRow = ({ item, depth }) => {
+    const open = !!openThreads[String(item._id)];
+    const replies = item.replies || [];
+    /* Indent stops at the second level. Facebook does the same: past that the
+       text column gets too narrow to read and threads walk off the screen. */
+    const indent = Math.min(depth, 1) * 32;
 
-    const bump = (fn) =>
-      setComments((prev) =>
-        prev.map((c) => (String(c._id) === String(commentId) ? fn(c) : c))
-      );
+    return (
+      <View style={{ marginTop: depth === 0 ? 12 : 10, marginLeft: indent }}>
+        <View style={styles.row}>
+          <Image source={avatarOf(item.author?.image)} style={depth ? styles.avatarSmall : styles.avatar} />
+          <View style={{ flex: 1 }}>
+            <View style={styles.bubble}>
+              <Text style={styles.bubbleName}>{item.author?.name || "Someone"}</Text>
+              {item.deleted ? (
+                <Text style={[styles.bubbleText, { fontStyle: "italic", color: FB.textTertiary }]}>
+                  This comment was deleted
+                </Text>
+              ) : (
+                <Text style={styles.bubbleText}>
+                  {/*
+                    Who this answers.
 
-    const liked = (item.likes || []).some(
-      (l) => String(l.username?._id || l.username) === String(username)
+                    Replies are one level deep by design -- answering a reply
+                    puts your comment beside it, not under it -- so without
+                    naming the target a thread of three people becomes
+                    unreadable. The server records it as `replyTo`.
+                  */}
+                  {item.replyTo?.name ? (
+                    <Text style={styles.replyToName}>{item.replyTo.name} </Text>
+                  ) : null}
+                  {item.message}
+                </Text>
+              )}
+            </View>
+
+            <View style={styles.metaRow}>
+              <Text style={styles.metaTime}>{timeAgo(item.timestamp)}</Text>
+
+              {/* Legacy replies carry no id, so they can be read but not acted
+                  on. Offering buttons that cannot work would be worse. */}
+              {!item.legacy && !item.deleted && (
+                <>
+                  <TouchableOpacity onPress={() => toggleCommentLike(item)}>
+                    <Text style={[styles.metaAction, item.isLiked && styles.metaActionOn]}>
+                      Like
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => startReply(item)}>
+                    <Text style={styles.metaAction}>Reply</Text>
+                  </TouchableOpacity>
+                  {item.isMine && (
+                    <TouchableOpacity onPress={() => deleteComment(item)}>
+                      <Text style={[styles.metaAction, { color: FB.danger }]}>Delete</Text>
+                    </TouchableOpacity>
+                  )}
+                </>
+              )}
+
+              {item.likes > 0 && (
+                <View style={styles.likePill}>
+                  <Text style={styles.likePillText}>👍 {item.likes}</Text>
+                </View>
+              )}
+            </View>
+          </View>
+        </View>
+
+        {/* Replies are folded away until asked for, so one busy thread cannot
+            bury the rest of the conversation. */}
+        {replies.length > 0 && !open && (
+          <TouchableOpacity
+            style={styles.viewReplies}
+            onPress={() => setOpenThreads((o) => ({ ...o, [String(item._id)]: true }))}
+          >
+            <View style={styles.threadLine} />
+            <Text style={styles.viewRepliesText}>
+              View {replies.length} {replies.length === 1 ? "reply" : "replies"}
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {open && replies.map((r, i) => (
+          <CommentRow key={String(r?._id ?? i)} item={r} depth={depth + 1} />
+        ))}
+
+        {replies.length > 0 && open && (
+          <TouchableOpacity
+            style={styles.viewReplies}
+            onPress={() => setOpenThreads((o) => ({ ...o, [String(item._id)]: false }))}
+          >
+            <View style={styles.threadLine} />
+            <Text style={styles.viewRepliesText}>Hide replies</Text>
+          </TouchableOpacity>
+        )}
+      </View>
     );
-
-    bump((c) => ({
-      ...c,
-      likes: liked
-        ? (c.likes || []).filter((l) => String(l.username?._id || l.username) !== String(username))
-        : [...(c.likes || []), { username }],
-    }));
-
-    try {
-      const { data } = await api.post("/apis/reel/addcommentsylike", {
-        reelId,
-        commentId,
-        username,
-      });
-      if (typeof data?.count === "number") {
-        bump((c) => ({
-          ...c,
-          // Keep the array's length honest against the server's count without
-          // pretending to know who the other likers are.
-          likes: data.liked
-            ? [...(c.likes || []).filter((l) => String(l.username?._id || l.username) !== String(username)), { username }]
-            : (c.likes || []).filter((l) => String(l.username?._id || l.username) !== String(username)),
-        }));
-      }
-    } catch (e) {
-      bump((c) => ({ ...c, likes: item.likes || [] }));
-      Toast.show({
-        type: "error",
-        text1: e?.response?.data?.error || "Could not like that comment",
-      });
-    }
   };
 
   return (
@@ -235,9 +332,10 @@ const PostModalComents = ({ data, visible, onClose, username, reelId, onCommentA
 
         <View style={styles.header}>
           <Text style={styles.headerTitle}>
-            {comments.length > 0
-              ? `${comments.length} comment${comments.length === 1 ? "" : "s"}`
-              : "Comments"}
+            {(() => {
+              const total = comments.reduce((n, c) => n + 1 + (c.replies?.length || 0), 0);
+              return total > 0 ? `${total} comment${total === 1 ? "" : "s"}` : "Comments";
+            })()}
           </Text>
           <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Ionicons name="close" size={22} color={FB.text} />
@@ -256,70 +354,8 @@ const PostModalComents = ({ data, visible, onClose, username, reelId, onCommentA
               <Text style={styles.emptyHint}>Be the first to say something.</Text>
             </View>
           }
-          renderItem={({ item }) => (
-            <View style={{ marginTop: 12 }}>
-              <View style={styles.row}>
-                <Image source={avatarOf(item.user?.image)} style={styles.avatar} />
-                <View style={{ flex: 1 }}>
-                  {/* Facebook puts the name inside the bubble with the text,
-                      not on a line above it. */}
-                  <View style={styles.bubble}>
-                    <Text style={styles.bubbleName}>{item.user?.name || "Someone"}</Text>
-                    <Text style={styles.bubbleText}>{item.message}</Text>
-                  </View>
-
-                  {/* Plain text links under the bubble, which is the whole
-                      comment action set -- it was two stacked icon buttons
-                      with labels beneath them, taking three times the room. */}
-                  <View style={styles.metaRow}>
-                    <Text style={styles.metaTime}>{timeAgo(item.timestamp)}</Text>
-                    {/* Lit when it is yours, so the tap has a visible result. */}
-                    <TouchableOpacity onPress={() => onReplyLike(item)}>
-                      <Text
-                        style={[
-                          styles.metaAction,
-                          (item.likes || []).some(
-                            (l) => String(l.username?._id || l.username) === String(username)
-                          ) && styles.metaActionOn,
-                        ]}
-                      >
-                        Like
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => replyHandler(item)}>
-                      <Text style={styles.metaAction}>Reply</Text>
-                    </TouchableOpacity>
-                    {item.likes?.length > 0 && (
-                      <View style={styles.likePill}>
-                        <Text style={styles.likePillText}>👍 {item.likes.length}</Text>
-                      </View>
-                    )}
-                  </View>
-                </View>
-              </View>
-
-              {item.reply?.length > 0 && (
-                <View style={styles.replies}>
-                  {item.reply.map((r, i) => (
-                    <View key={String(r?._id ?? i)} style={styles.row}>
-                      <Image source={avatarOf(r.userinfo?.image)} style={styles.avatarSmall} />
-                      <View style={{ flex: 1 }}>
-                        <View style={styles.bubble}>
-                          <Text style={styles.bubbleName}>
-                            {r.userinfo?.name || "Someone"}
-                          </Text>
-                          <Text style={styles.bubbleText}>{r.message}</Text>
-                        </View>
-                        <View style={styles.metaRow}>
-                          <Text style={styles.metaTime}>{timeAgo(r.xtime)}</Text>
-                        </View>
-                      </View>
-                    </View>
-                  ))}
-                </View>
-              )}
-            </View>
-          )}
+          renderItem={({ item }) => <CommentRow item={item} depth={0} />}
+        
         />
 
         <KeyboardAvoidingView
@@ -329,12 +365,12 @@ const PostModalComents = ({ data, visible, onClose, username, reelId, onCommentA
           {/* Replying to someone is stated, with a way out. Tapping Reply used
               to change nothing on screen, so you could not tell whether your
               next message was a reply or a new comment. */}
-          {replytext ? (
+          {replyTo ? (
             <View style={styles.replyingBar}>
               <Text style={styles.replyingText} numberOfLines={1}>
-                Replying to {replytext.user?.name || "someone"}
+                Replying to {replyTo.author?.name || "someone"}
               </Text>
-              <TouchableOpacity onPress={() => setReplytext(null)}>
+              <TouchableOpacity onPress={() => setReplyTo(null)}>
                 <Ionicons name="close" size={16} color={FB.textSecondary} />
               </TouchableOpacity>
             </View>
@@ -344,7 +380,7 @@ const PostModalComents = ({ data, visible, onClose, username, reelId, onCommentA
             <View style={styles.inputWrapper}>
               <TextInput
                 ref={inputRef}
-                placeholder={replytext ? "Write a reply..." : "Write a comment..."}
+                placeholder={replyTo ? "Write a reply..." : "Write a comment..."}
                 placeholderTextColor={FB.textTertiary}
                 value={newComment}
                 onChangeText={setNewComment}
@@ -433,6 +469,10 @@ const styles = StyleSheet.create({
   metaTime: { fontSize: 12, color: FB.textTertiary },
   metaAction: { fontSize: 12, fontWeight: "700", color: FB.textSecondary },
   metaActionOn: { color: FB.primary },
+  replyToName: { color: FB.primary, fontWeight: "600" },
+  viewReplies: { flexDirection: "row", alignItems: "center", gap: 8, marginLeft: 40, marginTop: 8 },
+  threadLine: { width: 22, height: 1, backgroundColor: FB.divider },
+  viewRepliesText: { fontSize: 12, fontWeight: "700", color: FB.textSecondary },
   likePill: {
     flexDirection: "row", alignItems: "center",
     paddingHorizontal: 6, height: 20, borderRadius: 10,
