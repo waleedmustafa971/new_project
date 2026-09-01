@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#07070c">
+<meta name="description" content="The Terms of Use governing your Max Social account - eligibility, acceptable use, your content and licence, coins and gifts, creator earnings and payouts, live streaming rules, suspension and governing law.">
+<meta name="robots" content="index,follow">
+<title>Terms of Use - Max Social</title>
+<style>
+:root{
+  --bg:#07070c;--ink:#f5f5fa;--muted:#a3a3ba;--dim:#70708a;
+  --line:rgba(255,255,255,.09);--line-2:rgba(255,255,255,.15);
+  --glass:rgba(255,255,255,.045);
+  --grad:linear-gradient(115deg,#8b5cf6,#d946ef 50%,#fb923c);
+  --violet:#a78bfa;--green:#34d399;--amber:#fbbf24;--red:#fca5a5;
+  --nav-h:64px;--ease:cubic-bezier(.22,1,.36,1);
+}
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:90px;-webkit-text-size-adjust:100%}
+body{
+  margin:0;background:var(--bg);color:var(--ink);
+  font-family:Inter,-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,system-ui,sans-serif;
+  font-size:16px;line-height:1.72;letter-spacing:-.011em;-webkit-font-smoothing:antialiased;
+}
+a{color:var(--violet);text-decoration:none;border-bottom:1px solid rgba(167,139,250,.3);transition:border-color .25s,color .25s}
+a:hover{color:#c4b5fd;border-bottom-color:currentColor}
+h1,h2,h3{margin:0;line-height:1.14;letter-spacing:-.035em;font-weight:680}
+p,ul,ol{margin:0}
+::selection{background:rgba(139,92,246,.4)}
+
+.aurora{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden}
+.aurora b{position:absolute;display:block;border-radius:50%;filter:blur(100px);opacity:.30}
+.a1{width:56vw;height:56vw;left:-20vw;top:-26vw;background:radial-gradient(circle,#7c3aed,transparent 66%)}
+.a2{width:48vw;height:48vw;right:-18vw;top:-6vw;background:radial-gradient(circle,#f59e0b,transparent 66%);opacity:.20}
+
+.wrap{width:min(1140px,calc(100% - 44px));margin-inline:auto}
+
+.progress{position:fixed;top:0;left:0;height:2px;width:0;background:var(--grad);z-index:100;transition:width .1s linear}
+.nav{position:fixed;top:0;left:0;right:0;height:var(--nav-h);z-index:90;display:flex;align-items:center;
+  background:rgba(7,7,12,.75);backdrop-filter:blur(20px) saturate(150%);-webkit-backdrop-filter:blur(20px) saturate(150%);
+  border-bottom:1px solid var(--line)}
+.nav .wrap{display:flex;align-items:center;justify-content:space-between;gap:20px}
+.brand{display:inline-flex;align-items:center;gap:10px;font-size:16.5px;font-weight:720;letter-spacing:-.035em;color:var(--ink);border:0}
+.brand-mark{width:29px;height:29px;border-radius:10px;display:grid;place-items:center;flex:none;
+  background:var(--grad);color:#fff;font-size:15px;font-weight:800;letter-spacing:-.05em}
+.nav-right{display:flex;gap:8px;align-items:center}
+.nav-right a{padding:8px 15px;border-radius:100px;font-size:13.5px;font-weight:580;color:var(--muted);border:1px solid transparent;transition:all .25s}
+.nav-right a:hover{color:var(--ink);background:var(--glass);border-color:var(--line)}
+.nav-right a.on{color:var(--ink);background:var(--glass);border-color:var(--line-2)}
+
+header.page{padding:calc(var(--nav-h) + 64px) 0 46px}
+.badge{display:inline-flex;align-items:center;gap:9px;font-size:11.5px;font-weight:700;letter-spacing:.15em;
+  text-transform:uppercase;color:#c4b5fd;padding:7px 14px;border-radius:100px;
+  border:1px solid rgba(139,92,246,.28);background:rgba(139,92,246,.10)}
+header.page h1{font-size:clamp(38px,6vw,66px);margin:24px 0 20px;letter-spacing:-.05em;font-weight:700}
+header.page .sub{color:var(--muted);font-size:clamp(16px,1.4vw,18.5px);max-width:66ch;line-height:1.65}
+.meta{display:flex;flex-wrap:wrap;gap:10px;margin-top:30px}
+.meta span{padding:8px 15px;border-radius:100px;border:1px solid var(--line);background:var(--glass);font-size:12.5px;color:var(--muted)}
+.meta span b{color:var(--ink);font-weight:620}
+
+.layout{display:grid;grid-template-columns:250px 1fr;gap:56px;align-items:start;padding-bottom:100px}
+.toc{position:sticky;top:calc(var(--nav-h) + 26px);max-height:calc(100vh - var(--nav-h) - 52px);overflow-y:auto;
+  padding-right:8px;border-left:1px solid var(--line)}
+.toc h4{font-size:11px;text-transform:uppercase;letter-spacing:.13em;color:var(--dim);font-weight:700;margin:0 0 14px 17px}
+.toc a{display:block;padding:7px 0 7px 17px;font-size:13.3px;color:var(--dim);border:0;border-left:2px solid transparent;
+  margin-left:-1px;line-height:1.45;transition:color .25s,border-color .25s}
+.toc a:hover{color:var(--muted)}
+.toc a.on{color:var(--ink);border-left-color:#a78bfa}
+
+article h2{font-size:clamp(24px,2.8vw,32px);margin:64px 0 18px;letter-spacing:-.04em;scroll-margin-top:90px}
+article h2:first-child{margin-top:0}
+article h2 .num{display:inline-block;font-size:.52em;font-weight:700;color:#a78bfa;vertical-align:middle;
+  margin-right:12px;padding:4px 10px;border-radius:8px;background:rgba(139,92,246,.14);letter-spacing:0}
+article h3{font-size:17.5px;margin:34px 0 12px;letter-spacing:-.03em;font-weight:650}
+article p{color:#cfcfdd;margin-bottom:16px;max-width:76ch}
+article ul,article ol{color:#cfcfdd;margin:0 0 18px;padding-left:22px;max-width:76ch}
+article li{margin-bottom:9px}
+article li::marker{color:#8b5cf6}
+article strong{color:var(--ink);font-weight:630}
+
+.callout{border:1px solid var(--line-2);border-radius:18px;padding:22px 26px;margin:26px 0;
+  background:linear-gradient(160deg,rgba(139,92,246,.11),rgba(255,255,255,.02));max-width:76ch}
+.callout p{margin:0}
+.callout p+p{margin-top:12px}
+.callout.warn{background:linear-gradient(160deg,rgba(251,191,36,.10),rgba(255,255,255,.02));border-color:rgba(251,191,36,.28)}
+.callout.good{background:linear-gradient(160deg,rgba(52,211,153,.10),rgba(255,255,255,.02));border-color:rgba(52,211,153,.26)}
+.callout b.tag{display:inline-block;font-size:11px;text-transform:uppercase;letter-spacing:.12em;
+  color:#c4b5fd;margin-bottom:9px;font-weight:700}
+.callout.warn b.tag{color:var(--amber)}
+.callout.good b.tag{color:var(--green)}
+
+.table-scroll{overflow-x:auto;margin:22px 0;border:1px solid var(--line);border-radius:18px;background:var(--glass)}
+table{border-collapse:collapse;width:100%;min-width:600px;font-size:14.2px}
+th,td{text-align:left;padding:15px 18px;border-bottom:1px solid var(--line);vertical-align:top;color:#cfcfdd}
+th{font-size:11.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--dim);font-weight:700;
+  background:rgba(255,255,255,.03);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+td strong{color:var(--ink)}
+
+.rules{display:grid;grid-template-columns:repeat(auto-fit,minmax(258px,1fr));gap:14px;margin:24px 0}
+.rules div{padding:18px;border-radius:16px;border:1px solid rgba(252,165,165,.2);background:rgba(239,68,68,.055)}
+.rules b{display:block;font-size:14.5px;margin-bottom:6px;color:var(--ink);font-weight:640}
+.rules span{font-size:13.2px;color:var(--muted);line-height:1.55}
+
+.contact-card{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px;margin-top:24px}
+.contact-card div{padding:22px;border-radius:18px;border:1px solid var(--line);background:var(--glass)}
+.contact-card b{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:var(--dim);margin-bottom:8px;font-weight:700}
+.contact-card a{font-size:15px;font-weight:600}
+
+footer{border-top:1px solid var(--line);padding:44px 0 56px}
+.f-in{display:flex;flex-wrap:wrap;gap:18px;justify-content:space-between;align-items:center;font-size:13.5px;color:var(--dim)}
+.f-in nav{display:flex;gap:22px;flex-wrap:wrap}
+.f-in nav a{color:var(--muted);border:0}
+.f-in nav a:hover{color:var(--ink)}
+
+.top{position:fixed;right:24px;bottom:24px;width:46px;height:46px;border-radius:50%;display:grid;place-items:center;
+  background:rgba(16,16,26,.9);border:1px solid var(--line-2);backdrop-filter:blur(14px);color:var(--ink);
+  opacity:0;pointer-events:none;transition:opacity .35s,transform .35s var(--ease);transform:translateY(10px);z-index:80}
+.top.show{opacity:1;pointer-events:auto;transform:none}
+
+@media (max-width:900px){
+  .layout{grid-template-columns:1fr;gap:0}
+  .toc{position:static;max-height:none;border-left:0;border-bottom:1px solid var(--line);
+    padding:0 0 22px;margin-bottom:38px;display:flex;flex-wrap:wrap;gap:6px}
+  .toc h4{width:100%;margin:0 0 10px}
+  .toc a{padding:7px 13px;border:1px solid var(--line);border-radius:100px;font-size:12.5px;margin:0}
+  .toc a.on{border-color:var(--line-2)}
+}
+@media (max-width:560px){ .wrap{width:calc(100% - 32px)} .nav-right a{padding:7px 11px;font-size:12.5px} }
+@media (prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important;scroll-behavior:auto !important}}
+</style>
+<style>
+/* Visual system aligned with the public landing page. */
+:root{--bg:#f7f7f8;--ink:#17171b;--muted:#6e6e73;--dim:#8e8e93;--line:#e5e5e7;--line-2:#d7d7db;--glass:#fff;--violet:#007aff;--green:#1f9d55;--amber:#b45309;--red:#c6382f;--grad:#007aff}
+body{background:#f7f7f8;color:#17171b;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Arial,sans-serif}
+a{color:#007aff;border-bottom-color:rgba(0,122,255,.22)}a:hover{color:#0066d6}.aurora{display:none}.progress{background:#007aff}.nav{background:rgba(255,255,255,.84);border-bottom-color:#e5e5e7;backdrop-filter:blur(20px) saturate(180%)}.brand{color:#17171b}.brand-mark{background:#17171b;box-shadow:none}.nav-right a{color:#6e6e73}.nav-right a:hover,.nav-right a.on{color:#17171b;background:#f1f1f3;border-color:#e5e5e7}.badge{color:#007aff;background:#eef6ff;border-color:#cce5ff;letter-spacing:.08em}header.page h1{color:#17171b}header.page .sub{color:#6e6e73}.meta span{background:#fff;border-color:#e5e5e7;color:#6e6e73}.meta span b,article strong,td strong{color:#17171b}.layout{padding-top:20px}.toc{border-left-color:#e5e5e7}.toc h4{color:#8e8e93}.toc a{color:#6e6e73}.toc a:hover{color:#17171b}.toc a.on{color:#007aff;border-left-color:#007aff}article h2 .num{color:#007aff;background:#eef6ff}article p,article ul,article ol,th,td{color:#4f4f55}article li::marker{color:#007aff}.callout{background:#fff;border-color:#dce8f5;box-shadow:0 8px 24px rgba(0,0,0,.025)}.callout.warn{background:#fffaf0;border-color:#f2d398}.callout.good{background:#f0fbf5;border-color:#bce7cf}.callout b.tag{color:#007aff}.callout.warn b.tag{color:#b45309}.callout.good b.tag{color:#1f9d55}.table-scroll{background:#fff;border-color:#e5e5e7}th{background:#fafafa;color:#6e6e73}th,td{border-bottom-color:#e5e5e7}.rules div{background:#fff7f6;border-color:#f1c7c3}.rules b{color:#17171b}.rules span{color:#6e6e73}.contact-card div{background:#fff;border-color:#e5e5e7;box-shadow:0 6px 20px rgba(0,0,0,.02)}.contact-card b{color:#8e8e93}.top{background:#17171b;border-color:#17171b;color:#fff}.f-in{color:#8e8e93}.f-in nav a{color:#6e6e73}.f-in nav a:hover{color:#17171b}@media(max-width:900px){.toc{border-bottom-color:#e5e5e7}.toc a{background:#fff;border-color:#e5e5e7}.toc a.on{border-color:#8bc5ff}}
+</style>
+</head>
+<body>
+
+<div class="aurora"><b class="a1"></b><b class="a2"></b></div>
+<div class="progress" id="progress"></div>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="/"><span class="brand-mark">M</span> Max Social</a>
+    <div class="nav-right">
+      <a href="/">Home</a>
+      <a href="/policy">Privacy</a>
+      <a href="/terms_of_use" class="on">Terms</a>
+    </div>
+  </div>
+</header>
+
+<header class="page wrap">
+  <span class="badge">Legal</span>
+  <h1>Terms of Use</h1>
+  <p class="sub">These terms are the agreement between you and Max Social. They set out what you can expect from us, what we expect from you, and what happens when something goes wrong. By creating an account or using the app, you accept them.</p>
+  <div class="meta">
+    <span>Last updated <b>29 August 2026</b></span>
+    <span>Effective <b>29 August 2026</b></span>
+    <span>Minimum age <b>13</b></span>
+  </div>
+</header>
+
+<div class="wrap layout">
+
+  <nav class="toc" id="toc">
+    <h4>On this page</h4>
+    <a href="#agreement">1. This agreement</a>
+    <a href="#eligibility">2. Who may use it</a>
+    <a href="#account">3. Your account</a>
+    <a href="#your-content">4. Your content</a>
+    <a href="#licence">5. Licence you give us</a>
+    <a href="#acceptable-use">6. Acceptable use</a>
+    <a href="#live">7. Live streaming</a>
+    <a href="#messaging">8. Messaging and calls</a>
+    <a href="#coins">9. Coins, gifts, virtual items</a>
+    <a href="#creators">10. Creator earnings</a>
+    <a href="#subscriptions">11. Subscriptions</a>
+    <a href="#reporting">12. Reporting and moderation</a>
+    <a href="#ip">13. Intellectual property</a>
+    <a href="#third-party">14. Third-party services</a>
+    <a href="#suspension">15. Suspension and closure</a>
+    <a href="#disclaimer">16. Disclaimers</a>
+    <a href="#liability">17. Limitation of liability</a>
+    <a href="#indemnity">18. Indemnity</a>
+    <a href="#disputes">19. Governing law</a>
+    <a href="#changes">20. Changes</a>
+    <a href="#contact">21. Contact</a>
+  </nav>
+
+  <article>
+
+    <h2 id="agreement"><span class="num">01</span>This agreement</h2>
+    <p>These Terms of Use are a binding agreement between you and <strong>Max Social</strong> ("Max Social", "we", "us"), covering the Max Social mobile application, the website at maxsocialapp.com, and every feature within them (together, the "Service").</p>
+    <p>By creating an account, or by using the Service at all, you agree to these terms and to our <a href="/policy">Privacy Policy</a>, which is part of this agreement. <strong>If you do not agree, do not use the Service.</strong></p>
+
+    <h2 id="eligibility"><span class="num">02</span>Who may use the Service</h2>
+    <ul>
+      <li>You must be at least <strong>13 years old</strong>. Where the law in your country sets a higher minimum age for social media or for consent to data processing, that higher age applies to you.</li>
+      <li>If you are under the age of majority where you live, you may only use the Service with the involvement of a parent or guardian, who accepts these terms with you.</li>
+      <li>You must not be barred from using the Service under any applicable law, and you must not have been previously removed from Max Social for a breach of these terms.</li>
+      <li>You may use the Service only for lawful purposes and in line with these terms.</li>
+    </ul>
+
+    <h2 id="account"><span class="num">03</span>Your account</h2>
+    <p>You are responsible for your account and everything that happens on it. Specifically:</p>
+    <ul>
+      <li>Give accurate registration details and keep them current.</li>
+      <li>Keep your password to yourself. We recommend enabling two-factor authentication, and we give you a login history so you can see where your account has been used.</li>
+      <li>Tell us promptly at <a href="mailto:support@maxsocialapp.com">support@maxsocialapp.com</a> if you believe someone else has access to your account.</li>
+      <li>Do not sell, rent or transfer your account, and do not create an account for the purpose of impersonating anybody.</li>
+      <li>One person, one account. Additional accounts operated to evade a ban will also be removed.</li>
+    </ul>
+
+    <h2 id="your-content"><span class="num">04</span>Your content stays yours</h2>
+    <div class="callout good">
+      <b class="tag">The important part</b>
+      <p><strong>You own what you post.</strong> Max Social claims no ownership of your photos, videos, reels, stories, messages, music selections or captions. We do not sell your content, and we do not licence it to anyone else for their own use.</p>
+    </div>
+    <p>You are responsible for what you publish, and by posting it you confirm that you have the right to - that you either created it, or hold the necessary permissions from whoever did, including from any person who is identifiable in it.</p>
+
+    <h2 id="licence"><span class="num">05</span>The licence you give us</h2>
+    <p>To show your content to the people you chose, we need your permission to handle it. So you grant Max Social a <strong>non-exclusive, royalty-free, worldwide licence to host, store, reproduce, adapt (for formatting and delivery), publish and display</strong> the content you post, solely for the purpose of operating and improving the Service.</p>
+    <p>This licence is deliberately narrow:</p>
+    <ul>
+      <li>It exists only so we can store your content, transcode it, generate thumbnails, and deliver it to the audience you selected.</li>
+      <li>It <strong>ends when you delete the content or your account</strong>, subject only to the retention periods in our <a href="/policy#retention">Privacy Policy</a> and to copies other users have lawfully saved or received.</li>
+      <li>It does not let us sell your content, licence it onward, or use it in advertising outside the Service without asking you first.</li>
+      <li>It is limited by your audience settings. Content posted to close friends is never shown outside that group.</li>
+    </ul>
+
+    <h2 id="acceptable-use"><span class="num">06</span>Acceptable use</h2>
+    <p>Max Social is a place people should be able to use without being harmed. The following are not permitted anywhere on the Service - in posts, reels, stories, comments, messages, live streams, group chats, usernames or profile details.</p>
+
+    <div class="rules">
+      <div><b>Illegal content</b><span>Anything unlawful, or that promotes, facilitates or instructs criminal activity.</span></div>
+      <div><b>Child sexual abuse material</b><span>Zero tolerance. Reported to the authorities without exception and the account removed permanently.</span></div>
+      <div><b>Harassment and bullying</b><span>Targeted abuse, threats, stalking, coordinated pile-ons, or publishing someone's private information.</span></div>
+      <div><b>Hate speech</b><span>Attacks on people based on race, ethnicity, nationality, religion, disability, sex, gender identity, sexual orientation or age.</span></div>
+      <div><b>Sexual content</b><span>Pornography and sexually explicit material, and any sexualised content involving minors in any form.</span></div>
+      <div><b>Violence</b><span>Credible threats, incitement, glorification of violence, or graphic gore posted for shock.</span></div>
+      <div><b>Self-harm</b><span>Content that encourages suicide, self-injury or disordered eating. We surface support resources instead.</span></div>
+      <div><b>Impersonation</b><span>Pretending to be another person, brand or organisation, or misrepresenting your affiliation.</span></div>
+      <div><b>Spam and manipulation</b><span>Bulk unsolicited messaging, engagement farming, bought followers, or artificially inflating gifts or metrics.</span></div>
+      <div><b>Fraud and scams</b><span>Deceptive schemes, phishing, fake giveaways, or soliciting payment off-platform under false pretences.</span></div>
+      <div><b>Infringement</b><span>Posting content that breaches someone else's copyright, trademark or other rights.</span></div>
+      <div><b>Technical abuse</b><span>Scraping, reverse engineering, automated access, circumventing rate limits, or interfering with the Service or its security.</span></div>
+    </div>
+
+    <p>We may remove content, limit its reach, or restrict an account that breaches these rules. Serious or repeated breaches result in permanent removal.</p>
+
+    <h2 id="live"><span class="num">07</span>Live streaming</h2>
+    <p>Live is held to the same standards as everything else, and it is unforgiving of mistakes because it is unedited and immediate.</p>
+    <ul>
+      <li>Everything in <a href="#acceptable-use">section 6</a> applies to a live stream, its chat, and every guest you bring on stage.</li>
+      <li><strong>As host, you are responsible for your room</strong> - including guests you invite to a seat. You have moderator, mute, remove and chat controls, and we expect you to use them.</li>
+      <li>Do not stream content you do not hold the rights to, including music, film or broadcast sport.</li>
+      <li>Do not bring anyone on stage without their agreement, and remove a guest who asks to leave.</li>
+      <li>We may end a stream immediately, without warning, where it breaches these terms or presents a risk of harm.</li>
+      <li>Streams and their chat may be reviewed by our moderation team following a report. See our <a href="/policy#retention">retention periods</a>.</li>
+    </ul>
+
+    <h2 id="messaging"><span class="num">08</span>Messaging and calls</h2>
+    <p>Direct messages, group chats, voice notes and calls are private between the participants. We do not read them for advertising and we do not monitor them routinely. We may access specific messages where we are responding to a report, complying with a valid legal order, or investigating a safety incident.</p>
+    <p>Do not use messaging to send spam, to distribute prohibited content, or to contact people who have blocked or restricted you. Recording a call without the consent of everyone on it may be illegal where you live - that is your responsibility, not ours.</p>
+
+    <h2 id="coins"><span class="num">09</span>Coins, gifts and virtual items</h2>
+    <div class="callout warn">
+      <b class="tag">Read this before you buy anything</b>
+      <p>Coins and virtual items are a <strong>limited, personal, non-transferable licence to use a feature inside Max Social</strong>. They are <strong>not money</strong>, not a deposit, not a stored-value instrument and not property. They carry no cash value, earn no interest, and cannot be exchanged, sold, transferred to another person, or redeemed for cash outside the creator payout process in <a href="#creators">section 10</a>.</p>
+    </div>
+    <ul>
+      <li>Coins are purchased through Apple or Google in-app billing, or by card where offered. Purchases are processed by those platforms under their own terms.</li>
+      <li><strong>All coin purchases are final and non-refundable</strong>, except where a refund is required by law or granted by Apple or Google under their store policies. Refund requests for in-app purchases must go to the store you bought from, not to us.</li>
+      <li>Coins spent on a gift are consumed at that moment and cannot be reversed.</li>
+      <li>We may change the price of coins, the price or availability of virtual items, or the exchange rate between coins and creator earnings. We will give notice before a change that affects coins you already hold.</li>
+      <li>Unused coins have no value on account closure. If we close your account for a breach of these terms, any coin balance is forfeited.</li>
+      <li>Buying coins to manipulate rankings, launder funds, or artificially inflate a creator's earnings is prohibited and will result in removal.</li>
+    </ul>
+
+    <h2 id="creators"><span class="num">10</span>Creator earnings and payouts</h2>
+    <p>If you upgrade to a creator account, gifts and subscription revenue attributed to you are recorded in an earnings ledger, against which you may request a payout.</p>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Term</th><th>How it works</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Eligibility</strong></td><td>You must hold a creator account in good standing, have completed any identity or tax verification we request, and have supplied valid payout details.</td></tr>
+          <tr><td><strong>Revenue share</strong></td><td>Max Social retains a platform commission, disclosed in the app before you request a payout. Store fees charged by Apple or Google are deducted before the split.</td></tr>
+          <tr><td><strong>Minimum threshold</strong></td><td>Payouts are available once your balance reaches the minimum shown in the app.</td></tr>
+          <tr><td><strong>Processing</strong></td><td>Requests are reviewed and paid on our published schedule. We may hold a payout while we investigate suspected fraud or a chargeback.</td></tr>
+          <tr><td><strong>Clawback</strong></td><td>Earnings from fraudulent, reversed or manipulated transactions may be deducted from your balance or recovered from you.</td></tr>
+          <tr><td><strong>Tax</strong></td><td>You are responsible for declaring and paying tax on what you earn. We may be required to withhold or report amounts under applicable law.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>We do not guarantee any level of earnings, reach or audience. Feed ranking, discovery placement and recommendation are at our discretion and may change.</p>
+
+    <h2 id="subscriptions"><span class="num">11</span>Subscriptions</h2>
+    <p>Creators may offer paid subscription tiers giving access to members-only content. Subscriptions renew automatically for the period you selected, at the price shown, until cancelled.</p>
+    <ul>
+      <li>Cancel at any time through your Apple or Google account settings. Access continues to the end of the period you have already paid for.</li>
+      <li>Cancelling does not refund the current period unless the law or the store's policy requires it.</li>
+      <li>If a creator stops posting, closes their account, or is removed, we may cancel the subscription and, at our discretion, refund the unused portion.</li>
+      <li>Members-only content remains subject to <a href="#acceptable-use">section 6</a>. Paying does not licence a creator to break the rules.</li>
+    </ul>
+
+    <h2 id="reporting"><span class="num">12</span>Reporting and moderation</h2>
+    <p>You can report any post, comment, account, message or live stream from inside the app, and check the status of what you filed. Reports are reviewed by our moderation team.</p>
+    <p>Depending on what we find, we may take no action, remove the content, limit its distribution, restrict features, suspend the account for a period, or remove it permanently. We aim to act proportionately, and to act faster where there is a risk of real-world harm.</p>
+    <p>If you believe we got a decision about your account wrong, reply to the notice we sent you or write to <a href="mailto:support@maxsocialapp.com">support@maxsocialapp.com</a>, and a person will look at it again.</p>
+
+    <h2 id="ip"><span class="num">13</span>Intellectual property</h2>
+    <p>The Max Social name, logo, app, website, design and software are owned by us and protected by intellectual property law. These terms give you a personal, revocable, non-transferable licence to use the Service as it is intended - and nothing more. You may not copy, modify, reverse engineer, decompile or create derivative works from it.</p>
+    <h3>Copyright complaints</h3>
+    <p>If you believe content on Max Social infringes your copyright, write to <a href="mailto:support@maxsocialapp.com">support@maxsocialapp.com</a> with: a description of the work, the exact location of the infringing content, your contact details, a statement that you hold the rights or act for the person who does, and a statement that your complaint is made in good faith. We remove infringing content and terminate the accounts of repeat infringers.</p>
+
+    <h2 id="third-party"><span class="num">14</span>Third-party services</h2>
+    <p>The Service uses third-party providers - listed in our <a href="/policy#processors">Privacy Policy</a> - for hosting, real-time audio and video, push notifications, payments, maps and AI features. Your use of the Service is also subject to the terms of Apple's App Store or Google Play, whichever you installed it from. We are not responsible for third-party services we do not control, or for links to external sites that appear in user content.</p>
+
+    <h2 id="suspension"><span class="num">15</span>Suspension and closing your account</h2>
+    <h3>You closing your account</h3>
+    <p>You may stop using the Service and delete your account at any time, following the process in our <a href="/policy#account-deletion">Privacy Policy</a>. You do not need to give a reason.</p>
+    <h3>Us suspending or removing an account</h3>
+    <p>We may suspend or terminate your access where you breach these terms, where your use creates legal risk or risk of harm to others, where we are required to by law, or where an account has been inactive for an extended period. Where circumstances allow, we give notice and an opportunity to respond; where there is a serious or immediate risk, we act first.</p>
+    <p>On termination, your licence to use the Service ends, any coin balance is forfeited, and sections that by their nature should survive - the licence you granted for content still held, disclaimers, liability limits, indemnity and governing law - continue to apply.</p>
+
+    <h2 id="disclaimer"><span class="num">16</span>Disclaimers</h2>
+    <p>The Service is provided <strong>"as is" and "as available"</strong>. To the fullest extent permitted by law, we disclaim all warranties, express or implied, including merchantability, fitness for a particular purpose and non-infringement.</p>
+    <p>We do not warrant that the Service will be uninterrupted, timely, secure or error-free, that defects will be corrected, or that content will always be available. We do not endorse and are not responsible for content posted by users, and we make no guarantee about the conduct of anyone you meet through the Service.</p>
+    <p>Nothing in these terms excludes or limits liability that cannot lawfully be excluded, including for death or personal injury caused by negligence, or for fraud.</p>
+
+    <h2 id="liability"><span class="num">17</span>Limitation of liability</h2>
+    <p>To the fullest extent permitted by law, Max Social and its officers, employees and agents are not liable for any indirect, incidental, special, consequential or punitive damages, or for loss of profits, revenue, data, goodwill or business opportunity, arising from or related to your use of the Service.</p>
+    <p>Our total aggregate liability for all claims relating to the Service is limited to the greater of <strong>(a) the amount you paid us in the twelve months before the claim arose</strong>, or <strong>(b) AED 400</strong>.</p>
+    <p>Some jurisdictions do not allow certain limitations; where that is the case, the limitations apply to the maximum extent permitted, and your statutory rights as a consumer are unaffected.</p>
+
+    <h2 id="indemnity"><span class="num">18</span>Indemnity</h2>
+    <p>You agree to indemnify and hold Max Social harmless from any claim, demand, loss or expense, including reasonable legal fees, arising out of content you post, your use of the Service, your breach of these terms, or your violation of the rights of another person.</p>
+
+    <h2 id="disputes"><span class="num">19</span>Governing law and disputes</h2>
+    <p>These terms are governed by the laws of the <strong>United Arab Emirates</strong>. The courts of <strong>Dubai, UAE</strong> have exclusive jurisdiction over any dispute arising from them, except that we may seek injunctive relief in any court of competent jurisdiction to protect our intellectual property.</p>
+    <p>If you are a consumer resident elsewhere, this does not deprive you of the protection of mandatory consumer law in your country of residence, or of the right to bring proceedings in your local courts where that law gives you it.</p>
+    <div class="callout">
+      <b class="tag">Before anything formal</b>
+      <p>Almost everything is resolved faster by writing to us. Contact <a href="mailto:support@maxsocialapp.com">support@maxsocialapp.com</a> and give us 30 days to put it right before starting a formal claim.</p>
+    </div>
+
+    <h2 id="changes"><span class="num">20</span>Changes to these terms</h2>
+    <p>We may update these terms as the Service and the law change. The "last updated" date at the top reflects the current version. For material changes we will give notice in the app or by email <strong>before</strong> they take effect. Continuing to use the Service after that date means you accept the new terms; if you do not, you may close your account.</p>
+    <p>If any provision of these terms is held unenforceable, the rest continues in force. Our not enforcing a provision on one occasion is not a waiver of it.</p>
+
+    <h2 id="contact"><span class="num">21</span>Contact</h2>
+    <p>Questions about these terms, or about a decision we made on your account:</p>
+    <div class="contact-card">
+      <div><b>Support &amp; appeals</b><a href="mailto:support@maxsocialapp.com">support@maxsocialapp.com</a></div>
+      <div><b>Privacy &amp; data</b><a href="mailto:privacy@maxsocialapp.com">privacy@maxsocialapp.com</a></div>
+      <div><b>Privacy Policy</b><a href="/policy">Read the policy</a></div>
+    </div>
+
+  </article>
+</div>
+
+<footer>
+  <div class="wrap f-in">
+    <span>&copy; <span id="year">2026</span> Max Social. All rights reserved.</span>
+    <nav>
+      <a href="/">Home</a>
+      <a href="/policy">Privacy Policy</a>
+      <a href="/terms_of_use">Terms of Use</a>
+      <a href="mailto:support@maxsocialapp.com">Contact</a>
+    </nav>
+  </div>
+</footer>
+
+<a href="#" class="top" id="top" aria-label="Back to top">&#8593;</a>
+
+<script>
+(function () {
+  var progress = document.getElementById("progress");
+  var top = document.getElementById("top");
+  function onScroll() {
+    var y = window.scrollY || document.documentElement.scrollTop;
+    var h = document.documentElement.scrollHeight - window.innerHeight;
+    progress.style.width = (h > 0 ? (y / h) * 100 : 0) + "%";
+    top.classList.toggle("show", y > 600);
+  }
+  window.addEventListener("scroll", onScroll, { passive: true });
+  onScroll();
+
+  var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+  var sections = links.map(function (a) { return document.getElementById(a.getAttribute("href").slice(1)); })
+                      .filter(Boolean);
+  if ("IntersectionObserver" in window && sections.length) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (!en.isIntersecting) return;
+        links.forEach(function (a) {
+          a.classList.toggle("on", a.getAttribute("href") === "#" + en.target.id);
+        });
+      });
+    }, { rootMargin: "-90px 0px -70% 0px", threshold: 0 });
+    sections.forEach(function (s) { io.observe(s); });
+  }
+
+  document.getElementById("year").textContent = new Date().getFullYear();
+})();
+</script>
+</body>
+</html>

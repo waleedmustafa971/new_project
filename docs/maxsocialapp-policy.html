@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#07070c">
+<meta name="description" content="How Max Social collects, uses, shares and protects your personal data - including the device permissions we ask for, the processors we use, and how to delete your account.">
+<meta name="robots" content="index,follow">
+<title>Privacy Policy - Max Social</title>
+<style>
+:root{
+  --bg:#07070c;--ink:#f5f5fa;--muted:#a3a3ba;--dim:#70708a;
+  --line:rgba(255,255,255,.09);--line-2:rgba(255,255,255,.15);
+  --glass:rgba(255,255,255,.045);
+  --grad:linear-gradient(115deg,#8b5cf6,#d946ef 50%,#fb923c);
+  --violet:#a78bfa;--green:#34d399;--amber:#fbbf24;
+  --nav-h:64px;--ease:cubic-bezier(.22,1,.36,1);
+}
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:90px;-webkit-text-size-adjust:100%}
+body{
+  margin:0;background:var(--bg);color:var(--ink);
+  font-family:Inter,-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,system-ui,sans-serif;
+  font-size:16px;line-height:1.72;letter-spacing:-.011em;-webkit-font-smoothing:antialiased;
+}
+a{color:var(--violet);text-decoration:none;border-bottom:1px solid rgba(167,139,250,.3);transition:border-color .25s,color .25s}
+a:hover{color:#c4b5fd;border-bottom-color:currentColor}
+h1,h2,h3{margin:0;line-height:1.14;letter-spacing:-.035em;font-weight:680}
+p,ul,ol{margin:0}
+::selection{background:rgba(139,92,246,.4)}
+
+.aurora{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden}
+.aurora b{position:absolute;display:block;border-radius:50%;filter:blur(100px);opacity:.30}
+.a1{width:56vw;height:56vw;left:-20vw;top:-26vw;background:radial-gradient(circle,#7c3aed,transparent 66%)}
+.a2{width:48vw;height:48vw;right:-18vw;top:-6vw;background:radial-gradient(circle,#db2777,transparent 66%)}
+
+.wrap{width:min(1140px,calc(100% - 44px));margin-inline:auto}
+
+.progress{position:fixed;top:0;left:0;height:2px;width:0;background:var(--grad);z-index:100;transition:width .1s linear}
+.nav{position:fixed;top:0;left:0;right:0;height:var(--nav-h);z-index:90;display:flex;align-items:center;
+  background:rgba(7,7,12,.75);backdrop-filter:blur(20px) saturate(150%);-webkit-backdrop-filter:blur(20px) saturate(150%);
+  border-bottom:1px solid var(--line)}
+.nav .wrap{display:flex;align-items:center;justify-content:space-between;gap:20px}
+.brand{display:inline-flex;align-items:center;gap:10px;font-size:16.5px;font-weight:720;letter-spacing:-.035em;color:var(--ink);border:0}
+.brand-mark{width:29px;height:29px;border-radius:10px;display:grid;place-items:center;flex:none;
+  background:var(--grad);color:#fff;font-size:15px;font-weight:800;letter-spacing:-.05em}
+.nav-right{display:flex;gap:8px;align-items:center}
+.nav-right a{padding:8px 15px;border-radius:100px;font-size:13.5px;font-weight:580;color:var(--muted);border:1px solid transparent;transition:all .25s}
+.nav-right a:hover{color:var(--ink);background:var(--glass);border-color:var(--line)}
+.nav-right a.on{color:var(--ink);background:var(--glass);border-color:var(--line-2)}
+
+header.page{padding:calc(var(--nav-h) + 64px) 0 46px}
+.badge{display:inline-flex;align-items:center;gap:9px;font-size:11.5px;font-weight:700;letter-spacing:.15em;
+  text-transform:uppercase;color:#c4b5fd;padding:7px 14px;border-radius:100px;
+  border:1px solid rgba(139,92,246,.28);background:rgba(139,92,246,.10)}
+header.page h1{font-size:clamp(38px,6vw,66px);margin:24px 0 20px;letter-spacing:-.05em;font-weight:700}
+header.page .sub{color:var(--muted);font-size:clamp(16px,1.4vw,18.5px);max-width:66ch;line-height:1.65}
+.meta{display:flex;flex-wrap:wrap;gap:10px;margin-top:30px}
+.meta span{padding:8px 15px;border-radius:100px;border:1px solid var(--line);background:var(--glass);font-size:12.5px;color:var(--muted)}
+.meta span b{color:var(--ink);font-weight:620}
+
+.layout{display:grid;grid-template-columns:250px 1fr;gap:56px;align-items:start;padding-bottom:100px}
+.toc{position:sticky;top:calc(var(--nav-h) + 26px);max-height:calc(100vh - var(--nav-h) - 52px);overflow-y:auto;
+  padding-right:8px;border-left:1px solid var(--line)}
+.toc h4{font-size:11px;text-transform:uppercase;letter-spacing:.13em;color:var(--dim);font-weight:700;margin:0 0 14px 17px}
+.toc a{display:block;padding:7px 0 7px 17px;font-size:13.3px;color:var(--dim);border:0;border-left:2px solid transparent;
+  margin-left:-1px;line-height:1.45;transition:color .25s,border-color .25s}
+.toc a:hover{color:var(--muted)}
+.toc a.on{color:var(--ink);border-left-color:#a78bfa}
+
+article h2{font-size:clamp(24px,2.8vw,32px);margin:64px 0 18px;letter-spacing:-.04em;scroll-margin-top:90px}
+article h2:first-child{margin-top:0}
+article h2 .num{display:inline-block;font-size:.52em;font-weight:700;color:#a78bfa;vertical-align:middle;
+  margin-right:12px;padding:4px 10px;border-radius:8px;background:rgba(139,92,246,.14);letter-spacing:0}
+article h3{font-size:17.5px;margin:34px 0 12px;letter-spacing:-.03em;font-weight:650}
+article p{color:#cfcfdd;margin-bottom:16px;max-width:76ch}
+article ul,article ol{color:#cfcfdd;margin:0 0 18px;padding-left:22px;max-width:76ch}
+article li{margin-bottom:9px}
+article li::marker{color:#8b5cf6}
+article strong{color:var(--ink);font-weight:630}
+
+.callout{border:1px solid var(--line-2);border-radius:18px;padding:22px 26px;margin:26px 0;
+  background:linear-gradient(160deg,rgba(139,92,246,.11),rgba(255,255,255,.02));max-width:76ch}
+.callout p{margin:0}
+.callout p+p{margin-top:12px}
+.callout.warn{background:linear-gradient(160deg,rgba(251,191,36,.10),rgba(255,255,255,.02));border-color:rgba(251,191,36,.28)}
+.callout.good{background:linear-gradient(160deg,rgba(52,211,153,.10),rgba(255,255,255,.02));border-color:rgba(52,211,153,.26)}
+.callout b.tag{display:inline-block;font-size:11px;text-transform:uppercase;letter-spacing:.12em;
+  color:#c4b5fd;margin-bottom:9px;font-weight:700}
+.callout.warn b.tag{color:var(--amber)}
+.callout.good b.tag{color:var(--green)}
+
+.table-scroll{overflow-x:auto;margin:22px 0;border:1px solid var(--line);border-radius:18px;background:var(--glass)}
+table{border-collapse:collapse;width:100%;min-width:640px;font-size:14.2px}
+th,td{text-align:left;padding:15px 18px;border-bottom:1px solid var(--line);vertical-align:top;color:#cfcfdd}
+th{font-size:11.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--dim);font-weight:700;
+  background:rgba(255,255,255,.03);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+td strong{color:var(--ink)}
+
+.perm{display:grid;grid-template-columns:repeat(auto-fit,minmax(258px,1fr));gap:14px;margin:24px 0}
+.perm div{padding:18px;border-radius:16px;border:1px solid var(--line);background:var(--glass)}
+.perm b{display:block;font-size:14.5px;margin-bottom:6px;color:var(--ink);font-weight:640}
+.perm span{font-size:13.2px;color:var(--muted);line-height:1.55}
+.perm i{display:inline-block;font-style:normal;font-size:10.5px;font-weight:700;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--green);margin-top:9px}
+
+.contact-card{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px;margin-top:24px}
+.contact-card div{padding:22px;border-radius:18px;border:1px solid var(--line);background:var(--glass)}
+.contact-card b{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:var(--dim);margin-bottom:8px;font-weight:700}
+.contact-card a{font-size:15px;font-weight:600}
+
+footer{border-top:1px solid var(--line);padding:44px 0 56px}
+.f-in{display:flex;flex-wrap:wrap;gap:18px;justify-content:space-between;align-items:center;font-size:13.5px;color:var(--dim)}
+.f-in nav{display:flex;gap:22px;flex-wrap:wrap}
+.f-in nav a{color:var(--muted);border:0}
+.f-in nav a:hover{color:var(--ink)}
+
+.top{position:fixed;right:24px;bottom:24px;width:46px;height:46px;border-radius:50%;display:grid;place-items:center;
+  background:rgba(16,16,26,.9);border:1px solid var(--line-2);backdrop-filter:blur(14px);color:var(--ink);
+  opacity:0;pointer-events:none;transition:opacity .35s,transform .35s var(--ease);transform:translateY(10px);z-index:80}
+.top.show{opacity:1;pointer-events:auto;transform:none}
+
+@media (max-width:900px){
+  .layout{grid-template-columns:1fr;gap:0}
+  .toc{position:static;max-height:none;border-left:0;border-bottom:1px solid var(--line);
+    padding:0 0 22px;margin-bottom:38px;display:flex;flex-wrap:wrap;gap:6px}
+  .toc h4{width:100%;margin:0 0 10px}
+  .toc a{padding:7px 13px;border:1px solid var(--line);border-radius:100px;font-size:12.5px;margin:0}
+  .toc a.on{border-color:var(--line-2)}
+}
+@media (max-width:560px){ .wrap{width:calc(100% - 32px)} .nav-right a{padding:7px 11px;font-size:12.5px} }
+@media (prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important;scroll-behavior:auto !important}}
+</style>
+<style>
+/* Visual system aligned with the public landing page. */
+:root{--bg:#f7f7f8;--ink:#17171b;--muted:#6e6e73;--dim:#8e8e93;--line:#e5e5e7;--line-2:#d7d7db;--glass:#fff;--violet:#007aff;--green:#1f9d55;--amber:#b45309;--grad:#007aff}
+body{background:#f7f7f8;color:#17171b;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Arial,sans-serif}
+a{color:#007aff;border-bottom-color:rgba(0,122,255,.22)}a:hover{color:#0066d6}.aurora{display:none}.progress{background:#007aff}.nav{background:rgba(255,255,255,.84);border-bottom-color:#e5e5e7;backdrop-filter:blur(20px) saturate(180%)}.brand{color:#17171b}.brand-mark{background:#17171b;box-shadow:none}.nav-right a{color:#6e6e73}.nav-right a:hover,.nav-right a.on{color:#17171b;background:#f1f1f3;border-color:#e5e5e7}.badge{color:#007aff;background:#eef6ff;border-color:#cce5ff;letter-spacing:.08em}header.page h1{color:#17171b}header.page .sub{color:#6e6e73}.meta span{background:#fff;border-color:#e5e5e7;color:#6e6e73}.meta span b,article strong,td strong{color:#17171b}.layout{padding-top:20px}.toc{border-left-color:#e5e5e7}.toc h4{color:#8e8e93}.toc a{color:#6e6e73}.toc a:hover{color:#17171b}.toc a.on{color:#007aff;border-left-color:#007aff}article h2 .num{color:#007aff;background:#eef6ff}article p,article ul,article ol,th,td{color:#4f4f55}article li::marker{color:#007aff}.callout{background:#fff;border-color:#dce8f5;box-shadow:0 8px 24px rgba(0,0,0,.025)}.callout.warn{background:#fffaf0;border-color:#f2d398}.callout.good{background:#f0fbf5;border-color:#bce7cf}.callout b.tag{color:#007aff}.callout.warn b.tag{color:#b45309}.callout.good b.tag{color:#1f9d55}.table-scroll{background:#fff;border-color:#e5e5e7}th{background:#fafafa;color:#6e6e73}th,td{border-bottom-color:#e5e5e7}.perm div,.contact-card div{background:#fff;border-color:#e5e5e7;box-shadow:0 6px 20px rgba(0,0,0,.02)}.perm b{color:#17171b}.perm span{color:#6e6e73}.perm i{color:#1f9d55}.contact-card b{color:#8e8e93}.top{background:#17171b;border-color:#17171b;color:#fff}.f-in{color:#8e8e93}.f-in nav a{color:#6e6e73}.f-in nav a:hover{color:#17171b}@media(max-width:900px){.toc{border-bottom-color:#e5e5e7}.toc a{background:#fff;border-color:#e5e5e7}.toc a.on{border-color:#8bc5ff}}
+</style>
+</head>
+<body>
+
+<div class="aurora"><b class="a1"></b><b class="a2"></b></div>
+<div class="progress" id="progress"></div>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="/"><span class="brand-mark">M</span> Max Social</a>
+    <div class="nav-right">
+      <a href="/">Home</a>
+      <a href="/policy" class="on">Privacy</a>
+      <a href="/terms_of_use">Terms</a>
+    </div>
+  </div>
+</header>
+
+<header class="page wrap">
+  <span class="badge">Legal</span>
+  <h1>Privacy Policy</h1>
+  <p class="sub">This policy explains what Max Social collects, why we collect it, who we share it with and what you can do about it. We have written it to be read, not to be survived. If anything here is unclear, write to us and we will explain it in plain terms.</p>
+  <div class="meta">
+    <span>Last updated <b>29 August 2026</b></span>
+    <span>Effective <b>29 August 2026</b></span>
+    <span>Applies to <b>Max Social app &amp; maxsocialapp.com</b></span>
+  </div>
+</header>
+
+<div class="wrap layout">
+
+  <nav class="toc" id="toc">
+    <h4>On this page</h4>
+    <a href="#who-we-are">1. Who we are</a>
+    <a href="#what-we-collect">2. What we collect</a>
+    <a href="#permissions">3. Device permissions</a>
+    <a href="#how-we-use">4. How we use your data</a>
+    <a href="#legal-basis">5. Legal bases</a>
+    <a href="#sharing">6. Who we share with</a>
+    <a href="#processors">7. Service providers</a>
+    <a href="#public">8. What is public</a>
+    <a href="#payments">9. Coins and payments</a>
+    <a href="#notifications">10. Push notifications</a>
+    <a href="#retention">11. How long we keep it</a>
+    <a href="#account-deletion">12. Deleting your account</a>
+    <a href="#your-rights">13. Your rights</a>
+    <a href="#security">14. Security</a>
+    <a href="#transfers">15. International transfers</a>
+    <a href="#children">16. Children and age</a>
+    <a href="#changes">17. Changes</a>
+    <a href="#contact">18. Contact us</a>
+  </nav>
+
+  <article>
+
+    <h2 id="who-we-are"><span class="num">01</span>Who we are</h2>
+    <p>Max Social ("Max Social", "we", "us") operates the Max Social mobile application and the website at <strong>maxsocialapp.com</strong>. We are the data controller for the personal data described in this policy.</p>
+    <p>We are established in the <strong>United Arab Emirates</strong>. For any question about this policy or about your data, contact <a href="mailto:privacy@maxsocialapp.com">privacy@maxsocialapp.com</a>.</p>
+
+    <h2 id="what-we-collect"><span class="num">02</span>What we collect</h2>
+    <p>We collect four kinds of data: what you give us, what you create, what your device reports, and what you tell us in support conversations. We do not buy personal data from data brokers.</p>
+
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Category</th><th>What it includes</th><th>Why we hold it</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>Account details</strong></td>
+            <td>Name, username, email address, mobile number, password (stored only as a salted hash), date of birth, gender, nationality and country.</td>
+            <td>To create and secure your account, verify you, and meet our minimum-age obligations.</td>
+          </tr>
+          <tr>
+            <td><strong>Profile</strong></td>
+            <td>Profile photo, bio, interests, website and public contact details you choose to publish, verification status, creator category.</td>
+            <td>To render your profile and let people find you.</td>
+          </tr>
+          <tr>
+            <td><strong>Content you create</strong></td>
+            <td>Posts, photos, albums, reels, stories and highlights, comments, captions, hashtags, place tags, messages, voice notes, live streams and live chat, and the audience setting attached to each item.</td>
+            <td>To deliver the service - to show your content to exactly the people you chose.</td>
+          </tr>
+          <tr>
+            <td><strong>Social graph</strong></td>
+            <td>Followers and following, follow requests, close-friends lists, group memberships, blocked, restricted and muted accounts, hidden posts.</td>
+            <td>To build your feed and enforce the privacy and safety choices you have made.</td>
+          </tr>
+          <tr>
+            <td><strong>Usage and interactions</strong></td>
+            <td>Likes, comments, shares, saves, story views, search history, followed hashtags and topics, watch and impression events on posts and reels.</td>
+            <td>To rank your feed, power discovery and give creators their analytics.</td>
+          </tr>
+          <tr>
+            <td><strong>Device and technical</strong></td>
+            <td>Device model and operating system, app version, language, time zone, IP address, push notification token, and login events including approximate location and the devices you mark as trusted.</td>
+            <td>To deliver notifications, keep the service working across devices, and show you your own login history so you can spot an intrusion.</td>
+          </tr>
+          <tr>
+            <td><strong>Optional data</strong></td>
+            <td>Precise or approximate location, contacts, camera and microphone input, and photo library items - each only when you turn the relevant feature on. See <a href="#permissions">section 3</a>.</td>
+            <td>To run the specific feature you asked for. Decline any of these and the rest of the app still works.</td>
+          </tr>
+          <tr>
+            <td><strong>Transactions</strong></td>
+            <td>Coin purchases, gifts sent and received, virtual items owned, subscription tiers, earnings entries and payout requests.</td>
+            <td>To run the coin economy, pay creators and keep the financial records the law requires.</td>
+          </tr>
+          <tr>
+            <td><strong>Safety and support</strong></td>
+            <td>Reports you file or that are filed about you, moderation decisions and notes, and the content of your messages to our support team.</td>
+            <td>To investigate abuse, enforce our Terms and answer you.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout good">
+      <b class="tag">Worth being clear about</b>
+      <p>We do <strong>not</strong> collect your contacts, location, camera, microphone or photo library unless you grant that permission and use the feature it belongs to. We do not read your private messages except where we are responding to a report, complying with a legal order, or investigating a specific safety incident.</p>
+    </div>
+
+    <h2 id="permissions"><span class="num">03</span>Device permissions we ask for</h2>
+    <p>Every permission below is optional and requested only at the moment you first use the feature that needs it. You can withdraw any of them later in your device settings; the feature that depends on it stops working, and nothing else does.</p>
+
+    <div class="perm">
+      <div><b>Camera</b><span>Taking photos and video for posts, reels and stories, and carrying your video during voice and video calls and live streams.</span><i>Optional</i></div>
+      <div><b>Microphone</b><span>Recording voice notes, and carrying your audio during calls and live streams.</span><i>Optional</i></div>
+      <div><b>Photos and media</b><span>Choosing existing photos, videos and audio from your device to post or send.</span><i>Optional</i></div>
+      <div><b>Location</b><span>Tagging a place on a post, and the "nearby" discovery view. Precise location is never attached to anything without your action.</span><i>Optional</i></div>
+      <div><b>Contacts</b><span>Finding people you already know who are on Max Social. We match against your address book to make suggestions.</span><i>Optional</i></div>
+      <div><b>Notifications</b><span>Delivering push alerts for messages, calls, follows, likes, mentions and live streams you follow.</span><i>Optional</i></div>
+      <div><b>Bluetooth</b><span>Routing call and live-stream audio to headphones or a speaker you have paired.</span><i>Optional</i></div>
+      <div><b>Network state</b><span>Detecting whether you are online so calls, messages and uploads can recover from a dropped connection.</span><i>Required</i></div>
+    </div>
+
+    <div class="callout warn">
+      <b class="tag">About contacts</b>
+      <p>If you enable contact matching, we transmit your contacts to our servers to identify which of them already use Max Social. We use them for that purpose only. We do not message your contacts, do not sell or share them, and do not build profiles of people who are not Max Social users. You can turn contact matching off at any time, and ask us to delete the contact data we hold for you by writing to <a href="mailto:privacy@maxsocialapp.com">privacy@maxsocialapp.com</a>.</p>
+    </div>
+
+    <h2 id="how-we-use"><span class="num">04</span>How we use your data</h2>
+    <ul>
+      <li><strong>To run the service</strong> - show your feed, deliver messages, connect calls and live streams, and store the content you publish.</li>
+      <li><strong>To honour your privacy choices</strong> - enforce audience rules, private accounts, blocks, restrictions and mutes on every request, on our servers.</li>
+      <li><strong>To personalise</strong> - rank your feed, suggest accounts, tags and topics, and surface content near you if you have enabled location.</li>
+      <li><strong>To notify you</strong> - send the push and in-app alerts you have switched on, honouring your quiet hours.</li>
+      <li><strong>To pay creators</strong> - record gifts, subscriptions and earnings, and process payout requests.</li>
+      <li><strong>To keep people safe</strong> - detect spam and abuse, act on reports, and enforce our Terms.</li>
+      <li><strong>To improve the product</strong> - understand which features are used, and diagnose crashes and errors.</li>
+      <li><strong>To meet legal obligations</strong> - keep tax and transaction records, and respond to lawful requests.</li>
+    </ul>
+    <p>We do <strong>not</strong> sell your personal data. We do not share it with third parties for their own independent advertising.</p>
+
+    <h2 id="legal-basis"><span class="num">05</span>Legal bases for processing</h2>
+    <p>Where the GDPR or a comparable law applies to you, we rely on these bases:</p>
+    <ul>
+      <li><strong>Contract</strong> - processing needed to give you the service you signed up for: your account, your content, messaging, calls and live streams.</li>
+      <li><strong>Consent</strong> - camera, microphone, photo library, location, contacts and push notifications. You may withdraw consent at any time.</li>
+      <li><strong>Legitimate interests</strong> - keeping the platform safe and free of abuse, preventing fraud, securing accounts, and improving the product. We balance these against your rights.</li>
+      <li><strong>Legal obligation</strong> - retaining financial records and responding to valid legal process.</li>
+    </ul>
+
+    <h2 id="sharing"><span class="num">06</span>Who we share your data with</h2>
+    <ul>
+      <li><strong>Other users</strong> - exactly as far as the audience setting on each item allows. See <a href="#public">section 8</a>.</li>
+      <li><strong>Service providers</strong> - the processors listed in <a href="#processors">section 7</a>, who act on our instructions and may not use your data for their own purposes.</li>
+      <li><strong>Payment platforms</strong> - Apple and Google process in-app purchases. We receive confirmation of a purchase, not your card details.</li>
+      <li><strong>Legal and safety</strong> - law enforcement or regulators where we are legally required, or where disclosure is necessary to prevent serious harm.</li>
+      <li><strong>A business transfer</strong> - if Max Social is acquired or merged, your data may transfer to the successor, who remains bound by this policy until they give you notice of any change.</li>
+    </ul>
+
+    <h2 id="processors"><span class="num">07</span>Service providers we use</h2>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Provider</th><th>What it does for us</th><th>What it receives</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Amazon Web Services</strong></td><td>Hosts our servers, database and uploaded media. Primary region: EU (Frankfurt).</td><td>All data described in this policy, stored on our behalf.</td></tr>
+          <tr><td><strong>MongoDB Atlas</strong></td><td>Managed database hosting, in the same EU region.</td><td>Account, content, social graph and transaction records.</td></tr>
+          <tr><td><strong>Google Firebase Cloud Messaging</strong></td><td>Delivers push notifications to your device.</td><td>Your push token and the notification content.</td></tr>
+          <tr><td><strong>Agora</strong></td><td>Carries real-time audio and video for calls and live streams.</td><td>Live audio and video streams and session identifiers, for the duration of the call.</td></tr>
+          <tr><td><strong>Stripe</strong></td><td>Processes card payments where in-app purchase is not used.</td><td>Payment details, handled by Stripe as its own controller under its privacy policy.</td></tr>
+          <tr><td><strong>Apple &amp; Google</strong></td><td>App distribution and in-app purchase billing for coins.</td><td>Purchase and receipt data under their own privacy policies.</td></tr>
+          <tr><td><strong>Google Maps &amp; Mapbox</strong></td><td>Renders maps and resolves place names when you tag a location.</td><td>The coordinates or place query you are looking up.</td></tr>
+          <tr><td><strong>OpenAI</strong></td><td>Powers the AI reel assistant and in-app translation.</td><td>Only the text or prompt you submit to those features. It is not used to train third-party models on your behalf.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 id="public"><span class="num">08</span>What is public and what is not</h2>
+    <p>This is the part most policies leave vague, so here it is plainly:</p>
+    <ul>
+      <li><strong>Always public</strong> - your username, profile photo, bio and follower and following counts, unless your account is private.</li>
+      <li><strong>Audience-controlled</strong> - every post and story carries its own setting: public, followers, close friends, or only you. We enforce it on the server when the content is requested, not merely by hiding it in the app.</li>
+      <li><strong>Private by default</strong> - direct and group messages, voice notes, your search history, your login history, your blocked and restricted lists, and your notification settings. Nobody else sees these.</li>
+      <li><strong>Visible to the creator</strong> - if you view a story, the person who posted it can see that you did. If you gift during a live stream, your name may appear on that stream's leaderboard.</li>
+      <li><strong>Not reversible</strong> - anything you post publicly may be seen, screenshotted or re-shared by others before you delete it. Deleting it removes it from Max Social; it cannot remove copies other people already made.</li>
+    </ul>
+
+    <h2 id="payments"><span class="num">09</span>Coins, gifts and payments</h2>
+    <p>Coins are bought through Apple or Google billing, or by card through Stripe. <strong>We never see or store your full card number.</strong> We keep a record of what you purchased, when, and the coin balance and transaction history that results, because we need it to run the coin economy and to satisfy tax and accounting rules.</p>
+    <p>If you are a creator, we hold your earnings ledger and your payout requests, along with the payout details you supply. Those records are kept for the statutory retention period even if you later close your account - see <a href="#retention">section 11</a>.</p>
+
+    <h2 id="notifications"><span class="num">10</span>Push notifications</h2>
+    <p>If you allow notifications, we store a push token for each device you sign in on and send it to Firebase Cloud Messaging to deliver alerts. You control which categories you receive - likes, comments, replies, mentions, tags, follows, shares, live streams, group activity, messages, story views and security alerts - each independently, and you can set quiet hours during which nothing is delivered. Revoking the permission in your device settings stops all of them.</p>
+
+    <h2 id="retention"><span class="num">11</span>How long we keep your data</h2>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Data</th><th>Retention period</th></tr></thead>
+        <tbody>
+          <tr><td>Account and profile</td><td>For as long as your account is open.</td></tr>
+          <tr><td>Posts, reels, comments and highlights</td><td>Until you delete them, or your account is deleted.</td></tr>
+          <tr><td>Stories</td><td>24 hours from posting, unless you save one as a highlight.</td></tr>
+          <tr><td>Messages and voice notes</td><td>Until deleted by a participant, or the account is deleted.</td></tr>
+          <tr><td>Live streams</td><td>The stream itself is not recorded by default. Stream metadata and chat are kept for up to 90 days for moderation.</td></tr>
+          <tr><td>Search and login history</td><td>Up to 12 months, or until you clear it - search history can be cleared in the app at any time.</td></tr>
+          <tr><td>Transactions, earnings and payouts</td><td>Up to 7 years, as tax and accounting law requires.</td></tr>
+          <tr><td>Reports and moderation records</td><td>Up to 2 years after the case is closed, so repeat behaviour can be recognised.</td></tr>
+          <tr><td>Backups</td><td>Deleted data disappears from routine backups within 90 days.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 id="account-deletion"><span class="num">12</span>Deleting your account</h2>
+    <div class="callout">
+      <b class="tag">How to delete your account and data</b>
+      <p><strong>By email:</strong> write to <a href="mailto:privacy@maxsocialapp.com">privacy@maxsocialapp.com</a> from the email address registered to your account, with the subject <strong>"Delete my account"</strong>. We may ask one question to confirm it is really you, and nothing more.</p>
+      <p>You do not need to give a reason, and we will not try to talk you out of it. We confirm in writing once the deletion is done.</p>
+    </div>
+    <p>When you request deletion, your account is deactivated immediately and stops being visible to anyone else. We then permanently erase your profile, posts, reels, stories, comments, messages, media and social graph <strong>within 30 days</strong>, and from our backups within 90 days.</p>
+    <p>Three things survive that, and only these:</p>
+    <ul>
+      <li><strong>Financial records</strong> of coin purchases, gifts and payouts, kept for up to 7 years because tax law requires it. These are reduced to the transaction facts and are no longer linked to a live profile.</li>
+      <li><strong>Moderation records</strong> where you were the subject of an upheld report, kept for up to 2 years so that a banned user cannot simply re-register.</li>
+      <li><strong>Content other people hold</strong> - messages you sent to another person remain in that person's copy of the conversation, exactly as an email you sent would.</li>
+    </ul>
+    <p>Deletion is permanent. We cannot restore an account or its content once the 30-day window has passed.</p>
+
+    <h2 id="your-rights"><span class="num">13</span>Your rights</h2>
+    <p>Depending on where you live, you have some or all of these rights. We honour all of them for every user, wherever you are, because it is simpler and fairer than doing otherwise.</p>
+    <ul>
+      <li><strong>Access</strong> - ask what personal data we hold about you and get a copy.</li>
+      <li><strong>Rectification</strong> - correct anything inaccurate. Most of it you can edit yourself in the app.</li>
+      <li><strong>Erasure</strong> - delete your account and data, as set out in <a href="#account-deletion">section 12</a>.</li>
+      <li><strong>Portability</strong> - receive your data in a machine-readable format.</li>
+      <li><strong>Restriction and objection</strong> - ask us to pause a particular use, or object to processing based on legitimate interests.</li>
+      <li><strong>Withdraw consent</strong> - revoke any device permission at any time, in your device settings.</li>
+      <li><strong>Complain</strong> - raise a complaint with your local data protection authority. We would rather you came to us first, but it is your right either way.</li>
+    </ul>
+    <p>To exercise any of these, write to <a href="mailto:privacy@maxsocialapp.com">privacy@maxsocialapp.com</a>. We respond within <strong>30 days</strong>. We do not charge for this, and we will never restrict your account for making a request.</p>
+
+    <h2 id="security"><span class="num">14</span>How we protect your data</h2>
+    <ul>
+      <li>All traffic between the app and our servers is encrypted with TLS. The website is served over HTTPS only.</li>
+      <li>Passwords are stored as salted hashes. Nobody at Max Social can read your password.</li>
+      <li>Sessions use short-lived access tokens that refresh automatically, so a stolen token has a narrow window of use.</li>
+      <li>Real-time connections are authenticated - the server verifies your signed-in identity on every socket handshake rather than trusting what the client claims to be.</li>
+      <li>Optional two-factor authentication with single-use recovery codes.</li>
+      <li>A visible login history and trusted-device list, so you can spot and act on access you do not recognise.</li>
+      <li>Databases run in a private network with restricted administrative access and automated encrypted backups.</li>
+    </ul>
+    <p>No system is perfectly secure. If a breach affects your personal data and puts you at risk, we will tell you and the relevant regulator without undue delay.</p>
+
+    <h2 id="transfers"><span class="num">15</span>International transfers</h2>
+    <p>Our servers are in the <strong>European Union (Frankfurt)</strong>. Some of our service providers operate elsewhere, including the United States. Where data leaves the EEA or the UK, we rely on Standard Contractual Clauses or another approved transfer mechanism, and we take the additional measures those clauses require.</p>
+
+    <h2 id="children"><span class="num">16</span>Children and minimum age</h2>
+    <p>Max Social is <strong>not intended for anyone under 13</strong>, and we ask for a date of birth at sign-up. Where local law sets a higher minimum age for consent to data processing, that higher age applies to you.</p>
+    <p>We do not knowingly collect personal data from children under 13. If you believe a child has created an account, tell us at <a href="mailto:privacy@maxsocialapp.com">privacy@maxsocialapp.com</a> and we will verify and delete the account and its data promptly. Parents and guardians may contact us about a minor's account at the same address.</p>
+
+    <h2 id="changes"><span class="num">17</span>Changes to this policy</h2>
+    <p>We update this policy when the product or the law changes. The "last updated" date at the top always reflects the current version. If a change materially affects your rights or how we use your data, we will notify you in the app or by email before it takes effect, so that you have a real chance to object or close your account.</p>
+
+    <h2 id="contact"><span class="num">18</span>Contact us</h2>
+    <p>We read everything sent to these addresses, and a person answers.</p>
+    <div class="contact-card">
+      <div><b>Privacy &amp; data requests</b><a href="mailto:privacy@maxsocialapp.com">privacy@maxsocialapp.com</a></div>
+      <div><b>General support</b><a href="mailto:support@maxsocialapp.com">support@maxsocialapp.com</a></div>
+      <div><b>Account deletion</b><a href="#account-deletion">See section 12</a></div>
+    </div>
+
+  </article>
+</div>
+
+<footer>
+  <div class="wrap f-in">
+    <span>&copy; <span id="year">2026</span> Max Social. All rights reserved.</span>
+    <nav>
+      <a href="/">Home</a>
+      <a href="/policy">Privacy Policy</a>
+      <a href="/terms_of_use">Terms of Use</a>
+      <a href="mailto:support@maxsocialapp.com">Contact</a>
+    </nav>
+  </div>
+</footer>
+
+<a href="#" class="top" id="top" aria-label="Back to top">&#8593;</a>
+
+<script>
+(function () {
+  var progress = document.getElementById("progress");
+  var top = document.getElementById("top");
+  function onScroll() {
+    var y = window.scrollY || document.documentElement.scrollTop;
+    var h = document.documentElement.scrollHeight - window.innerHeight;
+    progress.style.width = (h > 0 ? (y / h) * 100 : 0) + "%";
+    top.classList.toggle("show", y > 600);
+  }
+  window.addEventListener("scroll", onScroll, { passive: true });
+  onScroll();
+
+  var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+  var sections = links.map(function (a) { return document.getElementById(a.getAttribute("href").slice(1)); })
+                      .filter(Boolean);
+  if ("IntersectionObserver" in window && sections.length) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (!en.isIntersecting) return;
+        links.forEach(function (a) {
+          a.classList.toggle("on", a.getAttribute("href") === "#" + en.target.id);
+        });
+      });
+    }, { rootMargin: "-90px 0px -70% 0px", threshold: 0 });
+    sections.forEach(function (s) { io.observe(s); });
+  }
+
+  document.getElementById("year").textContent = new Date().getFullYear();
+})();
+</script>
+</body>
+</html>
