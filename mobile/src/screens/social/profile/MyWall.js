@@ -24,6 +24,9 @@ import * as base from "../../../component/global";
 import PostSection from "../post/PostSection";
 import Footerpage from "../Footerpage";
 import { FB } from "../../../theme/social";
+import { useDispatch } from "react-redux";
+import { followUserAsync } from "../../../store/slice/userSlice";
+import Toast from "react-native-toast-message";
 
 /*
   The personal wall.
@@ -105,6 +108,15 @@ const MyWall = () => {
   const [counts, setCounts] = useState({ posts: 0, reels: 0, media: 0 });
   const [total, setTotal] = useState(0);
   const [locked, setLocked] = useState(false);
+  /*
+    Who the wall belongs to, as the wall itself reports them -- including
+    whether you follow them. getProfile answers with counts but never says
+    that, and reading it off a post fails on an account with no posts.
+  */
+  const [author, setAuthor] = useState(null);
+  const [following, setFollowing] = useState(false);
+  const [followBusy, setFollowBusy] = useState(false);
+  const dispatch = useDispatch();
 
   const [loading, setLoading] = useState(true);
   const [paging, setPaging] = useState(false);
@@ -163,6 +175,10 @@ const MyWall = () => {
         if (generation !== generationRef.current) return;
 
         setLocked(!!data?.locked);
+        if (data?.author) {
+          setAuthor(data.author);
+          setFollowing(!!data.author.isFollowing);
+        }
         setCounts(data?.counts || { posts: 0, reels: 0, media: 0 });
         setTotal(data?.total || 0);
         setHasMore(!!data?.hasMore);
@@ -290,6 +306,58 @@ const MyWall = () => {
     [isMine, items, viewerId]
   );
 
+  /*
+    Follow, optimistically.
+
+    Waiting on a round trip before the button changes reads as a dead tap, and
+    the store outlives this screen so the change survives navigating away and
+    back.
+  */
+  const toggleFollow = useCallback(async () => {
+    if (!viewerId || !authorId || followBusy) return;
+    const before = following;
+    setFollowing(!before);
+    setFollowBusy(true);
+    try {
+      if (before) {
+        /*
+          Unfollowing needs its own endpoint.
+
+          /apis/reel/Addfollow does not toggle -- it only ever follows, and
+          answers "Already following!" when you are. Driving both directions
+          through it would have cleared the button while the server kept the
+          follow, so the next screen you opened showed Following again.
+        */
+        await api.post("/apis/profile/unfollow", { userId: viewerId, targetId: authorId });
+      } else {
+        await dispatch(followUserAsync({ userId: viewerId, followId: authorId })).unwrap();
+      }
+    } catch (e) {
+      setFollowing(before);
+      Toast.show({ type: "error", text1: before ? "Could not unfollow" : "Could not follow" });
+    } finally {
+      setFollowBusy(false);
+    }
+  }, [viewerId, authorId, following, followBusy, dispatch]);
+
+  const openMessage = useCallback(() => {
+    if (!viewerId || !authorId) return;
+    navigation.navigate("ChatDetails", {
+      me: viewerId,
+      partner: authorId,
+      userinfo: {
+        _id: authorId,
+        type: "private",
+        partner: {
+          _id: authorId,
+          name: author?.name || profile?.name || "",
+          image: author?.image || profile?.image || "",
+        },
+        lastMsg: null,
+      },
+    });
+  }, [viewerId, authorId, author, profile, navigation]);
+
   const avatar = absolute(profile?.image);
   const name = profile?.name || "";
 
@@ -377,7 +445,39 @@ const MyWall = () => {
             </View>
           </View>
 
-          {isMine ? (
+          {!isMine ? (
+            /*
+              Somebody else's wall: Follow and Message.
+
+              Tapping a name in the timeline used to open UserProfile, a
+              separate screen that fetched the *logged-in* user's profile and
+              ignored the id it was given -- so the header showed you while the
+              tabs below showed them. That screen is gone; this one takes the
+              id it is handed and uses it.
+            */
+            <View style={styles.actions}>
+              <TouchableOpacity
+                style={[styles.action, following ? styles.actionFollowing : styles.actionPrimary]}
+                onPress={toggleFollow}
+                activeOpacity={0.85}
+                disabled={followBusy}
+              >
+                <Ionicons
+                  name={following ? "checkmark" : "person-add"}
+                  size={16}
+                  color={following ? FB.text : "#fff"}
+                />
+                <Text style={following ? styles.actionText : styles.actionPrimaryText}>
+                  {following ? "Following" : "Follow"}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.action} onPress={openMessage} activeOpacity={0.85}>
+                <Ionicons name="chatbubble-outline" size={15} color={FB.text} />
+                <Text style={styles.actionText}>Message</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
             <View style={styles.actions}>
               <TouchableOpacity
                 style={[styles.action, styles.actionPrimary]}
@@ -403,7 +503,7 @@ const MyWall = () => {
                 <Feather name="settings" size={16} color="#111827" />
               </TouchableOpacity>
             </View>
-          ) : null}
+          )}
         </View>
 
         <View style={styles.tabs}>
@@ -432,7 +532,7 @@ const MyWall = () => {
         {tab === "about" ? <About profile={profile} /> : null}
       </View>
     ),
-    [avatar, name, profile, postCount, reelCount, tab, isMine, authorId, navigation]
+    [avatar, name, profile, postCount, reelCount, tab, isMine, authorId, navigation, following, followBusy, toggleFollow, openMessage]
   );
 
   const Empty = () => {
@@ -708,6 +808,7 @@ const styles = StyleSheet.create({
   },
   actionText: { fontSize: 13, fontWeight: "600", color: FB.text },
   actionPrimary: { backgroundColor: FB.primary },
+  actionFollowing: { backgroundColor: FB.fill },
   actionPrimaryText: { fontSize: 13, fontWeight: "600", color: "#fff" },
   actionIcon: {
     width: 38,

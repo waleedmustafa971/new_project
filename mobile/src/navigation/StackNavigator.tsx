@@ -76,7 +76,7 @@ import SocialLab from '../screens/social/devtools/SocialLab';
 import ListAds from '../screens/social/ads/ListAds';
 import DashboardSearch from '../screens/social/search/DashboardSearch';
 import NotificationPage from '../screens/social/notification/NotificationPage';
-import UserProfile from '../screens/social/profile/UserProfile';
+/* UserProfile.js is retired -- the UserProfile route renders MyWall. */
 import MarketPlace from '../screens/social/marketplace/MarketPlace';
 import CreateStream from '../screens/social/live/CreateStream';
 import LiveScrollingstream from '../screens/social/live/LiveScrollingstream';
@@ -350,8 +350,20 @@ export default function StackNavigator() {
       {/* SearchReels */}
       <Stack.Screen name="NotificationPage" component={NotificationPage}
         options={{ headerShown: false, headerTitle: "Ads Manager" }} />
-      {/* UserProfile */}
-      <Stack.Screen name="UserProfile" component={UserProfile}
+      {/*
+        Somebody else's profile IS the wall.
+
+        UserProfile.js fetched the *logged-in* user -- it read
+        AsyncStorage and asked getProfile for that id, ignoring the
+        userid it had been handed -- so opening someone from the
+        timeline showed your own name and counts above their posts. Two
+        different people on one screen.
+
+        The route name stays so every existing navigate("UserProfile",
+        { userid }) keeps working; it renders MyWall, which takes that
+        id and uses it. UserProfile.js is no longer imported anywhere.
+      */}
+      <Stack.Screen name="UserProfile" component={MyWall}
         options={{ headerShown: false, headerTitle: '' }} />
 
       <Stack.Screen name="SingleReel" component={SingleReel}
