@@ -29,6 +29,9 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 //import MusicShowPage from "../../music/MusicShowPage";
 import { useNavigation } from '@react-navigation/native';
 import { useTypography } from "../../../../constants/fontsize";
+import LinearGradient from "react-native-linear-gradient";
+import Ionicons from "react-native-vector-icons/Ionicons";
+import { FB } from "../../../../theme/social";
 
 const CreateStory = ({ navigation }) => {
     // const navigation = useNavigation();
@@ -171,165 +174,137 @@ const CreateStory = ({ navigation }) => {
 
     return (
         <SafeAreaProvider style={styles.container}>
-            <View style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                padding: 15,
-                backgroundColor: '#ffffff'
-            }}
+            {/*
+              Facebook's story creator: two big choices, then your gallery.
 
-            >
+              What was here was a header and a row of six identical grey
+              circles -- Music, Text, Templates, Saved, Your Content -- given
+              equal weight, so the two things you actually come here to do sat
+              among four navigation shortcuts. The header also had a back arrow
+              AND a close X, both calling goBack(), and printed the font size
+              into the title: "13 Create Story".
+            */}
+            <View style={styles.header}>
                 <TouchableOpacity
-                    onPress={() => {
-                        navigation.goBack();
-                    }}
+                    onPress={() => navigation.goBack()}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
-                    <AntDesign name="arrowleft" size={24} color="black" />
+                    <Ionicons name="close" size={26} color={FB.text} />
                 </TouchableOpacity>
-                <Text style={{ fontSize: font.sm }}> {font.sm} Create Story</Text>
+                <Text style={styles.headerTitle}>Create story</Text>
+                <View style={{ width: 26 }} />
+            </View>
+
+            {/* The two ways to make a story, as cards rather than as two of
+                six equal circles. */}
+            <View style={styles.choices}>
                 <TouchableOpacity
-                    onPress={() => {
-                        navigation.goBack();
-                    }}
+                    style={styles.choice}
+                    activeOpacity={0.85}
+                    onPress={() => navigation.navigate("CreateStorytext", {
+                        typescreen: 'Reel',
+                        picture: "888.jpg",
+                        imagetype: "image",
+                        musictype: 'no',
+                        posttype: 'Story'
+                    })}
                 >
-                    <AntDesign name="close" size={18} color="black" />
+                    <LinearGradient
+                        colors={["#8B5CF6", "#EC4899"]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.choiceFill}
+                    >
+                        <Text style={styles.choiceGlyph}>Aa</Text>
+                    </LinearGradient>
+                    <Text style={styles.choiceLabel}>Text</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                    style={styles.choice}
+                    activeOpacity={0.85}
+                    onPress={() => navigation.navigate("CreateStorymusic")}
+                >
+                    <LinearGradient
+                        colors={["#0EA5E9", "#22C55E"]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.choiceFill}
+                    >
+                        <Ionicons name="musical-notes" size={30} color="#fff" />
+                    </LinearGradient>
+                    <Text style={styles.choiceLabel}>Music</Text>
                 </TouchableOpacity>
             </View>
-            <View style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                padding: 8,
-                backgroundColor: '#ffffff'
-            }}
 
-            >
-                <View style={{ alignItems: 'center' }}>
-                    <TouchableOpacity
-                        style={{
-                            width: 50,
-                            height: 50,
-                            borderRadius: 50,
-                            backgroundColor: '#f2f2f2',
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                        }}
-                        onPress={() => {
-                            navigation.navigate("CreateStorymusic") // CreateStorymusic.js
-                        }}
-                    >
-                        <Feather name="music" size={font.sm} color="black" />
+            {/* The three navigation shortcuts, demoted to chips. They are
+                places to go, not ways to make a story. */}
+            <View style={styles.chips}>
+                {[
+                    { icon: "grid-outline", label: "Templates", go: () => navigation.navigate("ListTemplate") },
+                    { icon: "bookmark-outline", label: "Saved", go: () => navigation.navigate("SavedReel", { userId: userid }) },
+                    { icon: "folder-outline", label: "Your content", go: () => navigation.navigate("ShowReels") },
+                ].map((c) => (
+                    <TouchableOpacity key={c.label} style={styles.chip} onPress={c.go} activeOpacity={0.7}>
+                        <Ionicons name={c.icon} size={15} color={FB.textSecondary} />
+                        <Text style={styles.chipText}>{c.label}</Text>
                     </TouchableOpacity>
-                    <Text style={{ marginTop: 1, fontSize: font.sm }}>Music</Text>
-                </View>
-
-                <View style={{ alignItems: 'center' }}>
-                    <TouchableOpacity
-                        style={{
-                            width: 50,
-                            height: 50,
-                            borderRadius: 50,
-                            backgroundColor: '#f2f2f2',
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                        }}
-                        //CreateStorytext NewReelcamera
-                        onPress={() => navigation.navigate("CreateStorytext", {
-                            typescreen: 'Reel',
-                            picture: "888.jpg",
-                            imagetype: "image",
-                            musictype: 'no',
-                            posttype: 'Story'
-                        })}
-                    >
-                        <Text style={{
-                            marginTop: 1, fontSize: font.sm,
-                        }}>Text</Text>
-                    </TouchableOpacity>
-                    <Text style={{
-                        marginTop: 1, fontSize: font.sm,
-                    }}>Text</Text>
-                </View>
-                <View style={{ alignItems: 'center' }}>
-                    <TouchableOpacity
-                        style={{
-                            width: 50,
-                            height: 50,
-                            borderRadius: 50,
-                            backgroundColor: '#f2f2f2',
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                        }}
-                        onPress={() => {
-                            navigation.navigate("ListTemplate");
-                        }}
-                    >
-                        <Feather name="layout" size={font.xl} color="black" />
-
-                    </TouchableOpacity>
-                    <Text style={{ marginTop: 1, fontSize: font.sm }}>Templates</Text>
-                </View>
-                <View style={{ alignItems: 'center' }}>
-                    <TouchableOpacity
-                        style={{
-                            width: 50,
-                            height: 50,
-                            borderRadius: 50,
-                            backgroundColor: '#f2f2f2',
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                        }}
-                        onPress={() => {
-                            navigation.navigate("SavedReel", {
-                                userId: userid
-                            });
-                        }}
-                    >
-                        <Feather name="bookmark" size={font.xl} color="black" />
-
-                    </TouchableOpacity>
-                    <Text style={{ marginTop: 1, fontSize: font.sm }}>Saved</Text>
-                </View>
-                <View style={{ alignItems: 'center' }}>
-                    <TouchableOpacity
-                        style={{
-                            width: 50,
-                            height: 50,
-                            borderRadius: 50,
-                            backgroundColor: '#f2f2f2',
-                            justifyContent: 'center',
-                            alignItems: 'center',
-
-                        }}
-                        onPress={() => {
-                            navigation.navigate("ShowReels");
-                        }}
-                    >
-                        <Feather name="folder" size={font.sm} color="black" />
-                    </TouchableOpacity>
-                    <Text style={{ marginTop: 1, fontSize: font.sm }}>Your Content</Text>
-
-                </View>
-
-            </View>
-            <View style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                padding: 0,
-            }}>
-                   <GalleryShow />
+                ))}
             </View>
 
+            <Text style={styles.sectionLabel}>Recent</Text>
 
-
+            <View style={{ flex: 1 }}>
+                <GalleryShow />
+            </View>
         </SafeAreaProvider>
     );
 };
 
 const styles = StyleSheet.create({
-    container: {
-        backgroundColor: "#fffff"
-        //flex: 1,
-        //  paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
+    /* "#fffff" -- five f's, not six. That is not a colour, so React Native
+       fell back to transparent and the screen took whatever was behind it. */
+    container: { flex: 1, backgroundColor: FB.surface },
+    header: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: FB.divider,
+    },
+    headerTitle: { ...FB.font.title },
+
+    choices: { flexDirection: "row", gap: 12, paddingHorizontal: 14, paddingTop: 16 },
+    choice: { flex: 1 },
+    choiceFill: {
+        height: 96,
+        borderRadius: FB.radius.lg,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    choiceGlyph: { color: "#fff", fontSize: 30, fontWeight: "800" },
+    choiceLabel: { ...FB.font.name, fontSize: 14, marginTop: 8, textAlign: "center" },
+
+    chips: { flexDirection: "row", gap: 8, paddingHorizontal: 14, paddingTop: 16 },
+    chip: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        paddingHorizontal: 12,
+        height: 32,
+        borderRadius: FB.radius.pill,
+        backgroundColor: FB.fill,
+    },
+    chipText: { ...FB.font.meta, fontWeight: "600" },
+
+    sectionLabel: {
+        ...FB.font.name,
+        fontSize: 15,
+        paddingHorizontal: 14,
+        paddingTop: 20,
+        paddingBottom: 10,
     },
     title: { fontSize: 12, color: "#000", marginBottom: 3 },
     button: { padding: 12, borderRadius: 8, marginBottom: 20 },
