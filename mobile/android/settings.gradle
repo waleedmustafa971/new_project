@@ -9,8 +9,12 @@ includeBuild('../node_modules/@react-native/gradle-plugin')
 
 include ':ffmpeg-helper' //for ffmpge
 
-include ':@react-native-camera-roll_camera-roll'
-project(':@react-native-camera-roll_camera-roll').projectDir = new File(rootProject.projectDir, '../node_modules/@react-native-camera-roll/camera-roll/android')
+// camera-roll is autolinked (autolinkLibrariesFromCommand above); it must not
+// also be included by hand. Both were present, which gave Gradle two projects
+// over the same source directory -- ':@react-native-camera-roll_camera-roll'
+// and ':react-native-camera-roll_camera-roll' -- and their codegen tasks then
+// raced over the same output, failing the build with an implicit-dependency
+// validation error.
 
 include ':react-native-audio-recorder-player'
 project(':react-native-audio-recorder-player').projectDir = new File(rootProject.projectDir, 	'../node_modules/react-native-audio-recorder-player/android')

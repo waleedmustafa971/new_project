@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { FB } from "../../../../theme/social";
 import {
   Alert,
   Linking,
@@ -28,7 +29,10 @@ const GalleryShow: React.FC = () => {
 
   const [hasPermission, setHasPermission] = useState(false);
   const screenWidth = Dimensions.get('window').width;
-  const imageSize = screenWidth / 4 - 6; // 4 columns with spacing
+  /* Three columns. Four gave ~84px tiles -- too small to tell one photo from
+     another, which is the only thing a picker has to do. Matches the profile
+     gallery, which is also three. */
+  const imageSize = screenWidth / 3 - 4;
   //const imageSize = screenWidth / 4 - 6; // spacing adjustment
   // const [photos, setPhotos] = useState([]);
   const [photos, setPhotos] = useState<PhotoIdentifier[]>([]);
@@ -42,6 +46,16 @@ const GalleryShow: React.FC = () => {
   const [hasNextPage, setHasNextPage] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [albums, setAlbums] = useState<{ title: string; count: number }[]>([]);
+  /*
+    All / Photos / Videos.
+
+    The three controls above the grid -- "Camera Roll", "Picture", "Video" --
+    were three plain bits of text that all called loadAlbums(). The same
+    function, three times, so whichever you pressed did exactly the same thing
+    and nothing filtered anything. They filter now.
+  */
+  const [mediaFilter, setMediaFilter] = useState<'all' | 'image' | 'video'>('all');
+
   const [selectedAlbum, setSelectedAlbum] = useState<string | null>(null);
 
 
@@ -195,24 +209,24 @@ const GalleryShow: React.FC = () => {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
-      <View style={{ flexDirection: 'row', width: '100%' }}>
-        <TouchableOpacity style={{
-          padding: 10
-        }} onPress={loadAlbums}>
-          <Text>Camera Roll</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={{
-          padding: 10
-        }} onPress={loadAlbums}>
-          <Text>Picture</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={{
-          padding: 10
-        }} onPress={loadAlbums}>
-          <Text>Video</Text>
-        </TouchableOpacity>
+      <View style={styles.filterRow}>
+        {([
+          { key: 'all', label: 'All' },
+          { key: 'image', label: 'Photos' },
+          { key: 'video', label: 'Videos' },
+        ] as const).map((f) => {
+          const on = mediaFilter === f.key;
+          return (
+            <TouchableOpacity
+              key={f.key}
+              style={[styles.filterChip, on && styles.filterChipOn]}
+              onPress={() => setMediaFilter(f.key)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.filterText, on && styles.filterTextOn]}>{f.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
       <FlatList
         horizontal
@@ -242,13 +256,34 @@ const GalleryShow: React.FC = () => {
 
       {hasPermission && (
         <FlatList
-          data={photos}
-          numColumns={4}
+          data={
+            mediaFilter === 'all'
+              ? photos
+              : photos.filter((ph: any) =>
+                  String(ph?.node?.type || '').startsWith(mediaFilter)
+                )
+          }
+          numColumns={3}
           keyExtractor={(item, index) => index.toString()}
           contentContainerStyle={{ paddingBottom: 30 }}
           onEndReached={loadMorePhotos}
           onEndReachedThreshold={0.5}
           ListFooterComponent={loadingMore ? <ActivityIndicator size="small" /> : null}
+          /* A filter that matches nothing must say so. Empty with no message
+             is indistinguishable from broken -- which is exactly how this
+             screen looked for as long as the camera-roll module was missing. */
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyTitle}>
+                {mediaFilter === 'video' ? 'No videos here' : mediaFilter === 'image' ? 'No photos here' : 'Nothing here yet'}
+              </Text>
+              <Text style={styles.emptyHint}>
+                {mediaFilter === 'all'
+                  ? 'Photos and videos on this device will appear here.'
+                  : 'Try All to see everything on this device.'}
+              </Text>
+            </View>
+          }
           renderItem={({ item }) => (
             <TouchableOpacity onPress={() => {
 
@@ -278,7 +313,8 @@ const GalleryShow: React.FC = () => {
                   width: imageSize,
                   height: imageSize,
                   margin: 2,
-                  borderRadius: 6,
+                  borderRadius: 4,
+                  backgroundColor: FB.fill,
                 }}
               />
             </TouchableOpacity>
@@ -291,6 +327,28 @@ const GalleryShow: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
+  filterRow: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingTop: 4,
+    paddingBottom: 8,
+  },
+  filterChip: {
+    paddingHorizontal: 14,
+    height: 30,
+    borderRadius: FB.radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: FB.fill,
+  },
+  filterChipOn: { backgroundColor: FB.primary },
+  filterText: { fontSize: 13, fontWeight: '600', color: FB.textSecondary },
+  emptyState: { alignItems: 'center', justifyContent: 'center', paddingVertical: 56, paddingHorizontal: 40 },
+  emptyTitle: { fontSize: 15, fontWeight: '600', color: FB.text },
+  emptyHint: { fontSize: 13, color: FB.textSecondary, textAlign: 'center', marginTop: 6, lineHeight: 18 },
+  filterTextOn: { color: FB.onPrimary },
+
   button: {
     backgroundColor: '#2089dc',
     paddingVertical: 12,
