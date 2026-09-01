@@ -157,17 +157,16 @@ export const bootstrap = wrap(async (req, res) => {
   const count = await Admin.countDocuments();
   if (count > 0) return fail(res, 403, "An admin already exists. Use the login form.");
 
-  const { name, username, email, password } = req.body || {};
+  const { username, password } = req.body || {};
   const loginName = normalizeAdminUsername(username);
-  if (!loginName || !email || !password) return fail(res, 400, "Name, username, email and password are required");
+  if (!loginName || !password) return fail(res, 400, "Username and password are required");
   if (!validAdminUsername(loginName)) return fail(res, 400, "Username must be 3–32 characters and use letters, numbers, dots, underscores or hyphens");
   if (String(password).length < 6) return fail(res, 400, "Password must be at least 6 characters");
 
   const admin = await Admin.create({
-    name: name || "Super Admin",
+    name: "System Administrator",
     username: loginName,
     designation: "Super Admin",
-    email: String(email).toLowerCase().trim(),
     password: await bcrypt.hash(String(password), 10),
     status: true,
     permissions: { all: true },

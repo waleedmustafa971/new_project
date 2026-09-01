@@ -2221,9 +2221,6 @@ async function initAuth() {
 
   if (state.bootstrapMode) {
     $("#bootstrapNotice").classList.remove("hidden");
-    $("#nameField").hidden = false;
-    $("#emailField").hidden = false;
-    $("#authEmail").required = true;
     $("#authSubmit").textContent = "Create admin account";
     $("#authPassword").autocomplete = "new-password";
   }
@@ -2244,7 +2241,6 @@ $("#authForm").onsubmit = async (e) => {
     const body = {
       username: $("#authUsername").value.trim(),
       password: $("#authPassword").value,
-      ...(state.bootstrapMode ? { name: $("#authName").value.trim(), email: $("#authEmail").value.trim() } : {}),
     };
     const d = await api(state.bootstrapMode ? "/bootstrap" : "/login", { method: "POST", body });
 
