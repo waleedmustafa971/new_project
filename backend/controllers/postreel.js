@@ -926,22 +926,75 @@ export const getPosts = async (req, res) => {
       post wins. Engagement is the tie-break, so a post that people actually
       responded to surfaces above one that nobody touched.
     */
-    visible.sort((a, b) => {
-      const score = (x) => {
-        const followed = followingIds.has(String(x.reel.username)) ? 2 : 0;
-        const known = x.rel === "follower" ? 1 : 0;
-        return followed + known;
-      };
-      const byRank = score(b) - score(a);
-      if (byRank) return byRank;
-      const byTime = new Date(b.reel.xtime) - new Date(a.reel.xtime);
-      if (byTime) return byTime;
-      const engagement = (x) =>
-        (x.reel.likes?.length || 0) + (x.reel.comments?.length || 0) * 2;
-      return engagement(b) - engagement(a);
-    });
+    /*
+      Ranking. Relationship boosts recency; it does not replace it.
 
-    const reels = visible.slice(0, Number(limit) || 10).map((v) => v.reel);
+      This used to compare relationship first and fall through to time only on
+      a tie -- a hard partition, so every post by someone you follow outranked
+      every post by someone you do not, whatever the dates. On an account
+      following one person who happens to hold half the posts on the site, the
+      timeline was that one person for sixteen cards running, two-week-old
+      posts included, before anybody else appeared at all. That is what it
+      looked like on the handset, and it is what the sort asked for.
+
+      The score is continuous now: a follow is worth a fixed boost, and recency
+      decays on a half-life, so a fresh post from a stranger can sit above a
+      fortnight-old post from a friend while a fresh post from a friend still
+      beats both.
+    */
+    const HALF_LIFE_DAYS = 3;
+    const now = Date.now();
+    const scoreOf = (x) => {
+      const followed = followingIds.has(String(x.reel.username)) ? 1.6 : 0;
+      const known = x.rel === "follower" ? 0.4 : 0;
+      const ageDays = Math.max((now - new Date(x.reel.xtime).getTime()) / 86400000, 0);
+      // 1.0 when brand new, 0.5 at the half-life, approaching 0 for old posts.
+      const recency = Math.pow(0.5, ageDays / HALF_LIFE_DAYS);
+      // Engagement is a nudge, not a driver -- enough to break ties between
+      // posts of similar age, never enough to resurface something stale.
+      const engagement = Math.min(
+        (x.reel.likes?.length || 0) + (x.reel.comments?.length || 0) * 2,
+        20
+      ) / 100;
+      return followed + known + recency * 2 + engagement;
+    };
+
+    visible.sort((a, b) => scoreOf(b) - scoreOf(a));
+
+    /*
+      Author diversity.
+
+      Ranking alone still lets one prolific account take a whole page when it
+      posts in bursts -- ten posts written the same afternoon score almost
+      identically. A timeline is worth reading because it is varied, so no
+      author gets more than two cards in a row.
+
+      Greedy: always take the best-scoring post left, unless that would make a
+      third in a row from the same person, in which case take the best-scoring
+      post by anyone else. If nobody else is left, the run is unavoidable and
+      it is allowed -- dropping posts to enforce a layout rule would be worse
+      than a repeated author.
+    */
+    const MAX_STREAK = 2;
+    const pool = visible.slice();
+    const ordered = [];
+    let lastAuthor = null;
+    let streak = 0;
+
+    while (pool.length) {
+      let index = 0;
+      if (lastAuthor !== null && streak >= MAX_STREAK) {
+        const other = pool.findIndex((x) => String(x.reel.username) !== lastAuthor);
+        if (other !== -1) index = other;
+      }
+      const [item] = pool.splice(index, 1);
+      const author = String(item.reel.username);
+      streak = author === lastAuthor ? streak + 1 : 1;
+      lastAuthor = author;
+      ordered.push(item);
+    }
+
+    const reels = ordered.slice(0, Number(limit) || 10).map((v) => v.reel);
 
     if (reels.length === 0) {
       return res.status(201).json({ message: "No posts found" });
