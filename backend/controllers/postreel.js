@@ -424,13 +424,93 @@ export const getRecentstory = async (req, res) => {
 };
 
 
+/* ---- wall helpers ---- */
+
+const WALL_TYPES = new Set(["posts", "reels", "media", "all"]);
+
 /*
-  Someone's wall: their posts and shares, newest first.
+  A post carries media in one of two places: `media[]`, written by the newer
+  composer, and `videoUrl`, which older rows use and which is a bare string on
+  some of them and an array on others. Anything asking "does this have a photo
+  or a video" has to accept all three shapes or half the wall goes missing.
+*/
+const HAS_MEDIA = {
+  $or: [
+    { "media.0": { $exists: true } },
+    { "videoUrl.0": { $exists: true } },
+    { videoUrl: { $type: "string", $ne: "" } },
+  ],
+};
+
+const wallFilter = (type) => {
+  if (type === "reels") return { posttype: "Reel" };
+  if (type === "all") return { posttype: { $in: ["Post", "Reel"] } };
+  if (type === "media") return { posttype: { $in: ["Post", "Reel"] }, ...HAS_MEDIA };
+  return { posttype: "Post" };
+};
+
+// likes / shares / favorites are rows carrying a count, not one row per tap.
+const sumCounts = (rows) =>
+  (rows || []).reduce((sum, row) => sum + (Number(row?.count) || 0), 0);
+
+/*
+  Comment authors, one lookup per distinct person.
+
+  `comments[].username` is an ObjectId ref. The timeline resolves it with
+  `User.findOne({ email: comment.username })`, which never matches an id, so
+  every comment it sends carries `user: null` and renders nameless. Older rows
+  really do hold an email there, so both are tried.
+*/
+const enrichComments = async (comments) => {
+  const rows = comments || [];
+  if (!rows.length) return [];
+
+  const keys = [...new Set(rows.map((c) => String(c.username)).filter(Boolean))];
+  const ids = keys.filter((k) => isId(k));
+  const emails = keys.filter((k) => !isId(k));
+
+  const found = await User.find({
+    $or: [
+      ...(ids.length ? [{ _id: { $in: ids } }] : []),
+      ...(emails.length ? [{ email: { $in: emails } }] : []),
+    ],
+  }).select("name email image").lean();
+
+  const byKey = new Map();
+  for (const u of found) {
+    byKey.set(String(u._id), u);
+    if (u.email) byKey.set(String(u.email), u);
+  }
+
+  return rows.map((c) => {
+    const u = byKey.get(String(c.username));
+    return {
+      ...c,
+      user: u ? { name: u.name, email: u.email, image: u.image } : null,
+    };
+  });
+};
+
+/*
+  Someone's wall: everything they have published, newest first.
 
   There was no endpoint for this at all. yourContent is hardcoded to
   posttype "Reel", the gallery tab reads uploaded images, and the timeline is
   everyone's posts mixed together — so there was nowhere in the product that
   answered "show me what this person has posted", including for yourself.
+
+  `type` chooses what the wall is showing, and defaults to "posts" so the
+  existing grid keeps behaving exactly as it did:
+
+    posts   written posts and shares          (posttype "Post")
+    reels   recorded reels                    (posttype "Reel")
+    media   anything carrying a photo or video, of either type
+    all     one combined stream, the way a Facebook wall reads
+
+  Each item comes back in the same shape the timeline sends — userInfo,
+  counted likes, enriched comments — so a wall can render the very same post
+  card the feed does instead of a second, thinner version of it. The slim
+  fields the grid already reads (media, isShare, audience) are still there.
 
   Visibility is decided the same way the feed decides it, because a wall is just
   a feed filtered to one author and it must not become a way around privacy: a
@@ -444,13 +524,16 @@ export const userWall = async (req, res) => {
     const viewerId = isId(req.query.viewerId) ? String(req.query.viewerId) : null;
     const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 12, 1), 50);
+    const type = WALL_TYPES.has(String(req.query.type || "").toLowerCase())
+      ? String(req.query.type).toLowerCase()
+      : "posts";
 
     if (!isId(authorId)) {
       return res.status(400).json({ message: "A valid userid is required" });
     }
 
     const author = await User.findById(authorId)
-      .select("name image bio verifiedBadge accountType followers closeFriends blockedUsers privacy privacySettings followRequests")
+      .select("name email image bio verifiedBadge accountType followers following closeFriends blockedUsers privacy privacySettings followRequests gender nationality")
       .lean();
     if (!author) return res.status(404).json({ message: "User not found" });
 
@@ -472,16 +555,27 @@ export const userWall = async (req, res) => {
           locked: true,
           reason: "private",
           message: "This account is private",
-          author: { _id: author._id, name: author.name, image: author.image, verifiedBadge: !!author.verifiedBadge },
+          author: {
+            _id: author._id,
+            name: author.name,
+            image: author.image,
+            verifiedBadge: !!author.verifiedBadge,
+            followersCount: (author.followers || []).length,
+            followingCount: (author.following || []).length,
+          },
+          type,
           posts: [],
+          counts: { posts: 0, reels: 0, media: 0 },
           total: 0,
           hasMore: false,
         });
       }
     }
 
-    // Posts and shares both live in the same collection under posttype "Post".
-    const candidates = await Reel.find({ username: authorId, posttype: "Post", ...NOT_DELETED })
+    // Posts, shares and reels all live in the same collection, told apart by
+    // posttype. wallFilter turns the requested tab into the matching query.
+    const base = { username: authorId, ...NOT_DELETED };
+    const candidates = await Reel.find({ ...base, ...wallFilter(type) })
       .populate({
         path: "sharepost.originalPost",
         populate: { path: "username", select: "name email image bio verifiedBadge" },
@@ -498,24 +592,74 @@ export const userWall = async (req, res) => {
       if (verdict.allowed) visible.push(post);
     }
 
-    const posts = visible.slice(0, limit).map((p) => ({
-      _id: p._id,
-      videoTitle: p.videoTitle,
-      videoUrl: p.videoUrl,
-      media: p.media || [],
-      posttype: p.posttype,
-      posttypechild: p.posttypechild,
-      xbackgroundcolor: p.xbackgroundcolor,
-      isShare: !!(p.sharepost && p.sharepost.length),
-      sharepost: p.sharepost || [],
-      likes: p.likes || [],
-      comments: p.comments || [],
-      shares: p.shares || [],
-      audience: p.audience || "everyone",
-      xtime: p.xtime,
-    }));
+    const authorInfo = {
+      userid: author._id,
+      name: author.name,
+      email: author.email,
+      image: author.image,
+      bio: author.bio,
+      gender: author.gender,
+      nationality: author.nationality,
+      verifiedBadge: !!author.verifiedBadge,
+      accountType: author.accountType,
+    };
 
-    const total = await Reel.countDocuments({ username: authorId, posttype: "Post", ...NOT_DELETED });
+    // The viewer already follows the author, or is the author. Resolved once
+    // for the whole wall rather than per post — every item shares one author.
+    const followStatus =
+      viewerId && (author.followers || []).some((f) => String(f) === String(viewerId))
+        ? "follow"
+        : "not follow";
+
+    const posts = await Promise.all(
+      visible.slice(0, limit).map(async (p) => ({
+        _id: p._id,
+        videoTitle: p.videoTitle,
+        videoUrl: p.videoUrl,
+        media: p.media || [],
+        posttype: p.posttype,
+        posttypechild: p.posttypechild,
+        thumbnail: p.thumbnail,
+        sound: p.sound,
+        username: p.username,
+        xbackgroundcolor: p.xbackgroundcolor,
+        xfontstyle: p.xfontstyle,
+        xfontsize: p.xfontsize,
+        xtextalign: p.xtextalign,
+        isShare: !!(p.sharepost && p.sharepost.length),
+        sharepost: p.sharepost || [],
+        /*
+          Counts, not the raw arrays. The timeline sends counts and the post
+          card renders them straight into the like/comment/share row, so a wall
+          handing back arrays drew "[object Object]" where a number belongs.
+          Nothing reads the arrays here — the grid only ever wanted totals.
+        */
+        likes: sumCounts(p.likes),
+        dislikes: sumCounts(p.dislikes),
+        comments: p.comments?.length ?? 0,
+        favorites: sumCounts(p.favorites),
+        shares: sumCounts(p.shares),
+        stars: sumCounts(p.stars),
+        commentsdetails: await enrichComments(p.comments),
+        liked: !!viewerId && (p.likes || []).some((l) => String(l.username) === String(viewerId)),
+        isOwner: !!isSelf,
+        audience: p.audience || "everyone",
+        xtime: p.xtime,
+        followStatus,
+        userInfo: authorInfo,
+      }))
+    );
+
+    const [postCount, reelCount, mediaCount] = await Promise.all([
+      Reel.countDocuments({ ...base, ...wallFilter("posts") }),
+      Reel.countDocuments({ ...base, ...wallFilter("reels") }),
+      Reel.countDocuments({ ...base, ...wallFilter("media") }),
+    ]);
+    const total =
+      type === "reels" ? reelCount
+        : type === "media" ? mediaCount
+          : type === "all" ? postCount + reelCount
+            : postCount;
 
     return res.status(200).json({
       success: true,
@@ -527,10 +671,14 @@ export const userWall = async (req, res) => {
         bio: author.bio,
         verifiedBadge: !!author.verifiedBadge,
         accountType: author.accountType,
+        followersCount: (author.followers || []).length,
+        followingCount: (author.following || []).length,
       },
+      type,
       page,
       limit,
       total,
+      counts: { posts: postCount, reels: reelCount, media: mediaCount },
       hasMore: (page - 1) * limit + posts.length < total,
       posts,
     });

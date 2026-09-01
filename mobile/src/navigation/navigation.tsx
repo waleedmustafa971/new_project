@@ -69,6 +69,8 @@ export type RootStackParamList = {
     CreateStory: undefined;
     MusicShowPage: undefined;
     MyProfile: undefined;
+    /** Personal wall. No param means your own. */
+    MyWall: { userid?: string } | undefined;
     CameraReel: undefined;
     CreateTemplate: {id: number, videoUrl: string, clip: string, durations : string};
     LiveScreen: undefined;

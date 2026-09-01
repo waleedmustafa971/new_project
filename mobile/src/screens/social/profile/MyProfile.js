@@ -198,26 +198,31 @@ const MyProfile = ({ navigation }) => {
         */}
 
                 <View style={styles.profileContainer}>
-                    <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center" }}>
-                        <TouchableOpacity
-                            onPress={() =>
-                                navigation.navigate("EditProfile", { userdata: userdata })
+                    {/*
+                      Your name and picture open your wall, the way they do
+                      everywhere else. This screen is the settings dashboard --
+                      coins, language, ads, logout -- so tapping yourself here
+                      used to drop you into a form for editing your bio, and
+                      there was no route at all to the things you had posted.
+                    */}
+                    <TouchableOpacity
+                        style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", flex: 1 }}
+                        activeOpacity={0.8}
+                        onPress={() => navigation.navigate("MyWall")}
+                    >
+                        <Image
+                            source={
+                                image
+                                    ? { uri: base.BASE_URL + '/' + image }
+                                    : require("../../../assets/user.png")
                             }
-                        >
-                            <Image
-                                source={
-                                    image
-                                        ? { uri: base.BASE_URL + '/' + image }
-                                        : require("../../../assets/user.png")
-                                }
-                                style={{
-                                    width: 40,
-                                    height: 40,
-                                    borderRadius: 10,
-                                    marginTop: 7,
-                                }}
-                            />
-                        </TouchableOpacity>
+                            style={{
+                                width: 40,
+                                height: 40,
+                                borderRadius: 10,
+                                marginTop: 7,
+                            }}
+                        />
 
                         <View style={{ marginLeft: 10 }}>
                             <Text style={{ fontSize: FONT_TITLE, fontWeight: "bold" }}>
@@ -227,7 +232,7 @@ const MyProfile = ({ navigation }) => {
                                 {bio ? bio : "Write your interest"}
                             </Text>
                         </View>
-                    </View>
+                    </TouchableOpacity>
 
                     <TouchableOpacity
                         onPress={() =>
@@ -363,7 +368,11 @@ const MyProfile = ({ navigation }) => {
                         gap: 2,
                     }}
                 >
+                    {/* This pill carried no onPress at all -- three buttons in
+                        a row and one of them dead. It leads to the wall, which
+                        is where your reels and posts actually live. */}
                     <TouchableOpacity
+                        onPress={() => navigation.navigate("MyWall")}
                         style={{
                             backgroundColor: '#3B82F6', // Tailwind blue-500
                             paddingHorizontal: 24,
@@ -381,7 +390,7 @@ const MyProfile = ({ navigation }) => {
                     >
                         <Text style={{
                             color: '#ffffff'
-                        }}>Reel</Text>
+                        }}>My Wall</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -433,6 +442,20 @@ const MyProfile = ({ navigation }) => {
 
                 <View style={{ padding: 5, marginBottom: 10 }}>
                     <View style={styles.dashboardContainer} >
+
+                        <TouchableOpacity
+                            style={styles.optionContainer}
+                            onPress={() => navigation.navigate("MyWall")}
+                        >
+                            <View style={[styles.leftSection, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                                <Ionicons name="albums" size={24} color="#000" style={styles.icon} />
+                                <View>
+                                    <Text style={styles.optionTitle}>My Wall</Text>
+                                    <Text style={styles.optionSubtitle}>Your posts, photos and reels</Text>
+                                </View>
+                            </View>
+                            <AntDesign name="right" size={18} color="silver" />
+                        </TouchableOpacity>
 
                         <TouchableOpacity
                             style={styles.optionContainer}

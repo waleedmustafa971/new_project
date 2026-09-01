@@ -237,9 +237,19 @@ const PostSection = ({ post: initialPost, navigation, userid }) => {
   };
 
   const handleProfile = (item) => {
-    // Alert.alert(item.userInfo.userid)
+    const authorid = item?.userInfo?.userid;
+    if (!authorid) return;
+    /*
+      Your own name led to UserProfile, the screen written for looking at
+      somebody else: a Follow button and a Message button pointed back at
+      yourself. Your own posts belong on your own wall.
+    */
+    if (String(authorid) === String(userid || "")) {
+      navigation.navigate("MyWall");
+      return;
+    }
     navigation.navigate("UserProfile", {
-      userid: item.userInfo.userid,
+      userid: authorid,
       name: item.userInfo.name,
       image: item.userInfo.image
     })
@@ -488,13 +498,17 @@ const PostSection = ({ post: initialPost, navigation, userid }) => {
               }}
               numberOfLines={expanded ? 0 : 2}
             >
-              {post.videoTitle}
+              {post.videoTitle || ''}
             </Text>
 
 
 
             {/* end share content */}
-            {post.videoTitle.length > 100 && (
+            {/* A reel posted from the camera carries no caption at all, and
+                reading `.length` off undefined took the whole list down with
+                "Cannot read property 'length' of undefined" the moment one
+                reached the wall. */}
+            {(post.videoTitle || '').length > 100 && (
               <TouchableOpacity onPress={() => setExpanded(!expanded)}>
                 <Text
                   style={{

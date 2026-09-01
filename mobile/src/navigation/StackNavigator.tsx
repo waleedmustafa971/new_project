@@ -50,6 +50,7 @@ import CreateStory from '../screens/social/story/create/CreateStory';
 import MusicShowPage from '../screens/social/music/MusicShowPage';
 
 import MyProfile from '../screens/social/profile/MyProfile';
+import MyWall from '../screens/social/profile/MyWall';
 import CameraReel from '../screens/social/reel/create/CameraReels';
 import CreateTemplate from '../screens/social/reel/template/CreateTemplate'
 import { RootStackParamList } from '../navigation/navigation';
@@ -393,6 +394,12 @@ export default function StackNavigator() {
         }} 
         
         />
+      {/* The personal wall — everything you have published, in one place.
+          Takes an optional `userid` param so it serves anyone's wall. */}
+      <Stack.Screen name="MyWall"
+        component={MyWall} options={{
+          headerShown: false
+        }} />
       <Stack.Screen name="CameraReel"
         component={CameraReel} options={{
           headerShown: false
