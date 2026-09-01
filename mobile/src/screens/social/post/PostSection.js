@@ -36,7 +36,7 @@ import ReportSheet from "./ReportSheet";
 import { FB } from "../../../theme/social";
 import ActionBar from "../../../component/social/Reactions";
 
-const PostSection = ({ post: initialPost, navigation, userid }) => {
+const PostSection = ({ post: initialPost, navigation, userid, onReactionChange }) => {
   // console.log('..get post data...' + post.userInfo.userid)
   const [post, setPost] = useState(initialPost); // <-- local state
   const dispatch = useDispatch();
@@ -434,6 +434,23 @@ const PostSection = ({ post: initialPost, navigation, userid }) => {
               The menu looked like moderation was on offer and did nothing at
               all. Every one of them has had a working endpoint for a while.
             */}
+            {/*
+              Save lives here, not on a row of its own under the action bar.
+
+              On the handset that extra row read as a fourth action competing
+              with Like / Comment / Share, and it left the bar looking
+              unbalanced -- three centred buttons with a stray left-aligned one
+              beneath them. Facebook keeps saving in this menu, which is also
+              where the other post-level actions already were.
+            */}
+            <TouchableOpacity
+              style={styles.menuRow}
+              onPress={() => { toggleDropdown(null); handleSavepost(post); }}
+            >
+              <Ionicons name="bookmark-outline" size={16} color="#374151" />
+              <Text style={styles.menuText}>Save post</Text>
+            </TouchableOpacity>
+
             <TouchableOpacity style={styles.menuRow} onPress={openReport}>
               <Ionicons name="flag-outline" size={16} color="#B42318" />
               <Text style={[styles.menuText, { color: '#B42318' }]}>Report</Text>
@@ -553,19 +570,26 @@ const PostSection = ({ post: initialPost, navigation, userid }) => {
           initialCounts={reactions.counts}
           initialTotal={reactions.total}
           initialMine={reactions.myReaction}
-          onChanged={setReactions}
+          onChanged={(summary) => {
+            setReactions(summary);
+            /*
+              Tell the list, not just this card.
+
+              FlatList recycles rows: scroll a post out of view and back and the
+              card is re-created from the array the screen is holding, which
+              still carries the reaction summary from when the page was
+              fetched. Local state alone therefore looked right until you
+              scrolled -- react with Love, scroll past, come back, and the
+              button had snapped to Like again while the server happily held
+              the Love. Only the owner of the data can fix that, so the change
+              is handed up to whoever passed the post in.
+            */
+            onReactionChange?.(post._id, summary);
+          }}
           onComment={() => handleComment(post)}
           onShare={() => shareHandle(post)}
         />
 
-        <TouchableOpacity
-          style={styles.saveRow}
-          onPress={() => handleSavepost(post)}
-          activeOpacity={0.6}
-        >
-          <Ionicons name="bookmark-outline" size={16} color={FB.textSecondary} />
-          <Text style={styles.saveText}>Save</Text>
-        </TouchableOpacity>
       </View>
       {
         showComments ?
@@ -614,6 +638,7 @@ const styles = StyleSheet.create({
     backgroundColor: FB.surface,
     marginBottom: FB.card.gap,
     paddingTop: FB.card.padding,
+    paddingBottom: 4,
   },
   header: {
     flexDirection: 'row',
@@ -634,16 +659,6 @@ const styles = StyleSheet.create({
   metaText: { ...FB.font.meta },
   metaDot: { ...FB.font.meta, marginHorizontal: 4 },
 
-  saveRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    alignSelf: 'flex-start',
-    paddingHorizontal: FB.card.padding,
-    paddingBottom: 10,
-    paddingTop: 2,
-  },
-  saveText: { ...FB.font.meta, fontWeight: '600' },
 
   /* Follow control — one pill, two states. Sized so the row height does not
      jump when it flips between them. */

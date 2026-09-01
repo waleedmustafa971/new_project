@@ -40,6 +40,7 @@ import VolumeBar from "./VolumeBar";
 import VolumeVisualizer from "./VolumeVisualizer";
 import { useUser } from "../../../context/UserContext";
 import api from "../../../../component/api";
+import { FB } from "../../../../theme/social";
 
 const CreatePost = ({ navigation }) => {
   const { user, setUserData, logout } = useUser();  
@@ -73,6 +74,15 @@ const CreatePost = ({ navigation }) => {
   const [isloading, setIsloading] = useState(false);
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
   const [textAlign, setTextAlign] = useState('left');
+  /*
+    Text styling is collapsed behind an "Aa" button.
+
+    Alignment, size and colour used to be three permanent rows of a settings
+    form stacked under the input -- the first thing you saw when you went to
+    write something was a control panel. They are options, not the task, so
+    they live behind one toggle now and the writing surface gets the screen.
+  */
+  const [showTextStyle, setShowTextStyle] = useState(false);
 
   const colorsdata = [
     "#000000", // Black
@@ -380,112 +390,149 @@ const playMusicFromChild = (item) => {
     }
   };
 
+  /* A gradient is "chosen" only when it is not the default white-on-white. */
+  const hasBackground =
+    Array.isArray(bgFontColor) && bgFontColor[0] !== "#ffffff";
+  const canPost = !!text.trim() || selectedMedia?.length > 0;
+
+  const audience = visibility === "Public"
+    ? { icon: "earth", label: "Public" }
+    : { icon: "lock-closed", label: "Only me" };
+
+  const avatarUri = user?.image
+    ? (/^(https?:|file:|data:)/.test(user.image)
+        ? user.image
+        : `${base.BASE_URL}/${String(user.image).replace(/^\/+/, "")}`)
+    : null;
+
   return (
-    <SafeAreaProvider>
-      {/* Top Menu */}
-      <View
-        style={{
-          flexDirection: 'row', alignItems: 'center',
-          justifyContent: 'space-between', padding: 5,
-          backgroundColor: '#ffffff'
-        }}>
+    <SafeAreaProvider style={{ flex: 1, backgroundColor: FB.surface }}>
+      {/*
+        A Facebook composer, not a settings form.
+
+        What was here was a stack of labelled rows -- Text Alignment, Font
+        Size, Background Color, Font Color, "Who can see the reel?", then four
+        more rows of actions -- every one of them permanently expanded. Writing
+        a post meant scrolling past a control panel to find the box.
+
+        The shape now is Facebook's: a header with one primary button, who you
+        are and who can see it, the writing surface, and the options as a sheet
+        at the foot of the screen.
+      */}
+      <View style={styles.topBar}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
-          style={{ flexDirection: 'row', alignItems: 'center' }}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Ionicons name="arrow-back" size={24} color="black"
-            style={{ marginRight: 5 }} />
-          <Text style={{ fontSize: 16 }}>Create Post</Text>
-          <Text style={{ marginLeft: 8 }}>
-            {selectedFeeling?.emoji} {selectedFeeling?.label}
-          </Text>
-
+          <Ionicons name="close" size={26} color={FB.text} />
         </TouchableOpacity>
 
-        {playingId ? (
-          <View style={styles.container}>
-            <Text style={styles.text} numberOfLines={1}>
-              {playingId.length > 18 ? playingId.substring(0, 18) + "..." : playingId}
-            </Text>
+        <Text style={styles.topTitle}>Create post</Text>
 
-            <TouchableOpacity style={styles.button} onPress={StopParentSound}>
-              <Ionicons
-                name={playingId ? "pause" : "play"}
-                size={20}
-                color={parentsoundstopStatus ? "red" : "black"}
-              />
-            </TouchableOpacity>
-          </View>
-        ) : null}
-
-        {/* Right side: Next button */}
         {isloading ? (
-          <ActivityIndicator />
+          <ActivityIndicator color={FB.primary} />
         ) : (
-          <TouchableOpacity onPress={() => postSave()}>
-            <Text style={{
-              fontSize: 16, color: 'blue', marginRight: 7
-            }}>Next</Text>
+          /* One primary action, and it says what it does. "Next" implied a
+             second step that does not exist -- this posts. */
+          <TouchableOpacity
+            onPress={() => postSave()}
+            disabled={!canPost}
+            style={[styles.postBtn, !canPost && styles.postBtnOff]}
+            activeOpacity={0.85}
+          >
+            <Text style={[styles.postBtnText, !canPost && styles.postBtnTextOff]}>
+              Post
+            </Text>
           </TouchableOpacity>
         )}
       </View>
 
-      {/* Text Editor */}
       <ScrollView
-        style={{
-          borderWidth: 0,
-          borderColor: "#000",
-          overflow: "hidden",
-        }}
+        style={{ flex: 1 }}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ paddingBottom: 12 }}
       >
-        <View
-          style={{
-            borderWidth: 0,
-            borderColor: "#df1b1b", flexDirection: 'row',
-            alignItems: 'flex-start'
-          }}
-        >
-          <LinearGradient
-            colors={bgFontColor} // This should be an array like ['#ff7e5f', '#feb47b']
-            style={{
-              flex: 1,
-              marginLeft: 0,
-              padding: 2,
-              height: 150,
-            }}
-          >
+        {/* Who is posting, and who can see it. The audience was a row at the
+            bottom of the form labelled "Who can see the reel?" -- on a post. */}
+        <View style={styles.identity}>
+          <Image
+            source={avatarUri ? { uri: avatarUri } : require("../../../../assets/user.png")}
+            style={styles.identityAvatar}
+          />
+          <View style={{ marginLeft: 10 }}>
+            <View style={styles.identityNameRow}>
+              <Text style={styles.identityName} numberOfLines={1}>
+                {user?.name || "You"}
+              </Text>
+              {selectedFeeling?.label ? (
+                <Text style={styles.identityFeeling} numberOfLines={1}>
+                  {" is feeling "}{selectedFeeling.emoji} {selectedFeeling.label}
+                </Text>
+              ) : null}
+            </View>
+
+            <TouchableOpacity
+              style={styles.audienceChip}
+              onPress={() =>
+                setVisibility((prev) => (prev === "Public" ? "Private" : "Public"))
+              }
+              activeOpacity={0.7}
+            >
+              <Ionicons name={audience.icon} size={12} color={FB.textSecondary} />
+              <Text style={styles.audienceText}>{audience.label}</Text>
+              <Ionicons name="caret-down" size={10} color={FB.textSecondary} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* The writing surface. On a colour it centres and grows, the way a
+            Facebook background post does; on white it is a plain tall field. */}
+        {hasBackground ? (
+          <LinearGradient colors={bgFontColor} style={styles.canvas}>
             <TextInput
               ref={inputRef}
               value={text}
               onChangeText={setText}
               multiline
-              style={{
-                flexDirection: 'row', color: 'black',
-                color: fontColor,
-                fontSize,
-                fontFamily,
-                textAlignVertical: "top",
-                textAlign: textAlign, // <- dynamically set
-                padding: 12,
-              }}
-              placeholder="what is in your mind ?"
-              placeholderTextColor="#aaa"
+              style={[
+                styles.canvasInput,
+                { color: fontColor, fontSize: Math.max(fontSize, 22), textAlign: "center" },
+              ]}
+              placeholder="What's on your mind?"
+              placeholderTextColor="rgba(255,255,255,0.85)"
             />
           </LinearGradient>
-        </View>
+        ) : (
+          <TextInput
+            ref={inputRef}
+            value={text}
+            onChangeText={setText}
+            multiline
+            style={[
+              styles.plainInput,
+              { color: fontColor === "#ffffff" ? FB.text : fontColor, fontSize: Math.max(fontSize, 18), textAlign },
+            ]}
+            placeholder="What's on your mind?"
+            placeholderTextColor={FB.textTertiary}
+          />
+        )}
 
-        {/* Picture and Video  */}
+        {/* Music, if one is attached — it was a floating strip in the header. */}
+        {playingId ? (
+          <View style={styles.musicChip}>
+            <Ionicons name="musical-notes" size={15} color={FB.primary} />
+            <Text style={styles.musicChipText} numberOfLines={1}>{playingId}</Text>
+            <TouchableOpacity onPress={StopParentSound} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="close-circle" size={18} color={FB.textSecondary} />
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
         {selectedMedia?.length > 0 && (
-          <View
-            style={{
-              height: 180,
-            }}
-          >
+          <View style={{ paddingHorizontal: 8 }}>
             {/* scrollEnabled={false} because the composer's ScrollView is the
                 scroller here — which is also what stops React Native warning
-                that a VirtualizedList is nested inside a plain ScrollView.
-                It is at most four thumbnails, so nothing is lost by rendering
-                them all and letting the page scroll. */}
+                that a VirtualizedList is nested inside a plain ScrollView. */}
             <FlatList
               data={selectedMedia.slice(0, 4)}
               keyExtractor={(item, index) => index.toString()}
@@ -494,211 +541,149 @@ const playMusicFromChild = (item) => {
               renderItem={(props) =>
                 renderMediaItem(props, selectedMedia, setSelectedMedia)
               }
-              contentContainerStyle={{ padding: 5 }}
             />
           </View>
         )}
 
-        {/* End */}
-        <View style={{
-          width: '100%', padding: 10, marginTop: 15
-        }}>
-          <View style={{
-            flexDirection: 'row', justifyContent: 'space-between'
-          }}>
-            <Text style={{
-              fontSize: 14, marginBottom: 5
-            }}>Text Alignment</Text>
+        {/* Background swatches. Hidden once there is media, because a coloured
+            background behind a photo is not a thing Facebook offers and the
+            two settings fight each other. */}
+        {!selectedMedia?.length && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.swatchRow}
+            contentContainerStyle={{ paddingHorizontal: 12, alignItems: "center" }}
+          >
+            {/* "Aa" clears back to plain — there was no way to undo picking a
+                colour once you had. */}
+            <TouchableOpacity
+              onPress={() => { setBgFontColor(["#ffffff", "#ffffff"]); setFontColor("#000"); }}
+              style={[styles.swatchPlain, !hasBackground && styles.swatchOn]}
+            >
+              <Text style={styles.swatchAa}>Aa</Text>
+            </TouchableOpacity>
 
-            <View style={{
-              flexDirection: 'row'
-            }}>
-              <TouchableOpacity style={{
-                marginRight: 10
-              }} onPress={() => setTextAlign('left')}>
-                <MaterialCommunityIcons
-                  name="format-align-left"
-                  size={24}
-                  color="black"
-                />
-              </TouchableOpacity>
+            {gradients?.map((g, i) => {
+              const on = String(bgFontColor) === String(g);
+              return (
+                <TouchableOpacity
+                  key={i}
+                  onPress={() => { setBgFontColor(g); setFontColor("#ffffff"); }}
+                  style={[styles.swatch, on && styles.swatchOn]}
+                >
+                  <LinearGradient colors={g} style={styles.swatchFill} />
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        )}
 
-              <TouchableOpacity style={{
-                marginRight: 10
-              }} onPress={() => setTextAlign('center')}>
-                <MaterialCommunityIcons
-                  name="format-align-center"
-                  size={24}
-                  color="black"
-                />
-              </TouchableOpacity>
+        {/* Text styling, behind one button instead of three permanent rows. */}
+        <TouchableOpacity
+          style={styles.styleToggle}
+          onPress={() => setShowTextStyle((v) => !v)}
+          activeOpacity={0.7}
+        >
+          <MaterialCommunityIcons name="format-color-text" size={18} color={FB.textSecondary} />
+          <Text style={styles.styleToggleText}>Text style</Text>
+          <Ionicons
+            name={showTextStyle ? "chevron-up" : "chevron-down"}
+            size={16}
+            color={FB.textSecondary}
+          />
+        </TouchableOpacity>
 
-              <TouchableOpacity style={{
-                marginRight: 10
-              }} onPress={() => setTextAlign('right')}>
-                <MaterialCommunityIcons
-                  name="format-align-right"
-                  size={24}
-                  color="black"
-                />
+        {showTextStyle && (
+          <View style={styles.stylePanel}>
+            <View style={styles.styleRow}>
+              <Text style={styles.styleLabel}>Alignment</Text>
+              <View style={{ flexDirection: "row", gap: 6 }}>
+                {[
+                  ["left", "format-align-left"],
+                  ["center", "format-align-center"],
+                  ["right", "format-align-right"],
+                  ["justify", "format-align-justify"],
+                ].map(([value, icon]) => (
+                  <TouchableOpacity
+                    key={value}
+                    onPress={() => setTextAlign(value)}
+                    style={[styles.styleBtn, textAlign === value && styles.styleBtnOn]}
+                  >
+                    <MaterialCommunityIcons
+                      name={icon}
+                      size={19}
+                      color={textAlign === value ? FB.primary : FB.textSecondary}
+                    />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
 
-              </TouchableOpacity>
+            <View style={styles.styleRow}>
+              <Text style={styles.styleLabel}>Size</Text>
+              <VolumeVisualizer onChange={setFontSize} />
+            </View>
 
-              <TouchableOpacity style={{
-                marginRight: 10
-              }} onPress={() => setTextAlign('justify')} >
-                <MaterialCommunityIcons
-                  name="format-align-justify"
-                  size={24}
-                  color="black"
-                />
-              </TouchableOpacity>
+            <View style={[styles.styleRow, { alignItems: "center" }]}>
+              <Text style={styles.styleLabel}>Colour</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ alignItems: "center" }}
+              >
+                {colorsdata?.map((color) => (
+                  <TouchableOpacity
+                    key={color}
+                    onPress={() => setFontColor(color)}
+                    style={[
+                      styles.colorDot,
+                      { backgroundColor: color },
+                      fontColor === color && styles.colorDotOn,
+                    ]}
+                  />
+                ))}
+              </ScrollView>
             </View>
           </View>
-        </View>
-     {/*    <View style={{
-          width: '100%', padding: 10, flexDirection: 'row', justifyContent: 'space-between'
-        }}>
-          <Text className="text-sm font-medium">Font Size</Text>
-         <VolumeBar onChange={setFontSize} />
-        </View>
- */}
-        <View style={{
-          width: '100%', padding: 10, flexDirection: 'row', justifyContent: 'space-between'
-        }}>
-          <Text className="text-sm font-medium">Font Size</Text>
-         <VolumeVisualizer onChange={setFontSize} />
-        </View>
+        )}
 
-        <View style={{ flexDirection: 'row', padding: 10 }}>
-          <View
-            style={{
-              width: "40%",
-            }}
-          >
-            <Text style={{
-              fontSize: 14, marginTop: 5
-            }}>Background Color</Text>
-          </View>
-          <View
-            style={{
-              width: "60%",
-            }}
-          >
-            <ScrollView
-              horizontal={true}
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{
-                paddingHorizontal: 5,
-                justifyContent: "flex-end",
-                flexDirection: "row",
-              }}
-            >
-              {gradients?.map((colorss, index) => (
-                <TouchableOpacity
-                  key={index}
-                  onPress={() => setBgFontColor(colorss)}
-                  style={{
-                    width: 30,
-                    height: 30,
-                    borderRadius: 15,
-                    overflow: "hidden",
-                    borderWidth:
-                      fontColor?.toString() === colorss.toString() ? 3 : 1,
-                    borderColor:
-                      fontColor?.toString() === colorss.toString()
-                        ? "#000"
-                        : "#ccc",
-                    marginHorizontal: 4,
-                  }}
-                >
-                  <LinearGradient
-                    colors={colorss}
-                    style={{ flex: 1, borderRadius: 15 }}
-                  />
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </View>
-        <View style={{
-          padding: 10, width: '100%', flexDirection: 'row'
-        }}>
-          <View style={{ width: "40%" }}>
-            <Text className="text-sm font-medium mt-2">Font Color</Text>
-          </View>
-          <View
-            style={{
-              width: "60%",
-            }}
-          >
-            <ScrollView
-              horizontal={true}
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{
-                paddingHorizontal: 5,
-                justifyContent: "flex-end",
-                marginRight: 3,
-                flexDirection: "row",
-              }}
-            >
-              {colorsdata?.map((color) => (
-                <TouchableOpacity
-                  key={color.toString()}
-                  onPress={() => setFontColor(color)}
-                  style={{
-                    backgroundColor: color,
-                    width: 30,
-                    height: 30,
-                    marginRight: 5,
-                    borderRadius: 15,
-                    borderWidth: fontColor === color ? 3 : 1,
-                    borderColor: fontColor === color ? "#000" : "#ccc",
-                  }}
-                />
-              ))}
-            </ScrollView>
-          </View>
-        </View>
-        <View
-          style={{
-            padding: 10,
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}
-        >
-          <Text style={{ fontSize: 14 }}>Who can see the reel?</Text>
+      </ScrollView>
+      {/* The options sheet. Same four actions, but as a card with coloured
+          icons rather than four bare label/icon rows floating on white. */}
+      <View style={styles.sheet}>
+        <View style={styles.sheetGrabber} />
+        {actions.map(({ icon, label, lib: Icon }, idx) => {
+          const tint = {
+            "Photo": "#45BD62",
+            "Tag People": FB.primary,
+            "Feeling/Activity": "#F7B928",
+            "Music": "#8B5CF6",
+          }[label] || FB.textSecondary;
 
-          <TouchableOpacity
-            onPress={() => {
-              setVisibility((prev) =>
-                prev === "Public" ? "Private" : "Public"
-              );
-            }}
-          >
-            <Text style={{ color: 'gray', fontWeight: '600' }}>{visibility}</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={{ width: '100%', padding: 10 }}>
-          {actions.map(({ icon, label, lib: Icon, color }, idx) => (
+          return (
             <TouchableOpacity
               key={idx}
-              onPress={() => {
-                checkType(label);
-              }}
-              style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between', marginBottom: 23
-              }}
+              onPress={() => checkType(label)}
+              style={styles.sheetRow}
+              activeOpacity={0.6}
             >
-              <Text className="text-sm font-medium">{label}</Text>
-              <Icon name={icon} size={20} className={color} />
+              <View style={[styles.sheetIcon, { backgroundColor: `${tint}1A` }]}>
+                <Icon name={icon} size={17} color={tint} />
+              </View>
+              <Text style={styles.sheetLabel}>
+                {label === "Photo" ? "Photo/video" : label}
+              </Text>
+              {label === "Photo" && selectedMedia?.length > 0 ? (
+                <Text style={styles.sheetCount}>{selectedMedia.length}</Text>
+              ) : null}
+              {label === "Tag People" && taggedUsers?.length > 0 ? (
+                <Text style={styles.sheetCount}>{taggedUsers.length}</Text>
+              ) : null}
             </TouchableOpacity>
-          ))}
-        </View>
-      </ScrollView>
+          );
+        })}
+      </View>
 
       <Modal visible={showPickerfeeling}>
         {/*   <FeelingPicker
@@ -736,6 +721,175 @@ const playMusicFromChild = (item) => {
   );
 };
 const styles = StyleSheet.create({
+  topBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: FB.divider,
+    backgroundColor: FB.surface,
+  },
+  topTitle: { ...FB.font.title, flex: 1, marginLeft: 14 },
+  postBtn: {
+    backgroundColor: FB.primary,
+    paddingHorizontal: 18,
+    height: 34,
+    borderRadius: FB.radius.md,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  /* Greyed rather than hidden: the button has to stay where it is so its
+     position does not jump the moment you type the first character. */
+  postBtnOff: { backgroundColor: FB.fill },
+  postBtnText: { color: FB.onPrimary, fontSize: 15, fontWeight: "700" },
+  postBtnTextOff: { color: FB.textTertiary },
+
+  identity: { flexDirection: "row", alignItems: "center", padding: 12 },
+  identityAvatar: {
+    width: FB.avatar.md, height: FB.avatar.md, borderRadius: FB.avatar.md / 2,
+    backgroundColor: FB.fill,
+  },
+  identityNameRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap" },
+  identityName: { ...FB.font.name, fontSize: 16 },
+  identityFeeling: { ...FB.font.meta, fontSize: 14, color: FB.text },
+  audienceChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    alignSelf: "flex-start",
+    marginTop: 4,
+    paddingHorizontal: 8,
+    height: 24,
+    borderRadius: FB.radius.sm,
+    backgroundColor: FB.fill,
+  },
+  audienceText: { ...FB.font.meta, fontSize: 12, fontWeight: "600" },
+
+  canvas: {
+    minHeight: 300,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 24,
+    paddingVertical: 32,
+  },
+  canvasInput: { width: "100%", fontWeight: "700", textAlignVertical: "center" },
+  plainInput: {
+    minHeight: 150,
+    paddingHorizontal: 14,
+    paddingTop: 4,
+    textAlignVertical: "top",
+    lineHeight: 24,
+  },
+
+  musicChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginHorizontal: 12,
+    marginTop: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: FB.radius.md,
+    backgroundColor: FB.primarySoft,
+  },
+  musicChipText: { ...FB.font.meta, color: FB.text, flex: 1 },
+
+  swatchRow: { paddingVertical: 12 },
+  swatch: {
+    width: 34, height: 34, borderRadius: 8,
+    marginRight: 8, overflow: "hidden",
+    borderWidth: 1, borderColor: FB.divider,
+  },
+  swatchFill: { flex: 1 },
+  swatchPlain: {
+    width: 34, height: 34, borderRadius: 8, marginRight: 8,
+    alignItems: "center", justifyContent: "center",
+    borderWidth: 1, borderColor: FB.divider, backgroundColor: FB.surface,
+  },
+  swatchAa: { fontSize: 13, fontWeight: "700", color: FB.text },
+  swatchOn: { borderWidth: 2, borderColor: FB.primary },
+
+  styleToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginHorizontal: 12,
+    paddingVertical: 10,
+  },
+  styleToggleText: { ...FB.font.action, flex: 1 },
+  stylePanel: {
+    marginHorizontal: 12,
+    marginBottom: 8,
+    padding: 12,
+    borderRadius: FB.radius.lg,
+    backgroundColor: FB.page,
+  },
+  styleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+  styleLabel: { ...FB.font.meta, width: 76 },
+  styleBtn: {
+    width: 34, height: 30, borderRadius: FB.radius.sm,
+    alignItems: "center", justifyContent: "center",
+    backgroundColor: FB.surface,
+  },
+  styleBtnOn: { backgroundColor: FB.primarySoft },
+  colorDot: {
+    width: 26, height: 26, borderRadius: 13, marginRight: 8,
+    borderWidth: 1, borderColor: FB.divider,
+  },
+  colorDotOn: { borderWidth: 3, borderColor: FB.primary },
+
+  /*
+    Pinned to the bottom edge, outside the scroller.
+
+    Inside it, the sheet floated wherever the content happened to end -- on an
+    empty composer that left it stranded halfway up the screen with white
+    below it. A sheet is a bottom-anchored surface or it is just a card.
+  */
+  sheet: {
+    paddingTop: 8,
+    paddingBottom: 6,
+    borderTopLeftRadius: FB.radius.xl,
+    borderTopRightRadius: FB.radius.xl,
+    backgroundColor: FB.surface,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: FB.divider,
+    elevation: 6,
+    shadowColor: "#000",
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: -2 },
+  },
+  sheetGrabber: {
+    alignSelf: "center",
+    width: 40, height: 4, borderRadius: 2,
+    backgroundColor: FB.divider,
+    marginBottom: 8,
+  },
+  sheetRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  sheetIcon: {
+    width: 32, height: 32, borderRadius: 16,
+    alignItems: "center", justifyContent: "center",
+  },
+  sheetLabel: { ...FB.font.body, flex: 1, fontWeight: "500" },
+  sheetCount: {
+    ...FB.font.meta,
+    fontWeight: "700",
+    color: FB.primary,
+  },
+
   container: {
     transform: [{ translateX: 0.5 * 100 }], // You may need to tweak this
     zIndex: 10,

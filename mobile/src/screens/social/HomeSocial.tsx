@@ -122,6 +122,22 @@ const HomeSocial = () => {
     }
   };
 
+  /*
+    A reaction, written back into the list's own data.
+
+    Without this the card's state is the only record, and FlatList throws that
+    away every time the row is recycled.
+  */
+  const applyReaction = useCallback((postId: string, summary: any) => {
+    setGetpost((prev) =>
+      prev.map((p: any) =>
+        String(p._id) === String(postId)
+          ? { ...p, reactions: summary, likes: summary?.total ?? p.likes }
+          : p
+      )
+    );
+  }, []);
+
   const renderData = useMemo(() => {
     const result: any = [];
     let sponsorIndex = 0;
@@ -249,7 +265,14 @@ const HomeSocial = () => {
           renderItem={({ item }) => {
             switch (item.type) {
               case 'post':
-                return <PostSection post={item.data} navigation={navigation} userid={userid} />;
+                return (
+                  <PostSection
+                    post={item.data}
+                    navigation={navigation}
+                    userid={userid}
+                    onReactionChange={applyReaction}
+                  />
+                );
               case 'sponsor':
                 const randomIndex = Math.floor(Math.random() * sponsorAds.length);
                 return <SponsorScreen ad={sponsorAds[randomIndex]} />;

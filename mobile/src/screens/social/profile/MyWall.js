@@ -478,9 +478,25 @@ const MyWall = () => {
     );
   };
 
+  /* Same recycling problem as the timeline: the wall is a FlatList too. */
+  const applyReaction = useCallback((postId, summary) => {
+    setItems((prev) =>
+      prev.map((p) =>
+        String(p._id) === String(postId)
+          ? { ...p, reactions: summary, likes: summary?.total ?? p.likes }
+          : p
+      )
+    );
+  }, []);
+
   const renderCard = ({ item }) => (
     <View>
-      <PostSection post={item} navigation={navigation} userid={viewerId} />
+      <PostSection
+        post={item}
+        navigation={navigation}
+        userid={viewerId}
+        onReactionChange={applyReaction}
+      />
       {isMine ? (
         <TouchableOpacity
           style={styles.deleteChip}
