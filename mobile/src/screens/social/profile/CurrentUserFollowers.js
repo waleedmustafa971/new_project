@@ -111,6 +111,19 @@ const CurrentUserFollowers = () => {
         setFollowedUsersing((prev) => [...prev, followId]);
     };
 
+    /*
+      Open the person.
+
+      Every row here offered Follow and nothing else -- no way to look at
+      somebody before deciding to follow them, which is the one thing you want
+      from a list of strangers. Tapping the name or avatar opens their wall, the
+      same as tapping a name anywhere else in the app.
+      */
+    const openProfile = (item) => {
+      if (!item?._id) return;
+      navigation.navigate("MyWall", { userid: item._id });
+    };
+
     const renderItemusers = ({ item }) => (
         <View style={styles.friendContainer}>
             {item.image == null ? (
@@ -141,10 +154,14 @@ const CurrentUserFollowers = () => {
                     style={styles.avatar}
                 />
             )}
-            <View style={{ flex: 1 }}>
+            <TouchableOpacity
+                style={{ flex: 1 }}
+                onPress={() => openProfile(item)}
+                activeOpacity={0.7}
+            >
                 <Text style={styles.name}>{item.name}</Text>
-                <Text style={styles.subname}>People you may know</Text>
-            </View>
+                <Text style={styles.subname}>Follows you</Text>
+            </TouchableOpacity>
             <TouchableOpacity
                 //style={styles.addButton}
                 style={[

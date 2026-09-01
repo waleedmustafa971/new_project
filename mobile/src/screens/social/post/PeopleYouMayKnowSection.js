@@ -91,17 +91,33 @@ const PeopleYouMayKnowSection = ({ navigation }) => {
     setFollowedUsers((prev) => (prev.includes(followId) ? prev : [...prev, followId]));
   };
 
+  /*
+    Open the person.
+
+    The only touchable on this card was Follow, so the whole point of a
+    suggestion -- go and look at them, then decide -- was missing: you could
+    follow a stranger but not see a single thing they had posted first. The
+    avatar and the name open their wall, which is what tapping a person does
+    everywhere else in the app.
+  */
+  const openProfile = (item) => {
+    if (!item?._id) return;
+    navigation.navigate("MyWall", { userid: item._id });
+  };
+
   const renderItem = ({ item }) => (
     <View style={styles.card}>
-      <Image
-        source={
-          item.image ? { uri: base.BASE_URL + '/' +item.image } : require("../../../assets/user.png")
-        }
-        style={styles.avatar}
-      />
-      <Text style={styles.name} numberOfLines={1}>
-        {item.name} 
-      </Text>
+      <TouchableOpacity onPress={() => openProfile(item)} activeOpacity={0.75}>
+        <Image
+          source={
+            item.image ? { uri: base.BASE_URL + '/' +item.image } : require("../../../assets/user.png")
+          }
+          style={styles.avatar}
+        />
+        <Text style={styles.name} numberOfLines={1}>
+          {item.name}
+        </Text>
+      </TouchableOpacity>
       <Text style={styles.mutual}>People you may know</Text>
       <TouchableOpacity
         style={[
@@ -110,6 +126,7 @@ const PeopleYouMayKnowSection = ({ navigation }) => {
         ]}
         onPress={() => handleFollow(item._id)}
         disabled={followedUsers.includes(item._id)}
+        activeOpacity={0.85}
       >
         <Text style={styles.addText}>
           {followedUsers.includes(item._id) ? "Following" : "Follow"}

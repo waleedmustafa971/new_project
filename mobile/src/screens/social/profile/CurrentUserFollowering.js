@@ -99,16 +99,30 @@ const CurrentUserFollowering = () => {
         setFollowedUsersing((prev) => [...prev, followId]);
     };
 
+    /*
+      Open the person. Every row here offered Follow and nothing else -- no way
+      to look at somebody before deciding, which is the one thing you want from
+      a list of people. Same behaviour as tapping a name anywhere else.
+    */
+    const openProfile = (item) => {
+        if (!item?._id) return;
+        navigation.navigate("MyWall", { userid: item._id });
+    };
+
     const renderItemUsers = ({ item }) => (
         <View style={styles.friendContainer}>
             <Image
                 source={item.image ? { uri: item.image } : require("../../../assets/user.png")}
                 style={styles.avatar}
             />
-            <View style={{ flex: 1 }}>
+            <TouchableOpacity
+                style={{ flex: 1 }}
+                onPress={() => openProfile(item)}
+                activeOpacity={0.7}
+            >
                 <Text style={styles.name}>{item.name}</Text>
-                <Text style={styles.subname}>People you may know</Text>
-            </View>
+                <Text style={styles.subname}>You follow them</Text>
+            </TouchableOpacity>
             <TouchableOpacity
                 style={[
                     styles.addButton,
